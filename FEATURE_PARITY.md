@@ -10,12 +10,12 @@ No claim of full Android parity is made.
 | Native Compose desktop window / navigation | Verified | Packaged window started in Windows Server 2025 run 37940753717; consumer Windows interaction/DPI still pending |
 | Home / Explore | Partial | Real local recents, added tracks, favorites, albums/artists; provider feed blocked |
 | Search | Partial | Local title/artist/album search; online search blocked |
-| Library / favorites / history | Partial | Implemented with persisted local state; test execution pending |
+| Library / favorites / history | Partial | Implemented with persisted local state; coordinator/storage tests pass, interactive UI checks pending |
 | Playlists create/rename/delete/add/remove/move | Partial | Local playlists and duplicates; remote sync blocked |
 | Album / artist detail | Partial | Groups imported tagged music; no remote detail pages |
-| Now Playing / mini player / volume / seek | Partial | JavaFX real media pipeline; hardware smoke pending |
+| Now Playing / mini player / volume / seek | Partial | Packaged WAV integration passed play/pause/seek/resume in run 37941765127; physical controls/volume checks pending |
 | Queue / repeat / shuffle / duplicates | Verified | Domain and coordinator tests passed in run 37940753717; real device transitions remain pending |
-| Crossfade 0–12 seconds | Partial | Two-player equal-power local overlap at 1×; real output test pending |
+| Crossfade 0–12 seconds | Partial | Packaged real JavaFX two-player WAV crossfade passed in run 37941765127; timing/quality across formats remains partial |
 | Sample-accurate gapless / Automix beat/tempo transitions | Blocked | No beat analysis or time-stretch pipeline; not simulated |
 | Speed / equalizer / sleep timer | Partial | Actual JavaFX rate/equalizer and coroutine pause timer; device checks pending |
 | Lyrics | Partial | Local line/enhanced-word LRC, embedded text, click-to-seek; source word-growth timing reused but full animation not ported |

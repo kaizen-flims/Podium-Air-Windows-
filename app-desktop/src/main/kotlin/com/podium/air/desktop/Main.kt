@@ -20,6 +20,14 @@ fun main(args: Array<String>) {
     if (args.contains("--audio-smoke")) { audioSmoke(args); return }
     val smoke = args.contains("--ui-smoke")
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
+    if (smoke) {
+        store.directory.mkdirs()
+        val first = File(store.directory, "test-tone.wav"); generateTestWave(first, 1)
+        val second = File(store.directory, "second-tone.wav"); generateTestWave(second, 1)
+        val a = StoredTrack("smoke-a", first.absolutePath, "Generated test tone", "UI smoke fixture", "Test album", 1000)
+        val b = StoredTrack("smoke-b", second.absolutePath, "Second test tone", "UI smoke fixture", "Test album", 1000)
+        store.save(SavedState(library = listOf(a, b), playlists = listOf(Playlist(name = "Smoke playlist", tracks = listOf(a.id, b.id))), favorites = setOf(a.id), history = listOf(b.id, a.id)))
+    }
     val model = DesktopModel(JavaFxAudioEngine(), store)
     var tray: TrayIcon? = null
     application {
@@ -55,13 +63,13 @@ fun main(args: Array<String>) {
                     }.onFailure { model.message.value = "System tray is unavailable: ${it.message}" }
                 }
             }
-            PodiumApp(model, ::pick, onReady = {
+            PodiumApp(model, ::pick, smoke = smoke, onReady = {
                 if (smoke) {
                     // Start only after composition reaches content; captures render/runtime initialization failures.
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(2500)
                         val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                        File(result).writeText("PASS: Compose desktop window and navigation rendered.\n")
+                        File(result).writeText("PASS: Compose desktop window, all 14 navigation routes and populated playlist/album detail rendered.\n")
                         val png = args.firstOrNull { it.startsWith("--screenshot=") }?.substringAfter("=")
                         if (png != null) runCatching {
                             ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(png))

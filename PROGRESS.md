@@ -8,3 +8,6 @@
 - Initial Windows build failed on Gradle's java-extension name shadowing; corrected explicit ZipFile/File imports.
 - Commit 42911db passed unit checks, MSI/EXE packaging and packaged window startup in Windows Actions run 37940753717.
 - Expanded bundled notices with OpenJFX 21.0.9+1 native legal files and jaudiotagger LGPL, source bundles, dependency hashes and license selector. Adding a real-audio smoke attempt with explicit cloud-device blocker reporting.
+
+- Commit 2704a24 passed 18 tests, package startup, real WAV playback/pause/seek/crossfade, installer/portable/source packaging and notice/source collection in run 37941765127.
+- Added populated UI smoke traversal across all routes and playlist/album details; follow-up validation pending.

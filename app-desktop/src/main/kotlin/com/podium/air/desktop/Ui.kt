@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.music.bitchord.data.model.Song
 import com.podium.air.domain.RepeatMode
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Image as SkiaImage
 import java.awt.Desktop
@@ -67,7 +68,7 @@ private enum class Page(val title: String, val icon: ImageVector) {
 private data class Route(val page: Page = Page.HOME, val detail: String? = null, val title: String = page.title)
 
 @Composable
-fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, onReady: () -> Unit = {}) {
+fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean = false, onReady: () -> Unit = {}) {
     val state by model.state.collectAsState()
     val audio by model.engine.state.collectAsState()
     val message by model.message.collectAsState()
@@ -101,7 +102,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, onReady: () ->
                     Column(Modifier.weight(1f).fillMaxHeight()) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (route.detail != null) Control(Icons.Rounded.ArrowBack, "Back") { route = Route(route.page) }
-                            Text(route.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+                            Text(if (route.page == Page.PLAYLISTS && route.detail != null) state.playlists.find { it.id == route.detail }?.name ?: route.title else route.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (importing) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                             else {
                                 TextButton(onClick = { filePicker(false) }) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Import music") }
@@ -153,7 +154,16 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, onReady: () ->
             text = { OutlinedTextField(createName!!, { createName = it }, label = { Text("Playlist name") }, singleLine = true) },
             confirmButton = { TextButton({ model.createPlaylist(createName!!); createName = null }, enabled = !createName.isNullOrBlank()) { Text("Create") } },
             dismissButton = { TextButton({ createName = null }) { Text("Cancel") } })
-        LaunchedEffect(Unit) { onReady() }
+        LaunchedEffect(Unit) {
+            if (smoke) {
+                for (page in Page.entries) { route = Route(page); delay(300) }
+                val playlist = state.playlists.firstOrNull()
+                if (playlist != null) { route = Route(Page.PLAYLISTS, playlist.id, playlist.name); delay(300) }
+                state.library.firstOrNull()?.let { route = Route(Page.ALBUMS, it.album, it.album); delay(300) }
+                route = Route(Page.HOME); delay(300)
+            }
+            onReady()
+        }
     }
 }
 

@@ -1,60 +1,89 @@
 # Build report — 9 October 2026
 
-**Status: implementation prepared; Windows CI not yet verified. Not a finished
-Android-parity release.**
+**Native local-music preview: compiled, tested, packaged and started on Windows.
+Full Android feature parity is not complete.**
 
-Implemented code: Kotlin/Compose desktop UI and native shell, JavaFX audio
-engine, file/folder library, local playlists/favorites/history, atomic persistence,
-queue edits/repeat/shuffle, speed/EQ/sleep timer, local lyrics and two-player
-crossfade. Reused original domain and lyric code from source SHA
-48902e6b20fdcfeb1723e02d4744849e82d5067a.
+## Verified Windows build
 
-Authored tests cover duplicate queue identity, shuffle restoration, current
-selection across removal/reordering, repeat policies, lyric timing/entity parsing,
-state round-trip/recovery, missing references, WAV import, local LRC offsets,
-playback coordinator behavior and stale callbacks. Test execution is pending.
+Implementation commit: `2704a247037d20cf6d6003d5d51b9591dee39c6b`.
+Successful workflow:
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37941765127
 
-The current Linux workspace has JDK 17 but no cached Gradle/JDK 21/dependencies.
-Direct GitHub/Maven/Gradle downloads were unavailable under its network policy;
-repository content was accessed using the connected GitHub tools. Windows
-GitHub Actions is configured to run the actual build/tests and package/startup
-smoke. No compile or Windows runtime success is asserted until Actions returns.
+Download installer/portable/source artifact:
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37941765127/artifacts/11622980063
+
+Verification reports, screenshot, dependency inventory and runtime version:
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37941765127/artifacts/11622480374
+
+- `:shared-domain:check` and `:app-desktop:check`: **18 tests, zero failures/errors**.
+- Native `createDistributable`, `packageMsi`, `packageExe`: passed.
+- Packaged application startup: passed; actual Compose window rendered.
+- Packaged JavaFX audio smoke: **passed**. Generated PCM WAV playback advanced,
+  pause worked, seek reached 2 seconds, resume worked, and the two-player
+  crossfade entered a second queue entry and finished the overlap.
+- Source collection and notices: passed. Matching application source ZIP,
+  jaudiotagger/OpenJFX source JARs, full OpenJFX native source, native-library
+  license texts, dependency SHA256 inventory and package checksums included.
+
+Runner: Windows Server 2025 x64. JDK: Temurin 21.0.12+101.0. Kotlin 2.2.21,
+Compose 1.9.3, Gradle 8.14.3, OpenJFX 21.0.9. These are automated runtime/state
+checks, not a listening-quality or physical device hotplug assessment.
+
+The follow-up UI change adds automated traversal of all 14 screen routes plus
+populated playlist/album detail screens using actual generated WAV test files.
+It also improves long titles/renaming display and CI caching. Its validation is
+tracked by the next workflow run; no success is assumed ahead of execution.
+
+## Implementation
+
+Native Kotlin/Compose Desktop UI and AWT Windows shell; JavaFX native audio;
+local file/folder library and metadata/artwork; local playlists, favorites and
+history; atomic JSON persistence/recovery; duplicate-safe queue operations,
+repeat and reversible upcoming shuffle; play/pause/seek/volume/next/previous;
+speed, ten-band equalizer, sleep timer; local sidecar/embedded lyrics; two-player
+equal-power crossfade; light/dark source palette, original brand assets; native
+file chooser, tray and keyboard shortcuts. Original domain and lyrics code is
+reused from Android source SHA `48902e6b20fdcfeb1723e02d4744849e82d5067a`.
+
+Tests cover duplicate queue entries; removal/reordering while retaining current
+selection; repeat policies; reversible shuffle after additions/removals; word
+lyric timing/entity decoding; persistence round-trip/corruption recovery and
+missing references; generated WAV import and LRC offsets; playback coordinator
+commands, cleanup and stale end callbacks; crossfade queue handoff.
 
 ## Acceptance gates
 
-| Gate | State |
+| Gate | Result |
 |---|---|
-| A — source audit / legal reuse | Structural audit and reuse assessment recorded; runtime-native notice verification remains before public release |
-| B — native Windows startup | Pending packaged startup smoke |
-| C — audio plays/pauses/seeks/transitions | Engine implemented and coordinator tests authored; hardware smoke pending |
-| D — parity accurately tracked | FEATURE_PARITY.md records local preview and major blocked/missing integrations |
-| E — installable Windows CI artifact | Pending actual workflow success |
-| F — documentation, credits, reports | Prepared; final CI evidence to be appended |
+| A — source audit / reuse | Structural inventory and assessed reuse complete. GPL/AGPL/font/provider constraints documented; native notices and sources bundled. Full public-release dependency review remains |
+| B — native Windows startup | Passed packaged startup on Windows Server 2025; expanded navigation smoke added next |
+| C — audio plays/pauses/seeks/transitions | Passed packaged real JavaFX PCM WAV integration with crossfade; output quality and physical-device tests pending |
+| D — honest feature parity | FEATURE_PARITY.md identifies all major incomplete/blocked source features |
+| E — installable Windows CI artifact | Successful MSI/EXE/portable build and artifact upload verified |
+| F — handoff / documentation | README, audit, parity, credits/notices, matching source, progress log and draft PR #1 provided |
 
-Full streaming/account parity is blocked by the source's provider integration
-and the prompt's supported-API requirement. Automix requires separate AGPL
-reuse/decoder/model assessment. SMTC, hardware keys, device hotplug, performance,
-DPI, offline errors across real formats, runtime-native licenses, signing and
-installer install/uninstall behavior remain to be tested. No public release,
-main merge or auto-update has been performed.
+## Remaining constraints and release status
 
-## Recorded Windows evidence (initial working preview)
+YouTube Music streaming, Google login, remote playlists and bidirectional sync
+are blocked by the source's private API/extraction pipeline and the prompt's
+supported-provider requirement. The Account screen explicitly discloses this
+and opens the official service in the default browser; it does not invent sync.
+The first preview therefore uses the authorized local-playback baseline.
 
-Commit `42911db61e80261de1e7b57ea28fb89c1cabbc76` passed the Windows build:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37940753717
+Automix requires separate AGPL reuse, decoder/model and beat/tempo pipeline
+work. FLAC/Opus, animated canvas, translations/online lyric providers, remote
+network sources, Replay, scrobbling, Discord, Listen Together, SMTC, global
+media keys and notifications are not implemented. They are not advertised as
+working features. Source light/dark themes and branding are adapted, but full
+pixel/animation parity is not claimed; SF Pro fonts are not redistributed.
 
-Both `:shared-domain:check` and `:app-desktop:check` passed; Kotlin/Compose code
-compiled. `createDistributable`, `packageMsi` and `packageExe` completed. The
-packaged executable launched and wrote `PASS: Compose desktop window and
-navigation rendered.` A screenshot and test XML/HTML reports were uploaded.
-Runner: Windows Server 2025, x64; JDK Temurin 21.0.12+101.0. Windows 10/11
-consumer installation, UI interaction and audio device tests remain pending.
+Windows 10/11 client installation/uninstallation, 100/150/200% DPI, interactive
+keyboard/picker/tray checks, MP3/AIFF/M4A decoding, end-of-track across a large
+collection, audio-device changes, performance/memory/idle CPU and listening
+quality remain practical checks. Installers are unsigned; no code-signing
+credentials were supplied. They may show SmartScreen warnings.
 
-Initial package artifact:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37940753717/artifacts/11620239487
-
-This confirms build/startup/packaging gates, not audible output or complete
-feature parity. A follow-up commit adds full version-specific OpenJFX native
-notices, source bundles, a license selector, dependency inventory, Gradle
-distribution checksum and a default real-audio smoke attempt. Its CI result
-must be recorded separately before relying on the updated package.
+No merge to main, public release, Android changes or auto-update occurred.
+The connected GitHub tools were used to create the feature branch and PR;
+local dependency downloads were unavailable in the Linux workspace, so actual
+compilation, tests and target-platform verification ran on Windows Actions.

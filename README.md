@@ -9,7 +9,8 @@ Implemented: local-file/folder imports, metadata/artwork, Home, Search, Library,
 albums/artists, favorites, history, editable local playlists, queue management,
 repeat/shuffle, real JavaFX audio controls, 0–12s equal-power crossfade at 1×,
 sidecar/embedded lyrics, light/dark themes, speed, equalizer, sleep timer and tray.
-**Real audio/device verification is pending until recorded in BUILD_REPORT.md.**
+**Windows CI passes 18 tests, packaged startup, and a real WAV play/pause/seek/crossfade smoke.**
+Physical device and broader format checks remain; see [BUILD_REPORT.md](BUILD_REPORT.md).
 
 Google login, YouTube streaming/downloads and remote account sync are blocked
 by the supported-provider integration gate. Automix, FLAC/Opus, animated canvas,
@@ -35,7 +36,7 @@ license and device acceptance gates in [BUILD_REPORT.md](BUILD_REPORT.md) pass.
 
 [Windows native build workflows](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/workflows/windows.yml)
 produce `Podium-Air-Windows-x64`: MSI, EXE installer, portable ZIP, matching
-source ZIP and SHA256SUMS. A successful run is required; workflow configuration
+source ZIP, dependency source bundle and SHA256SUMS. A successful run is required; workflow configuration
 alone does not prove a package exists. Artifacts expire after 30 days.
 
 The `Windows-verification` artifact contains test reports and a startup screenshot.
