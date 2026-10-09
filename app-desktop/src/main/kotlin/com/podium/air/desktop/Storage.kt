@@ -78,9 +78,9 @@ class StateStore(val directory: File = defaultDataDirectory()) : StatePersistenc
 fun defaultDataDirectory(): File = File(System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home"), "PodiumAirWindows")
 fun formatTime(ms: Long): String { val seconds = ms.coerceAtLeast(0) / 1000; return "%d:%02d".format(seconds / 60, seconds % 60) }
 
-/** JavaFX baseline supports MP3, PCM WAV, AAC and M4A; no FLAC/Opus claim. */
+/** Native formats plus bounded, background FLAC/Opus-to-PCM preparation. */
 class LocalLibrary(private val directory: File = defaultDataDirectory()) {
-    val extensions = setOf("mp3", "wav", "aif", "aiff", "m4a")
+    val extensions = setOf("mp3", "wav", "aif", "aiff", "m4a", "flac", "opus", "ogg")
     fun import(files: List<File>): Pair<List<StoredTrack>, List<String>> {
         val failures = mutableListOf<String>()
         val tracks = files.distinctBy { it.canonicalPath }.mapNotNull { file ->

@@ -39,7 +39,7 @@ fun main(args: Array<String>) {
                 dialogTitle = if (folder) "Import music folder" else "Import music"
                 fileSelectionMode = if (folder) JFileChooser.DIRECTORIES_ONLY else JFileChooser.FILES_ONLY
                 isMultiSelectionEnabled = !folder
-                if (!folder) fileFilter = FileNameExtensionFilter("Supported audio (MP3, WAV, AIFF, M4A)", "mp3", "wav", "aif", "aiff", "m4a")
+                if (!folder) fileFilter = FileNameExtensionFilter("Supported audio (MP3, WAV, AIFF, M4A, FLAC, Opus)", "mp3", "wav", "aif", "aiff", "m4a", "flac", "opus", "ogg")
             }
             if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
                 model.importFiles(if (folder) listOf(chooser.selectedFile) else chooser.selectedFiles.toList(), folder)
@@ -85,8 +85,9 @@ fun main(args: Array<String>) {
 /** Optional hardware integration check. Fails explicitly if no usable audio output exists. */
 private fun audioSmoke(args: Array<String>) {
     val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "audio-smoke.txt")
-    val wave = File.createTempFile("podium-audio-", ".wav")
-    generateTestWave(wave, 6)
+    val supplied = args.firstOrNull { it.startsWith("--media=") }?.substringAfter("=")
+    val wave = supplied?.let(::File) ?: File.createTempFile("podium-audio-", ".wav")
+    if (supplied == null) generateTestWave(wave, 6)
     val engine = JavaFxAudioEngine()
     try {
         runBlocking {
@@ -107,10 +108,10 @@ private fun audioSmoke(args: Array<String>) {
             withTimeout(12000) { advanced.await() }
             engine.configure(Preferences(crossfadeSeconds = 1, volume = 0.5f))
             withTimeout(3000) { engine.state.first { it.entry?.key == next.key && it.playing && !it.fading } }
-            result.writeText("PASS: Generated PCM WAV played, paused, sought to 2s, resumed and crossfaded to a second queue entry.\n")
+            result.writeText("PASS: ${wave.extension.uppercase()} played, paused, sought to 2s, resumed and crossfaded to a second queue entry.\n")
         }
-    } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); engine.close(); FxRuntime.exit(); wave.delete(); exitProcess(1) }
-    engine.close(); FxRuntime.exit(); wave.delete(); exitProcess(0)
+    } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); engine.close(); FxRuntime.exit(); if (supplied == null) wave.delete(); exitProcess(1) }
+    engine.close(); FxRuntime.exit(); if (supplied == null) wave.delete(); exitProcess(0)
 }
 internal fun generateTestWave(file: File, seconds: Int) {
     val rate = 44100

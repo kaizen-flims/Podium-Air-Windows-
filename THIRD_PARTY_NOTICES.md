@@ -61,3 +61,11 @@ Every CI package artifact includes podium-air-windows-source.zip from exactly
 the packaged commit. Build scripts, tests, required resources and provenance
 are included. Use that commit to rebuild; see README.md. Dependency source
 locations above are provided for unmodified separately licensed libraries.
+
+## Additional local codecs
+
+- jFLAC 1.5.2 (`org.jflac:jflac-codec`) is dynamically loaded as a separate, replaceable JAR. Its project declares LGPL 2.1; individual source files also contain Library GPL 2-or-later and BSD notices. Full LGPL 2.1 and the upstream BSD notice are bundled under `licenses/jflac/`; the exact published sources are included in `dependency-sources.zip`. No codec source has been modified.
+- Concentus 1.0.2 (`io.github.jaredmdobson:concentus`) is the Java Opus implementation originally ported by Logan Stromberg. Its BSD-style notices and decoder copyright header are bundled under `licenses/concentus/`. The exact published source JAR and artifact-provided notices are collected beside each build. No native Opus binaries are used.
+- The Ogg container reader and PCM cache in this port are new GPL-3.0 code implementing RFC 3533 and RFC 7845. No code was extracted from the RFCs.
+
+FLAC above 16-bit is converted to 16-bit PCM because this JavaFX pipeline accepts 8/16-bit WAV. Opus is decoded at 48 kHz with header gain, pre-skip and final-granule trimming. Multichannel, chained Ogg streams and Ogg Vorbis are explicitly rejected rather than advertised as supported.

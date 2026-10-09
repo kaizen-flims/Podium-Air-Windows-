@@ -69,6 +69,26 @@ jobs:
               Get-Content $result
             } else { throw "Real audio integration failed: $failure" }
           }
+      - name: Verify packaged playback for each supported codec
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw 'Could not install the test-only media encoder' }
+          }
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $codecs = @{flac='flac'; opus='libopus'; mp3='libmp3lame'; m4a='aac'; aiff='pcm_s16be'}
+          foreach ($extension in @('flac', 'opus', 'mp3', 'm4a', 'aiff')) {
+            $media = Join-Path $PWD "fixture.$extension"
+            & ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=440:duration=6' -ac 1 -c:a $codecs[$extension] -y $media
+            if ($LASTEXITCODE -ne 0) { throw "Could not encode $extension fixture" }
+            $result = Join-Path $PWD "codec-$extension-smoke.txt"
+            $p = Start-Process -FilePath $exe -ArgumentList @('--audio-smoke', "--media=`"$media`"", "--result=`"$result`"") -PassThru
+            if (-not $p.WaitForExit(45000)) { $p.Kill(); throw "$extension smoke timed out" }
+            if (-not (Test-Path $result)) { throw "$extension process exited without a result" }
+            Get-Content $result
+            if ($p.ExitCode -ne 0) { throw "$extension integration failed" }
+          }
       - name: Summarize test and runtime evidence
         shell: pwsh
         run: |
@@ -117,6 +137,7 @@ jobs:
             ui-smoke.txt
             ui-smoke.png
             audio-smoke.txt
+            codec-*-smoke.txt
             test-summary.txt
             runtime-build.txt
             dependency-inventory.txt

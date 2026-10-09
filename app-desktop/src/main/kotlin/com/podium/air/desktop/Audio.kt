@@ -10,6 +10,7 @@ import javafx.event.EventHandler
 import javafx.scene.media.Media
 import javafx.scene.media.MediaPlayer
 import javafx.util.Duration
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.io.File
@@ -39,7 +40,11 @@ object FxRuntime {
 }
 
 /** All MediaPlayer lifecycle and controls are confined to the JavaFX application thread. */
-class JavaFxAudioEngine : AudioEngine {
+class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine {
+    private val decoding = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var openJob: Job? = null
+    private var standbyJob: Job? = null
+    private var generation = 0L
     private val mutable = MutableStateFlow(AudioState())
     override val state: StateFlow<AudioState> = mutable
     override var onEnd: (String) -> Unit = {}
@@ -66,22 +71,32 @@ class JavaFxAudioEngine : AudioEngine {
     private fun command(block: () -> Unit) { if (!closed.get()) FxRuntime.dispatch { if (!closed.get()) runCatching(block).onFailure { report(it) } } }
     private fun report(error: Throwable) { mutable.value = mutable.value.copy(loading = false, playing = false, error = error.message ?: "Audio playback failed") }
     override fun open(entry: QueueEntry, play: Boolean) = command {
+        openJob?.cancel(); standbyJob?.cancel(); generation++
         disposePlayers(); active = entry
         mutable.value = AudioState(entry = entry, loading = true)
-        val path = entry.song.localPath ?: error("Only local media is available in this build")
-        require(File(path).isFile) { "File is missing: $path. Reimport it or remove it from your library." }
-        val newPlayer = makePlayer(entry)
-        player = newPlayer
-        newPlayer.setOnReady {
-            if (player === newPlayer && !closed.get()) {
-                applyPreferences(newPlayer)
-                mutable.value = mutable.value.copy(loading = false, durationMs = finiteMs(newPlayer.totalDuration))
-                if (play) newPlayer.play()
-            }
+        val request = generation
+        openJob = decoding.launch {
+            try {
+                val file = mediaFiles.prepare(File(requireNotNull(entry.song.localPath) { "Only local media is available." })) { ensureActive() }
+                command {
+                    if (request == generation && active?.key == entry.key) {
+                        val newPlayer = makePlayer(entry, file)
+                        player = newPlayer
+                        newPlayer.setOnReady {
+                            if (player === newPlayer && !closed.get()) {
+                                applyPreferences(newPlayer)
+                                mutable.value = mutable.value.copy(loading = false, durationMs = finiteMs(newPlayer.totalDuration))
+                                if (play) newPlayer.play()
+                            }
+                        }
+                    }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { command { if (request == generation) report(error) } }
         }
     }
-    private fun makePlayer(entry: QueueEntry): MediaPlayer {
-        val media = Media(File(requireNotNull(entry.song.localPath)).toURI().toString())
+    private fun makePlayer(entry: QueueEntry, file: File): MediaPlayer {
+        val media = Media(file.toURI().toString())
         return MediaPlayer(media).apply {
             setOnError { if (player === this) report(error ?: IllegalStateException("Media could not be decoded")) }
             media.setOnError { if (player === this) report(media.error ?: IllegalStateException("Unsupported media")) }
@@ -97,17 +112,28 @@ class JavaFxAudioEngine : AudioEngine {
         }
     }
     override fun setUpcoming(entry: QueueEntry?) = command {
-        if (upcoming?.key != entry?.key) { standby?.dispose(); standby = null; standbyKey = null }
+        if (upcoming?.key != entry?.key) {
+            standbyJob?.cancel(); standbyJob = null
+            standby?.dispose(); standby = null; standbyKey = null
+        }
         upcoming = entry
+        if (preferences.crossfadeSeconds > 0) prepareNext()
     }
     private fun prepareNext() {
         val next = upcoming ?: return
-        if (standby != null || next.key == active?.key || outgoing != null) return
-        // Failure to predecode leaves the current track playing. Opening the next track reports its error normally.
-        runCatching {
-            require(File(requireNotNull(next.song.localPath)).isFile)
-            standby = makePlayer(next).apply { volume = 0.0; setOnReady { applyPreferences(this); volume = 0.0 } }
-            standbyKey = next.key
+        if (standby != null || standbyJob?.isActive == true || next.key == active?.key || outgoing != null) return
+        val request = generation
+        standbyJob = decoding.launch {
+            try {
+                val file = mediaFiles.prepare(File(requireNotNull(next.song.localPath))) { ensureActive() }
+                command {
+                    if (request == generation && upcoming?.key == next.key && standby == null) {
+                        standby = makePlayer(next, file).apply { volume = 0.0; setOnReady { applyPreferences(this); volume = 0.0 } }
+                        standbyKey = next.key
+                    }
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { /* The active track keeps playing; opening this track reports its error. */ }
         }
     }
     private fun beginFade() {
@@ -150,7 +176,7 @@ class JavaFxAudioEngine : AudioEngine {
     override fun toggle() = command { player?.let { if (it.status == MediaPlayer.Status.PLAYING) { it.pause(); outgoing?.pause() } else { it.play(); outgoing?.play() } } }
     override fun pause() = command { player?.pause(); outgoing?.pause() }
     override fun seek(ms: Long) = command {
-        finishFade(); standby?.dispose(); standby = null; standbyKey = null
+        finishFade(); standbyJob?.cancel(); standbyJob = null; standby?.dispose(); standby = null; standbyKey = null
         player?.let { it.seek(Duration.millis(ms.coerceIn(0, finiteMs(it.totalDuration)).toDouble())) }
     }
     override fun configure(preferences: Preferences) = command {
@@ -171,10 +197,10 @@ class JavaFxAudioEngine : AudioEngine {
         equalizer.isEnabled = preferences.equalizer.any { it != 0.0 }
         equalizer.bands.forEachIndexed { index, band -> band.gain = preferences.equalizer.getOrElse(index) { 0.0 }.coerceIn(-12.0, 12.0) }
     }
-    override fun stop() = command { disposePlayers(); active = null; upcoming = null; mutable.value = AudioState() }
+    override fun stop() = command { generation++; openJob?.cancel(); standbyJob?.cancel(); disposePlayers(); active = null; upcoming = null; mutable.value = AudioState() }
     private fun disposePlayers() { player?.dispose(); standby?.dispose(); outgoing?.dispose(); player = null; standby = null; outgoing = null; standbyKey = null }
     override fun close() {
-        if (closed.compareAndSet(false, true)) FxRuntime.dispatch { ticker?.stop(); disposePlayers(); mutable.value = AudioState() }
+        if (closed.compareAndSet(false, true)) { decoding.cancel(); FxRuntime.dispatch { ticker?.stop(); disposePlayers(); mutable.value = AudioState() } }
     }
 }
 private fun finiteMs(duration: Duration): Long = if (duration.isUnknown || duration.isIndefinite) 0 else duration.toMillis().toLong().coerceAtLeast(0)

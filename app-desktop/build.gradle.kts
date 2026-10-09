@@ -19,6 +19,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("net.jthink:jaudiotagger:3.0.1")
+    implementation("org.jflac:jflac-codec:1.5.2") { isTransitive = false }
+    implementation("io.github.jaredmdobson:concentus:1.0.2") { isTransitive = false }
     for (module in listOf("base", "graphics", "media")) {
         implementation("org.openjfx:javafx-$module:21.0.9:$fxPlatform")
     }
@@ -92,6 +94,8 @@ val dependencySources by configurations.creating {
 }
 dependencies {
     dependencySources("net.jthink:jaudiotagger:3.0.1:sources")
+    dependencySources("org.jflac:jflac-codec:1.5.2:sources")
+    dependencySources("io.github.jaredmdobson:concentus:1.0.2:sources")
     for (module in listOf("base", "graphics", "media")) dependencySources("org.openjfx:javafx-$module:21.0.9:sources")
 }
 tasks.register<Copy>("collectDependencySources") {
