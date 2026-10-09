@@ -5,19 +5,19 @@ Full Android feature parity is not complete.**
 
 ## Verified Windows build
 
-Implementation commit: `2704a247037d20cf6d6003d5d51b9591dee39c6b`.
+Implementation commit: `4c631f89875fefa067f3ae248cc8b04f8bca6923`.
 Successful workflow:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37941765127
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37942605916
 
 Download installer/portable/source artifact:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37941765127/artifacts/11622980063
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37942605916/artifacts/11622806566
 
 Verification reports, screenshot, dependency inventory and runtime version:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37941765127/artifacts/11622480374
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37942605916/artifacts/11622636786
 
 - `:shared-domain:check` and `:app-desktop:check`: **18 tests, zero failures/errors**.
 - Native `createDistributable`, `packageMsi`, `packageExe`: passed.
-- Packaged application startup: passed; actual Compose window rendered.
+- Packaged application startup: passed; all 14 routes and populated playlist/album details rendered.
 - Packaged JavaFX audio smoke: **passed**. Generated PCM WAV playback advanced,
   pause worked, seek reached 2 seconds, resume worked, and the two-player
   crossfade entered a second queue entry and finished the overlap.
@@ -29,10 +29,11 @@ Runner: Windows Server 2025 x64. JDK: Temurin 21.0.12+101.0. Kotlin 2.2.21,
 Compose 1.9.3, Gradle 8.14.3, OpenJFX 21.0.9. These are automated runtime/state
 checks, not a listening-quality or physical device hotplug assessment.
 
-The follow-up UI change adds automated traversal of all 14 screen routes plus
-populated playlist/album detail screens using actual generated WAV test files.
-It also improves long titles/renaming display and CI caching. Its validation is
-tracked by the next workflow run; no success is assumed ahead of execution.
+The populated UI smoke passed every navigation route and playlist/album detail
+using actual generated WAV files. Long titles/renaming display and CI caching
+are also included. A final fix preserves both crossfade volume envelopes when
+preferences change during a transition, tracks manual license files as Gradle
+inputs, and improves the file chooser label; the next workflow checks that fix.
 
 ## Implementation
 
@@ -56,7 +57,7 @@ commands, cleanup and stale end callbacks; crossfade queue handoff.
 | Gate | Result |
 |---|---|
 | A — source audit / reuse | Structural inventory and assessed reuse complete. GPL/AGPL/font/provider constraints documented; native notices and sources bundled. Full public-release dependency review remains |
-| B — native Windows startup | Passed packaged startup on Windows Server 2025; expanded navigation smoke added next |
+| B — native Windows startup | Passed packaged startup and all 14 navigation routes plus populated detail smoke on Windows Server 2025 |
 | C — audio plays/pauses/seeks/transitions | Passed packaged real JavaFX PCM WAV integration with crossfade; output quality and physical-device tests pending |
 | D — honest feature parity | FEATURE_PARITY.md identifies all major incomplete/blocked source features |
 | E — installable Windows CI artifact | Successful MSI/EXE/portable build and artifact upload verified |

@@ -39,7 +39,7 @@ fun main(args: Array<String>) {
                 dialogTitle = if (folder) "Import music folder" else "Import music"
                 fileSelectionMode = if (folder) JFileChooser.DIRECTORIES_ONLY else JFileChooser.FILES_ONLY
                 isMultiSelectionEnabled = !folder
-                if (!folder) fileFilter = FileNameExtensionFilter("Supported audio (MP3, WAV, AIFF, M4A AAC in M4A)", "mp3", "wav", "aif", "aiff", "m4a")
+                if (!folder) fileFilter = FileNameExtensionFilter("Supported audio (MP3, WAV, AIFF, M4A)", "mp3", "wav", "aif", "aiff", "m4a")
             }
             if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
                 model.importFiles(if (folder) listOf(chooser.selectedFile) else chooser.selectedFiles.toList(), folder)
@@ -105,6 +105,7 @@ private fun audioSmoke(args: Array<String>) {
             withTimeout(3000) { engine.state.first { it.positionMs in 1900..2200 } }
             engine.setUpcoming(next); engine.toggle()
             withTimeout(12000) { advanced.await() }
+            engine.configure(Preferences(crossfadeSeconds = 1, volume = 0.5f))
             withTimeout(3000) { engine.state.first { it.entry?.key == next.key && it.playing && !it.fading } }
             result.writeText("PASS: Generated PCM WAV played, paused, sought to 2s, resumed and crossfaded to a second queue entry.\n")
         }

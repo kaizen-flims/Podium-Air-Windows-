@@ -159,7 +159,13 @@ class JavaFxAudioEngine : AudioEngine {
         listOfNotNull(player, outgoing).forEach(::applyPreferences)
     }
     private fun applyPreferences(target: MediaPlayer) {
-        target.volume = preferences.volume.coerceIn(0f, 1f).toDouble()
+        val progress = (fadeElapsed / fadeLength.coerceAtLeast(1.0)).coerceIn(0.0, 1.0)
+        val envelope = when {
+            outgoing != null && target === player -> sin(progress * Math.PI / 2)
+            target === outgoing -> cos(progress * Math.PI / 2)
+            else -> 1.0
+        }
+        target.volume = preferences.volume.coerceIn(0f, 1f).toDouble() * envelope
         target.rate = preferences.speed.toDouble()
         val equalizer = target.audioEqualizer
         equalizer.isEnabled = preferences.equalizer.any { it != 0.0 }

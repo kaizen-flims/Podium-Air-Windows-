@@ -11,3 +11,5 @@
 
 - Commit 2704a24 passed 18 tests, package startup, real WAV playback/pause/seek/crossfade, installer/portable/source packaging and notice/source collection in run 37941765127.
 - Added populated UI smoke traversal across all routes and playlist/album details; follow-up validation pending.
+- Commit 4c631f8 passed all 14 UI routes and populated playlist/album details, all 18 tests, audio smoke and packaging in run 37942605916.
+- Final correction preserves crossfade gain envelopes during volume changes; audio smoke now changes volume mid-transition. Manual license files are explicit Gradle task inputs.

@@ -52,6 +52,7 @@ compose.desktop {
 val dependencyNotices by tasks.registering {
     val output = layout.buildDirectory.dir("generated/notices")
     inputs.files(configurations.runtimeClasspath)
+    inputs.dir(project.file("src/main/resources/licenses"))
     outputs.dir(output)
     doLast {
         val dest = output.get().asFile
