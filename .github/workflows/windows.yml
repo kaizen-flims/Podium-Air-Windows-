@@ -57,11 +57,34 @@ jobs:
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
           $result = Join-Path $PWD 'ui-smoke.txt'
           $png = Join-Path $PWD 'ui-smoke.png'
-          $p = Start-Process -FilePath $exe -ArgumentList @('--ui-smoke', "--result=`"$result`"", "--screenshot=`"$png`"") -PassThru
+          $p = Start-Process -FilePath $exe -ArgumentList @('--ui-smoke', "--result=`"$result`"", "--screenshot=`"$png`"", "--screenshots=`"$(Join-Path $PWD 'screenshots')`"") -PassThru
           if (-not $p.WaitForExit(30000)) { $p.Kill(); throw 'UI startup smoke timed out' }
           if (-not (Test-Path $result)) { throw 'App exited without rendering the Compose window' }
           Get-Content $result
           if ($p.ExitCode -ne 0) { throw "UI process failed with $($p.ExitCode)" }
+      - name: Verify packaged Windows helper
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'platform-smoke.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--platform-smoke', "--result=`"$result`"") -PassThru
+          if (-not $p.WaitForExit(20000)) { $p.Kill(); throw 'Packaged Windows helper timed out' }
+          Get-Content $result
+          if ($p.ExitCode -ne 0) { throw 'Packaged Windows integration failed' }
+      - name: Verify small window at 150 and 200 percent scaling
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          foreach ($scale in @('1.5', '2.0')) {
+            $env:JAVA_TOOL_OPTIONS = "-Dsun.java2d.uiScale=$scale"
+            $result = Join-Path $PWD "dpi-$scale-smoke.txt"
+            $png = Join-Path $PWD "dpi-$scale-smoke.png"
+            $p = Start-Process -FilePath $exe -ArgumentList @('--ui-smoke', '--small', "--result=`"$result`"", "--screenshot=`"$png`"") -PassThru
+            if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "UI scaling smoke timed out at $scale" }
+            Get-Content $result
+            if ($p.ExitCode -ne 0) { throw "UI scaling smoke failed at $scale" }
+          }
+          Remove-Item Env:JAVA_TOOL_OPTIONS
       - name: Attempt real audio integration smoke
         shell: pwsh
         run: |
@@ -100,6 +123,29 @@ jobs:
             Get-Content $result
             if ($p.ExitCode -ne 0) { throw "$extension integration failed" }
           }
+      - name: Install MSI, launch installed app and uninstall
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem 'app-desktop/build/compose/binaries/main/msi/*.msi' | Select-Object -First 1).FullName
+          $installed = Join-Path $env:RUNNER_TEMP 'podium-installed'
+          $installLog = Join-Path $PWD 'installer-install.log'
+          $uninstallLog = Join-Path $PWD 'installer-uninstall.log'
+          try {
+            $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart', "INSTALLDIR=`"$installed`"", '/L*v', "`"$installLog`"") -Wait -PassThru
+            if ($p.ExitCode -notin @(0, 3010)) { throw "MSI installation failed: $($p.ExitCode)" }
+            $exe = Join-Path $installed 'Podium Air.exe'
+            if (-not (Test-Path $exe)) { throw 'MSI did not install the application at the selected directory' }
+            $result = Join-Path $PWD 'installed-ui-smoke.txt'
+            $p = Start-Process $exe -ArgumentList @('--ui-smoke', "--result=`"$result`"") -PassThru
+            if (-not $p.WaitForExit(30000)) { $p.Kill(); throw 'Installed app timed out' }
+            Get-Content $result
+            if ($p.ExitCode -ne 0) { throw 'Installed app failed' }
+          } finally {
+            $p = Start-Process msiexec.exe -ArgumentList @('/x', "`"$msi`"", '/qn', '/norestart', '/L*v', "`"$uninstallLog`"") -Wait -PassThru
+            if ($p.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed: $($p.ExitCode)" }
+          }
+          if (Test-Path (Join-Path $installed 'Podium Air.exe')) { throw 'MSI uninstall left the application installed' }
+          'PASS: MSI installed at the selected directory, installed app rendered all routes, and MSI uninstalled successfully.' | Set-Content installer-smoke.txt
       - name: Summarize test and runtime evidence
         shell: pwsh
         run: |
@@ -150,6 +196,12 @@ jobs:
             audio-smoke.txt
             codec-*-smoke.txt
             windows-media-smoke.txt
+            platform-smoke.txt
+            dpi-*-smoke.*
+            screenshots/
+            installed-ui-smoke.txt
+            installer-smoke.txt
+            installer-*.log
             test-summary.txt
             runtime-build.txt
             dependency-inventory.txt

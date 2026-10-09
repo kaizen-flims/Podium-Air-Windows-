@@ -27,6 +27,10 @@ class DesktopModel(
     val queue: StateFlow<PlaybackQueue> = queueMutable
     val message = MutableStateFlow<String?>((persistence as? StateStore)?.recoveryMessage)
     val importing = MutableStateFlow(false)
+    val importProgress = MutableStateFlow<Pair<Int, Int>?>(null)
+    private var importJob: Job? = null
+    private val recorder = ListeningRecorder()
+    private var lastStatsFlush = 0L
     val lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val sleepRemaining = MutableStateFlow<Long?>(null)
     val platformStatus = MutableStateFlow("Windows media controls initialize when the window opens.")
@@ -35,6 +39,13 @@ class DesktopModel(
     private var sleepJob: Job? = null
     init {
         engine.configure(mutable.value.preferences)
+        scope.launch {
+            engine.state.collect { audio ->
+                val now = System.nanoTime() / 1_000_000
+                recorder.sample(audio.entry?.song?.videoId, audio.entry?.key, audio.playing, now, java.time.LocalDate.now().toString())
+                if (!audio.playing || now - lastStatsFlush >= 5000) { flushListening(); lastStatsFlush = now }
+            }
+        }
         engine.onEnd = { key -> scope.launch {
             if (queue.value.current?.key == key) {
                 val nextIndex = queue.value.nextIndex(automatic = true)
@@ -50,19 +61,50 @@ class DesktopModel(
     }
     fun importFiles(files: List<File>, folder: Boolean = false) {
         if (importing.value) return
-        scope.launch {
+        importJob = scope.launch {
             importing.value = true
             try {
                 val (newTracks, failures) = withContext(Dispatchers.IO) {
-                    val candidates = if (folder) files.flatMap(localLibrary::folder) else files
-                    localLibrary.import(candidates)
+                    val candidates = if (folder) files.flatMap { localLibrary.folder(it) { ensureActive() } } else files
+                    localLibrary.import(candidates, { ensureActive() }) { done, total -> importProgress.value = done to total }
                 }
                 change { copy(library = (library + newTracks).associateBy { it.id }.values.toList()) }
                 message.value = if (failures.isEmpty()) "Imported ${newTracks.size} tracks." else "Imported ${newTracks.size} tracks. ${failures.take(4).joinToString("; ")}"
-            } catch (error: Exception) { message.value = "Import failed: ${error.message}" }
-            finally { importing.value = false }
+            } catch (cancelled: CancellationException) { message.value = "Import cancelled. Existing library is unchanged."; throw cancelled }
+            catch (error: Exception) { message.value = "Import failed: ${error.message}" }
+            finally { importing.value = false; importProgress.value = null }
         }
     }
+    fun cancelImport() { importJob?.cancel() }
+    fun importPlaylist(file: File) {
+        if (importing.value) return
+        importJob = scope.launch {
+            importing.value = true
+            try {
+                val (candidates, warnings) = withContext(Dispatchers.IO) { PlaylistFiles.read(file) }
+                val (tracks, failures) = withContext(Dispatchers.IO) { localLibrary.import(candidates, { ensureActive() }) { done, total -> importProgress.value = done to total } }
+                val byPath = tracks.associateBy { it.path }
+                val ordered = withContext(Dispatchers.IO) { candidates.mapNotNull { byPath[it.canonicalPath]?.id } }
+                if (ordered.isNotEmpty()) change { copy(library = (library + tracks).associateBy { it.id }.values.toList(), playlists = playlists + Playlist(name = file.nameWithoutExtension, tracks = ordered)) }
+                message.value = "Imported ${ordered.size} playlist entries. " + (warnings + failures).take(4).joinToString("; ")
+            } catch (cancelled: CancellationException) { message.value = "Playlist import cancelled."; throw cancelled }
+            catch (error: Exception) { message.value = "Playlist import failed: ${error.message}" }
+            finally { importing.value = false; importProgress.value = null }
+        }
+    }
+    fun exportPlaylist(id: String, file: File) {
+        val snapshot = state.value
+        val playlist = snapshot.playlists.find { it.id == id } ?: return
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { PlaylistFiles.write(file, playlist.tracks.mapNotNull { key -> snapshot.library.find { it.id == key } }) }
+                message.value = "Exported ${playlist.name} to ${file.name}."
+            } catch (error: Exception) { message.value = "Export failed: ${error.message}" }
+        }
+    }
+    fun lyricOffset(trackId: String, milliseconds: Long) { change { copy(lyricOffsets = lyricOffsets + (trackId to milliseconds.coerceIn(-10000, 10000))) } }
+    fun reloadLyrics() { queue.value.current?.song?.let(::loadLyrics) }
+    private fun flushListening() { val added = recorder.drain(); if (added.isNotEmpty()) change { copy(listening = mergeListening(listening, added)) } }
     fun play(songs: List<Song>, index: Int = 0) { if (songs.isNotEmpty()) playQueue(PlaybackQueue.from(songs, index, queue.value.repeat)) }
     fun playQueue(value: PlaybackQueue) { updateQueue(value); value.current?.let { engine.open(it); record(it.song); loadLyrics(it.song) }; primeNext() }
     fun selectQueue(index: Int) = playQueue(queue.value.select(index))
@@ -136,6 +178,9 @@ class DesktopModel(
         }
     }
     override fun close() {
+        val audio = engine.state.value
+        recorder.sample(audio.entry?.song?.videoId, audio.entry?.key, false, System.nanoTime() / 1_000_000, java.time.LocalDate.now().toString())
+        flushListening()
         scope.cancel(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.
         runCatching { persistence.save(mutable.value) }.onFailure { System.err.println("Library save failed: ${it.message}") }

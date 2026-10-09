@@ -4,8 +4,6 @@ package com.podium.air.desktop
 import io.github.jaredmdobson.concentus.OpusDecoder
 import net.sourceforge.jaad.aac.Decoder
 import net.sourceforge.jaad.aac.SampleBuffer
-import net.sourceforge.jaad.mp4.MP4Container
-import net.sourceforge.jaad.mp4.api.AudioTrack
 import org.jflac.FLACDecoder
 import org.jflac.PCMProcessor
 import org.jflac.metadata.StreamInfo
@@ -25,7 +23,7 @@ class MediaFiles(private val directory: File = File(defaultDataDirectory(), "dec
     fun prepare(source: File, checkCancelled: () -> Unit = {}): File {
         require(source.isFile) { "File is missing: ${source.name}. Reimport it or remove it from your library." }
         if (source.extension.lowercase() !in setOf("flac", "opus", "ogg", "m4a")) return source
-        val identity = "v2|${source.canonicalPath}|${source.length()}|${source.lastModified()}"
+        val identity = "v3|${source.canonicalPath}|${source.length()}|${source.lastModified()}"
         val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
         synchronized(locks[(key.hashCode() and Int.MAX_VALUE) % locks.size]) {
             checkCancelled()
@@ -60,21 +58,21 @@ private fun decodeAac(source: File, destination: File, checkCancelled: () -> Uni
     var frames = 0
     try {
         RandomAccessFile(source, "r").use { input ->
-            val movie = MP4Container(input).movie
-            val track = movie.getTracks(AudioTrack.AudioCodec.AAC).firstOrNull() as? AudioTrack
-                ?: error("M4A playback supports AAC audio; ALAC and other codecs are not supported.")
-            require(track.protection == null) { "Protected/encrypted audio is not supported." }
-            require(track.isInFile) { "External MP4 media references are not supported." }
-            val decoder = Decoder(track.decoderSpecificInfo)
+            val track = Mp4Aac(input)
+            val decoder = Decoder(track.configuration)
             val buffer = SampleBuffer().apply { isBigEndian = false }
-            while (track.hasMoreFrames()) {
+            var decoded = 0L; var skip = 0L
+            for (index in track.sizes.indices) {
                 checkCancelled()
-                val frame = track.readNextFrame()
-                decoder.decodeFrame(frame.data, buffer)
+                decoder.decodeFrame(track.read(index), buffer)
                 require(buffer.channels in 1..2 && buffer.bitsPerSample == 16 && buffer.sampleRate in 8000..192000) { "Unsupported AAC output format." }
-                if (wave == null) wave = PcmWaveWriter(destination, buffer.sampleRate, buffer.channels)
-                wave!!.write(buffer.data); frames++
+                if (wave == null) { wave = PcmWaveWriter(destination, buffer.sampleRate, buffer.channels); skip = track.skipTicks * buffer.sampleRate / track.mediaTimescale }
+                val sampleCount = buffer.data.size / (buffer.channels * 2)
+                val discarded = (skip - decoded).coerceIn(0, sampleCount.toLong()).toInt()
+                wave!!.write(buffer.data.copyOfRange(discarded * buffer.channels * 2, buffer.data.size))
+                decoded += sampleCount; frames++
             }
+            track.durationTicks?.let { duration -> wave!!.trimFrames(minOf(decoded - skip, duration * buffer.sampleRate / track.movieTimescale)) }
             require(frames > 0) { "The AAC track contains no audio frames." }
         }
     } finally { wave?.close() }

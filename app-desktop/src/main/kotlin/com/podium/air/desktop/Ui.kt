@@ -32,6 +32,13 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.BaselineShift
+import androidx.compose.ui.graphics.Shadow
+import com.music.bitchord.data.lyrics.CharGrowth
+import com.music.bitchord.data.lyrics.LyricAlignment
+import com.music.bitchord.ui.player.activeLyricRows
+import com.music.bitchord.ui.player.LyricClockReconciler
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.music.bitchord.data.model.Song
@@ -61,18 +68,19 @@ private val Typography = Typography(
 private enum class Page(val title: String, val icon: ImageVector) {
     HOME("Home", Icons.Rounded.Home), EXPLORE("Explore", Icons.Rounded.Explore), SEARCH("Search", Icons.Rounded.Search),
     LIBRARY("Library", Icons.Rounded.LibraryMusic), PLAYLISTS("Playlists", Icons.Rounded.QueueMusic),
-    ALBUMS("Albums", Icons.Rounded.Album), ARTISTS("Artists", Icons.Rounded.Person), HISTORY("History", Icons.Rounded.History),
+    ALBUMS("Albums", Icons.Rounded.Album), ARTISTS("Artists", Icons.Rounded.Person), HISTORY("History", Icons.Rounded.History), REPLAY("Replay", Icons.Rounded.Insights),
     PLAYER("Now Playing", Icons.Rounded.MusicNote), QUEUE("Queue", Icons.Rounded.PlaylistPlay), LYRICS("Lyrics", Icons.Rounded.Lyrics),
     ACCOUNT("Account", Icons.Rounded.AccountCircle), SETTINGS("Settings", Icons.Rounded.Settings), ABOUT("About", Icons.Rounded.Info),
 }
 private data class Route(val page: Page = Page.HOME, val detail: String? = null, val title: String = page.title)
 
 @Composable
-fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean = false, onReady: () -> Unit = {}) {
+fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}) {
     val state by model.state.collectAsState()
     val audio by model.engine.state.collectAsState()
     val message by model.message.collectAsState()
     val importing by model.importing.collectAsState()
+    val progress by model.importProgress.collectAsState()
     var route by remember { mutableStateOf(Route()) }
     var search by remember { mutableStateOf("") }
     var createName by remember { mutableStateOf<String?>(null) }
@@ -103,7 +111,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
                         Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (route.detail != null) Control(Icons.Rounded.ArrowBack, "Back") { route = Route(route.page) }
                             Text(if (route.page == Page.PLAYLISTS && route.detail != null) state.playlists.find { it.id == route.detail }?.name ?: route.title else route.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (importing) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                            if (importing) { progress?.let { Text("${it.first}/${it.second}", fontSize = 12.sp) }; CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp); Control(Icons.Rounded.Close, "Cancel import") { model.cancelImport() } }
                             else {
                                 TextButton(onClick = { filePicker(false) }) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Import music") }
                                 Control(Icons.Rounded.FolderOpen, "Import folder (Ctrl+Shift+O)") { filePicker(true) }
@@ -131,11 +139,12 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
                                     val tracks = state.library.filter { selected.detail != "favorites" || it.id in state.favorites }.map { it.song() }
                                     TrackList(tracks, model, state, Modifier.weight(1f), emptyText = if (selected.detail == "favorites") "Favorite a song to find it here." else "Import music files or a folder to start your library.")
                                 }
-                                Page.PLAYLISTS -> if (selected.detail == null) Playlists(state, { createName = "" }) { route = Route(Page.PLAYLISTS, it.id, it.name) }
-                                    else PlaylistDetail(selected.detail, state, model) { route = Route(Page.PLAYLISTS) }
-                                Page.ALBUMS, Page.ARTISTS -> if (selected.detail == null) Collections(state, selected.page) { route = Route(selected.page, it, it) }
-                                    else TrackList(state.library.filter { if (selected.page == Page.ALBUMS) it.album == selected.detail else it.artist == selected.detail }.map { it.song() }, model, state, Modifier.padding(horizontal = 28.dp))
+                                Page.PLAYLISTS -> if (selected.detail == null) Playlists(state, { createName = "" }, { playlistPicker(null) }) { route = Route(Page.PLAYLISTS, it.id, it.name) }
+                                    else PlaylistDetail(selected.detail, state, model, { playlistPicker(it) }) { route = Route(Page.PLAYLISTS) }
+                                Page.ALBUMS, Page.ARTISTS -> if (selected.detail == null) Collections(state, selected.page) { key, title -> route = Route(selected.page, key, title) }
+                                    else TrackList(state.library.filter { if (selected.page == Page.ALBUMS) it.albumKey == selected.detail else it.artist == selected.detail }.sortedWith(compareBy<StoredTrack> { it.discNumber }.thenBy { it.trackNumber }.thenBy { it.title }).map { it.song() }, model, state, Modifier.padding(horizontal = 28.dp))
                                 Page.HISTORY -> TrackList(state.history.mapNotNull { id -> state.library.find { it.id == id }?.song() }, model, state, Modifier.padding(horizontal = 28.dp), emptyText = "Your recently played tracks will appear here.")
+                                Page.REPLAY -> ReplayView(model, state)
                                 Page.PLAYER -> NowPlaying(model, state)
                                 Page.QUEUE -> QueueView(model)
                                 Page.LYRICS -> LyricsView(model, Modifier.padding(horizontal = 28.dp))
@@ -156,10 +165,10 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
             dismissButton = { TextButton({ createName = null }) { Text("Cancel") } })
         LaunchedEffect(Unit) {
             if (smoke) {
-                for (page in Page.entries) { route = Route(page); delay(300) }
+                for (page in Page.entries) { route = Route(page); delay(450); onSmokePage(page.name.lowercase()) }
                 val playlist = state.playlists.firstOrNull()
-                if (playlist != null) { route = Route(Page.PLAYLISTS, playlist.id, playlist.name); delay(300) }
-                state.library.firstOrNull()?.let { route = Route(Page.ALBUMS, it.album, it.album); delay(300) }
+                if (playlist != null) { route = Route(Page.PLAYLISTS, playlist.id, playlist.name); delay(450); onSmokePage("playlist-detail") }
+                state.library.firstOrNull()?.let { route = Route(Page.ALBUMS, it.albumKey, it.album); delay(450); onSmokePage("album-detail") }
                 route = Route(Page.HOME); delay(300)
             }
             onReady()
@@ -244,7 +253,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
 @Composable private fun Explore(state: SavedState, navigate: (Route) -> Unit) {
     LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Explore your collection", style = MaterialTheme.typography.headlineMedium); Text("Albums and artists from your imported tracks.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        item { CollectionLink("Albums", "${state.library.map { it.album }.distinct().size} albums", Icons.Rounded.Album) { navigate(Route(Page.ALBUMS)) } }
+        item { CollectionLink("Albums", "${state.library.map { it.albumKey }.distinct().size} albums", Icons.Rounded.Album) { navigate(Route(Page.ALBUMS)) } }
         item { CollectionLink("Artists", "${state.library.map { it.artist }.distinct().size} artists", Icons.Rounded.Person) { navigate(Route(Page.ARTISTS)) } }
         item { CollectionLink("Favorites", "${state.favorites.size} tracks", Icons.Rounded.Favorite) { navigate(Route(Page.LIBRARY, "favorites", "Favorites")) } }
     }
@@ -294,29 +303,30 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
     if (remove) AlertDialog(onDismissRequest = { remove = false }, title = { Text("Remove ${song.title}?") }, text = { Text("This removes the track from your library, playlists and queue. The audio file stays on your computer.") },
         confirmButton = { TextButton({ model.removeTrack(song.videoId); remove = false }) { Text("Remove") } }, dismissButton = { TextButton({ remove = false }) { Text("Cancel") } })
 }
-@Composable private fun Playlists(state: SavedState, create: () -> Unit, open: (Playlist) -> Unit) {
+@Composable private fun Playlists(state: SavedState, create: () -> Unit, import: () -> Unit, open: (Playlist) -> Unit) {
     LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item { TextButton(create) { Icon(Icons.Rounded.Add, null); Text("New playlist") } }
+        item { Row { TextButton(create) { Icon(Icons.Rounded.Add, null); Text("New playlist") }; TextButton(import) { Text("Import M3U8") } } }
         items(state.playlists, key = { it.id }) { p -> CollectionLink(p.name, "${p.tracks.size} tracks", Icons.Rounded.QueueMusic) { open(p) } }
         if (state.playlists.isEmpty()) item { Empty("Create a playlist, then add tracks using each song's action menu.") }
     }
 }
-@Composable private fun PlaylistDetail(id: String, state: SavedState, model: DesktopModel, back: () -> Unit) {
+@Composable private fun PlaylistDetail(id: String, state: SavedState, model: DesktopModel, export: (Playlist) -> Unit, back: () -> Unit) {
     val p = state.playlists.find { it.id == id }
     if (p == null) { Empty("Playlist removed."); return }
     var rename by remember(id) { mutableStateOf<String?>(null) }; var delete by remember { mutableStateOf(false) }
     Column(Modifier.padding(horizontal = 28.dp)) {
-        Row { TextButton({ rename = p.name }) { Text("Rename") }; TextButton({ delete = true }) { Text("Delete") } }
+        Row { TextButton({ rename = p.name }) { Text("Rename") }; TextButton({ export(p) }) { Text("Export M3U8") }; TextButton({ delete = true }) { Text("Delete") } }
         TrackList(p.tracks.mapNotNull { trackId -> state.library.find { it.id == trackId }?.song() }, model, state, Modifier.weight(1f), playlist = p)
     }
     if (rename != null) AlertDialog(onDismissRequest = { rename = null }, title = { Text("Rename playlist") }, text = { OutlinedTextField(rename!!, { rename = it }, singleLine = true) },
         confirmButton = { TextButton({ model.renamePlaylist(id, rename!!); rename = null }, enabled = !rename.isNullOrBlank()) { Text("Save") } }, dismissButton = { TextButton({ rename = null }) { Text("Cancel") } })
     if (delete) AlertDialog(onDismissRequest = { delete = false }, title = { Text("Delete ${p.name}?") }, text = { Text("Your music files and library stay on your computer.") }, confirmButton = { TextButton({ model.deletePlaylist(id); delete = false; back() }) { Text("Delete") } }, dismissButton = { TextButton({ delete = false }) { Text("Cancel") } })
 }
-@Composable private fun Collections(state: SavedState, page: Page, open: (String) -> Unit) {
-    val groups = state.library.groupBy { if (page == Page.ALBUMS) it.album else it.artist }.toSortedMap(String.CASE_INSENSITIVE_ORDER)
+@Composable private fun Collections(state: SavedState, page: Page, open: (String, String) -> Unit) {
+    val groups = state.library.groupBy { if (page == Page.ALBUMS) it.albumKey else it.artist }.toSortedMap(String.CASE_INSENSITIVE_ORDER)
     LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        items(groups.entries.toList(), key = { it.key }) { entry -> CollectionLink(entry.key, "${entry.value.size} tracks", page.icon) { open(entry.key) } }
+        items(groups.entries.toList(), key = { it.key }) { entry -> val title = if (page == Page.ALBUMS) entry.value.first().album else entry.key
+            CollectionLink(title, "${entry.value.size} tracks" + if (page == Page.ALBUMS) " • ${entry.value.first().albumArtist.ifBlank { entry.value.first().artist }}" else "", page.icon) { open(entry.key, title) } }
         if (groups.isEmpty()) item { Empty("Import tracks to browse ${page.title.lowercase()}.") }
     }
 }
@@ -345,6 +355,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
     if (song == null) { Empty("Choose a track from your library to start listening."); return }
     BoxWithConstraints(Modifier.fillMaxSize().padding(28.dp, 0.dp, 28.dp, 24.dp)) {
         val wide = maxWidth > 720.dp
+        if (state.preferences.dynamicBackground) ArtworkBackground(song.thumbnailUrl, state.preferences.copy(reducedMotion = state.preferences.reducedMotion || !audio.playing))
         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
                 Art(song, if (wide) 300 else 230)
@@ -400,29 +411,100 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
     }
 }
 @Composable private fun LyricsView(model: DesktopModel, modifier: Modifier = Modifier) {
-    val lyrics by model.lyrics.collectAsState(); val audio by model.engine.state.collectAsState()
+    val lyrics by model.lyrics.collectAsState(); val audio by model.engine.state.collectAsState(); val saved by model.state.collectAsState()
     val list = rememberLazyListState()
-    val synced = lyrics.any { it.timeMs > 0 }
-    val current = if (synced) lyrics.indexOfLast { it.timeMs <= audio.positionMs } else -1
-    LaunchedEffect(audio.entry?.key, current) { if (current >= 0) list.animateScrollToItem((current - 1).coerceAtLeast(0)) }
-    if (lyrics.isEmpty()) { Empty("No lyrics found. Place a .lrc file beside the audio file with the same filename, or use embedded lyrics.", modifier); return }
-    LazyColumn(modifier.fillMaxSize(), state = list, contentPadding = PaddingValues(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        itemsIndexed(lyrics) { index, line ->
-            val alpha by animateFloatAsState(if (!synced || current == index) 1f else 0.35f, label = "lyric")
-            val text = buildAnnotatedString {
-                append(if (line.isGap) "♪" else line.text)
-                if (line.isWordSynced && current == index) addStyle(SpanStyle(color = AccentRed), 0, line.revealedChars(audio.positionMs).toInt().coerceIn(0, length))
-            }
-            Text(text, Modifier.fillMaxWidth().then(if (synced) Modifier.clickable { model.seek(line.timeMs) } else Modifier),
-                fontSize = 27.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
-            line.background?.let { Text(it.text, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    val id = audio.entry?.song?.videoId
+    val offset = saved.lyricOffsets[id] ?: 0
+    var displayed by remember(audio.entry?.key) { mutableLongStateOf(audio.positionMs) }
+    val clock = remember(audio.entry?.key) { LyricClockReconciler(audio.positionMs, System.nanoTime() / 1_000_000, audio.playing) }
+    LaunchedEffect(audio.entry?.key, audio.positionMs, audio.playing) {
+        displayed = if (saved.preferences.speed == 1f) clock.reconcile(displayed, audio.positionMs, System.nanoTime() / 1_000_000, audio.playing) else audio.positionMs
+    }
+    LaunchedEffect(audio.entry?.key, audio.playing, saved.preferences.speed, saved.preferences.reducedMotion) {
+        if (audio.playing && saved.preferences.speed == 1f && !saved.preferences.reducedMotion) {
+            var previous = withFrameNanos { it }
+            while (true) withFrameNanos { now -> displayed = (displayed + ((now - previous) / 1_000_000).coerceIn(0, 100)).coerceAtMost(audio.durationMs); previous = now }
         }
+    }
+    val position = (displayed + offset).coerceAtLeast(0)
+    val synced = lyrics.any { it.timeMs > 0 || it.isWordSynced }
+    val active = if (synced) activeLyricRows(lyrics, position) else emptyList()
+    val current = active.lastOrNull() ?: -1
+    LaunchedEffect(audio.entry?.key, current, saved.preferences.lyricsAutoScroll) { if (current >= 0 && saved.preferences.lyricsAutoScroll) list.animateScrollToItem((active.first() - 1).coerceAtLeast(0)) }
+    Column(modifier.fillMaxSize()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AssistChip({ model.preferences(saved.preferences.copy(lyricsAutoScroll = !saved.preferences.lyricsAutoScroll)) }, { Text(if (saved.preferences.lyricsAutoScroll) "Auto-scroll on" else "Auto-scroll off") })
+            Spacer(Modifier.weight(1f)); Control(Icons.Rounded.Refresh, "Reload sidecar lyrics") { model.reloadLyrics() }
+        }
+        if (id != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Control(Icons.Rounded.Remove, "Lyrics 100 milliseconds earlier") { model.lyricOffset(id, offset - 100) }
+                Text("Timing ${if (offset >= 0) "+" else ""}${offset} ms", fontSize = 11.sp)
+                Control(Icons.Rounded.Add, "Lyrics 100 milliseconds later") { model.lyricOffset(id, offset + 100) }
+                TextButton({ model.lyricOffset(id, 0) }) { Text("Reset") }
+            }
+        }
+        if (lyrics.isEmpty()) { Empty("Place a .ttml or .lrc file beside the audio file with the same filename, or use embedded lyrics.", Modifier.weight(1f)); return@Column }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = PaddingValues(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+            itemsIndexed(lyrics) { index, line ->
+                val focused = index in active
+                val alpha by animateFloatAsState(if (!synced || focused) 1f else 0.35f, label = "lyric")
+                val text = buildAnnotatedString {
+                    append(if (line.isGap) "♪" else line.text)
+                    if (line.isWordSynced && focused) {
+                        addStyle(SpanStyle(color = AccentRed), 0, line.revealedChars(position).toInt().coerceIn(0, length))
+                        if (!saved.preferences.reducedMotion) {
+                            val growth = CharGrowth()
+                            line.words.forEachIndexed { wordIndex, word ->
+                                val range = line.wordSpans[wordIndex]
+                                val growing = line.growingAt(wordIndex)
+                                for (char in word.text.indices) {
+                                    val at = range.first + char
+                                    if (at !in 0 until length) continue
+                                    growing?.sampleInto(char, position, growth)
+                                    val lift = if (growing != null) growth.rise else line.wordLift(wordIndex, position)
+                                    addStyle(SpanStyle(fontSize = (27f * if (growing != null) growth.scale else 1f).sp, baselineShift = BaselineShift(lift * 0.08f),
+                                        shadow = if (growing != null && growth.bloom > 0) Shadow(AccentRed.copy(alpha = growth.bloom * 0.4f), blurRadius = 8f) else null), at, at + 1)
+                                }
+                            }
+                        }
+                    }
+                }
+                Column(horizontalAlignment = if (line.alignment == LyricAlignment.End) Alignment.End else Alignment.Start) {
+                    Text(text, Modifier.fillMaxWidth().then(if (synced) Modifier.clickable { model.seek((line.timeMs - offset).coerceAtLeast(0)) } else Modifier),
+                        fontSize = 27.sp, fontWeight = FontWeight.Bold, textAlign = if (line.alignment == LyricAlignment.End) TextAlign.End else TextAlign.Start, color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+                    line.background?.let { backing -> Text(backing.text, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (position in backing.timeMs..backing.endMs) 0.85f else 0.35f)) }
+                }
+            }
+        }
+    }
+}
+@Composable private fun ReplayView(model: DesktopModel, state: SavedState) {
+    var period by remember { mutableStateOf(30L) }
+    val since = java.time.LocalDate.now().minusDays(period).toString()
+    val data = state.listening.filter { it.day >= since }
+    val milliseconds = data.sumOf { it.milliseconds }
+    val ranked = data.groupBy { it.trackId }.entries.sortedByDescending { it.value.sumOf { stat -> stat.milliseconds } }
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 28.dp)) {
+        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(7L, 30L, 365L).forEach { days -> FilterChip(period == days, { period = days }, { Text("${days} days") }) } } }
+        item { Text("${milliseconds / 60000} minutes listened", style = MaterialTheme.typography.displayLarge); Text("${data.sumOf { it.plays }} track starts • ${ranked.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Your top tracks", style = MaterialTheme.typography.headlineMedium) }
+        itemsIndexed(ranked.take(50)) { rank, entry ->
+            val track = state.library.find { it.id == entry.key }
+            if (track != null) CollectionLink("${rank + 1}. ${track.title}", "${track.artist} • ${entry.value.sumOf { it.milliseconds } / 60000} minutes", Icons.Rounded.MusicNote) { model.play(listOf(track.song())) }
+        }
+        if (ranked.isEmpty()) item { Text("Play your local collection to build your listening history. Paused time and seeking do not add listening minutes.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Top artists", style = MaterialTheme.typography.headlineMedium) }
+        val artists = ranked.mapNotNull { entry -> state.library.find { it.id == entry.key }?.artist?.let { it to entry.value.sumOf { stat -> stat.milliseconds } } }.groupBy { it.first }.mapValues { it.value.sumOf { pair -> pair.second } }.entries.sortedByDescending { it.value }
+        items(artists.take(10)) { Text("${it.key} • ${it.value / 60000} minutes") }
     }
 }
 @Composable private fun Settings(model: DesktopModel, state: SavedState) {
     val prefs = state.preferences; val sleep by model.sleepRemaining.collectAsState(); val platform by model.platformStatus.collectAsState()
     LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        item { Text("Appearance", style = MaterialTheme.typography.headlineMedium); Row(verticalAlignment = Alignment.CenterVertically) { Text("Dark theme", Modifier.weight(1f)); Switch(prefs.dark, { model.preferences(prefs.copy(dark = it)) }) } }
+        item { Text("Appearance", style = MaterialTheme.typography.headlineMedium); Row(verticalAlignment = Alignment.CenterVertically) { Text("Dark theme", Modifier.weight(1f)); Switch(prefs.dark, { model.preferences(prefs.copy(dark = it)) }) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Reduce motion", Modifier.weight(1f)); Switch(prefs.reducedMotion, { model.preferences(prefs.copy(reducedMotion = it)) }) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Artwork background", Modifier.weight(1f)); Switch(prefs.dynamicBackground, { model.preferences(prefs.copy(dynamicBackground = it)) }) } }
         item { Text("Playback", style = MaterialTheme.typography.headlineMedium); Text("Crossfade • ${prefs.crossfadeSeconds}s"); Slider(prefs.crossfadeSeconds.toFloat(), { model.preferences(prefs.copy(crossfadeSeconds = it.toInt())) }, valueRange = 0f..12f, steps = 11); Text("Equal-power volume overlap. Crossfade pauses during seeking and is disabled at playback speeds other than 1×. Automix beat matching is not available.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { Text("Playback speed • ${"%.2f".format(prefs.speed)}×"); Slider(prefs.speed, { model.preferences(prefs.copy(speed = it)) }, valueRange = 0.5f..2f, steps = 5) }
         item { Text("Sleep timer", style = MaterialTheme.typography.titleLarge); if (sleep != null) Text("Pauses in ${formatTime(sleep!! * 1000)}"); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(15, 30, 60).forEach { minutes -> AssistChip({ model.sleepTimer(minutes) }, { Text("${minutes}m") }) }; AssistChip({ model.sleepTimer(null) }, { Text("Cancel") }) } }

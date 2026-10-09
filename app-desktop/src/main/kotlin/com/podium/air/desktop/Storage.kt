@@ -4,6 +4,7 @@ package com.podium.air.desktop
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.lyrics.EnhancedLrc
 import com.music.bitchord.data.lyrics.LyricLine
+import com.music.bitchord.data.lyrics.TtmlLyrics
 import com.podium.air.domain.PlaybackQueue
 import com.podium.air.domain.QueueEntry
 import com.podium.air.domain.RepeatMode
@@ -17,14 +18,15 @@ import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 @Serializable
-data class StoredTrack(val id: String, val path: String, val title: String, val artist: String, val album: String, val duration: Long = 0, val artwork: String? = null) {
+data class StoredTrack(val id: String, val path: String, val title: String, val artist: String, val album: String, val duration: Long = 0, val artwork: String? = null, val albumArtist: String = "", val trackNumber: Int = 0, val discNumber: Int = 0, val genre: String = "") {
+    val albumKey: String get() = album.lowercase(java.util.Locale.ROOT) + "\u001f" + (albumArtist.ifBlank { artist }).lowercase(java.util.Locale.ROOT)
     fun song() = Song(id, title, artist, artwork?.let { File(it).toURI().toString() }, albumName = album,
         durationText = formatTime(duration), localPath = path, localUri = File(path).toURI().toString())
 }
 @Serializable
 data class Playlist(val id: String = UUID.randomUUID().toString(), val name: String, val tracks: List<String> = emptyList())
 @Serializable
-data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false)
+data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false, val reducedMotion: Boolean = false, val dynamicBackground: Boolean = true, val lyricsAutoScroll: Boolean = true)
 @Serializable
 data class SavedQueueEntry(val key: String, val trackId: String)
 @Serializable
@@ -34,6 +36,7 @@ data class SavedState(
     val favorites: Set<String> = emptySet(), val history: List<String> = emptyList(),
     val preferences: Preferences = Preferences(), val queue: List<SavedQueueEntry> = emptyList(),
     val cursor: Int = -1, val repeat: String = "OFF", val originalOrder: List<String>? = null,
+    val listening: List<ListeningEntry> = emptyList(), val lyricOffsets: Map<String, Long> = emptyMap(),
 ) {
     fun playbackQueue(): PlaybackQueue {
         val known = library.associateBy { it.id }
@@ -81,12 +84,15 @@ fun formatTime(ms: Long): String { val seconds = ms.coerceAtLeast(0) / 1000; ret
 /** Native formats plus bounded, background FLAC/Opus-to-PCM preparation. */
 class LocalLibrary(private val directory: File = defaultDataDirectory()) {
     val extensions = setOf("mp3", "wav", "aif", "aiff", "m4a", "flac", "opus", "ogg")
-    fun import(files: List<File>): Pair<List<StoredTrack>, List<String>> {
+    fun import(files: List<File>, checkCancelled: () -> Unit = {}, progress: (Int, Int) -> Unit = { _, _ -> }): Pair<List<StoredTrack>, List<String>> {
         val failures = mutableListOf<String>()
-        val tracks = files.distinctBy { it.canonicalPath }.mapNotNull { file ->
-            if (!file.isFile || file.extension.lowercase() !in extensions) { failures += "${file.name}: unsupported or missing file"; return@mapNotNull null }
+        val candidates = files.distinctBy { it.absolutePath }
+        val tracks = candidates.mapIndexedNotNull { index, file ->
+            checkCancelled(); progress(index + 1, candidates.size)
+            if (!file.isFile || file.extension.lowercase() !in extensions) { failures += "${file.name}: unsupported or missing file"; return@mapIndexedNotNull null }
             val id = UUID.nameUUIDFromBytes(file.canonicalPath.toByteArray()).toString()
             var title = file.nameWithoutExtension; var artist = "Unknown artist"; var album = "Local music"; var duration = 0L; var artwork: String? = null
+            var albumArtist = ""; var genre = ""; var trackNumber = 0; var discNumber = 0
             // Metadata failure never makes a playable WAV or other valid file disappear.
             runCatching {
                 val audio = AudioFileIO.read(file)
@@ -95,20 +101,28 @@ class LocalLibrary(private val directory: File = defaultDataDirectory()) {
                 tag?.getFirst(FieldKey.TITLE)?.takeIf { it.isNotBlank() }?.let { title = it }
                 tag?.getFirst(FieldKey.ARTIST)?.takeIf { it.isNotBlank() }?.let { artist = it }
                 tag?.getFirst(FieldKey.ALBUM)?.takeIf { it.isNotBlank() }?.let { album = it }
+                albumArtist = tag?.getFirst(FieldKey.ALBUM_ARTIST).orEmpty()
+                genre = tag?.getFirst(FieldKey.GENRE).orEmpty()
+                trackNumber = tag?.getFirst(FieldKey.TRACK)?.substringBefore('/')?.toIntOrNull() ?: 0
+                discNumber = tag?.getFirst(FieldKey.DISC_NO)?.substringBefore('/')?.toIntOrNull() ?: 0
                 tag?.firstArtwork?.binaryData?.let { bytes ->
+                    require(bytes.size <= 10_000_000) { "Artwork exceeds 10 MB." }
                     val artDir = File(directory, "artwork").apply { mkdirs() }
                     val image = File(artDir, "$id.image")
                     image.writeBytes(bytes); artwork = image.absolutePath
                 }
             }
-            StoredTrack(id, file.canonicalPath, title, artist, album, duration, artwork)
+            StoredTrack(id, file.canonicalPath, title, artist, album, duration, artwork, albumArtist, trackNumber, discNumber, genre)
         }
         return tracks to failures
     }
-    fun folder(folder: File): List<File> = folder.walkTopDown().onEnter { !it.isHidden }.filter { it.isFile && it.extension.lowercase() in extensions }.toList()
+    fun folder(folder: File, checkCancelled: () -> Unit = {}): List<File> = folder.walkTopDown().onEnter { checkCancelled(); !it.isHidden && !Files.isSymbolicLink(it.toPath()) }.filter { checkCancelled(); it.isFile && it.extension.lowercase() in extensions }.toList()
     fun lyrics(track: Song): List<LyricLine> {
         val audio = track.localPath?.let(::File) ?: return emptyList()
+        val ttml = File(audio.parentFile, "${audio.nameWithoutExtension}.ttml")
+        if (ttml.isFile) { require(ttml.length() <= 2_000_000) { "TTML lyrics exceed the 2 MB limit." }; return TtmlLyrics.parse(ttml.readText()) }
         val lrc = File(audio.parentFile, "${audio.nameWithoutExtension}.lrc")
+        if (lrc.isFile) require(lrc.length() <= 2_000_000) { "LRC lyrics exceed the 2 MB limit." }
         val text = if (lrc.isFile) lrc.readText() else runCatching { AudioFileIO.read(audio).tag?.getFirst(FieldKey.LYRICS) }.getOrNull().orEmpty()
         if (text.isBlank()) return emptyList()
         val enhanced = EnhancedLrc.parse(text)

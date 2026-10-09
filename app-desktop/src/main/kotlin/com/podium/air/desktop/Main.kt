@@ -17,6 +17,7 @@ import javax.swing.filechooser.FileNameExtensionFilter
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
+    if (args.contains("--platform-smoke")) { platformSmoke(args); return }
     if (args.contains("--audio-smoke")) { audioSmoke(args); return }
     val smoke = args.contains("--ui-smoke")
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
@@ -26,14 +27,15 @@ fun main(args: Array<String>) {
         val second = File(store.directory, "second-tone.wav"); generateTestWave(second, 1)
         val a = StoredTrack("smoke-a", first.absolutePath, "Generated test tone", "UI smoke fixture", "Test album", 1000)
         val b = StoredTrack("smoke-b", second.absolutePath, "Second test tone", "UI smoke fixture", "Test album", 1000)
-        store.save(SavedState(library = listOf(a, b), playlists = listOf(Playlist(name = "Smoke playlist", tracks = listOf(a.id, b.id))), favorites = setOf(a.id), history = listOf(b.id, a.id)))
+        File(store.directory, "test-tone.ttml").writeText("<tt><body><p begin='0' end='2'><span begin='0' end='1.2'>Podium </span><span begin='1.2' end='2'>Air</span></p></body></tt>")
+        store.save(SavedState(queue = listOf(SavedQueueEntry("ui-current", a.id)), cursor = 0, library = listOf(a, b), playlists = listOf(Playlist(name = "Smoke playlist", tracks = listOf(a.id, b.id))), favorites = setOf(a.id), history = listOf(b.id, a.id)))
     }
     val model = DesktopModel(JavaFxAudioEngine(), store)
     var tray: TrayIcon? = null
     var mediaControls: WindowsMediaControls? = null
     application {
         var visible by remember { mutableStateOf(!args.contains("--background") || !SystemTray.isSupported()) }
-        val windowState = rememberWindowState(width = 1160.dp, height = 800.dp)
+        val windowState = rememberWindowState(width = if (args.contains("--small")) 760.dp else 1160.dp, height = if (args.contains("--small")) 560.dp else 800.dp)
         fun shutdown() { tray?.let { SystemTray.getSystemTray().remove(it) }; mediaControls?.close(); model.close(); FxRuntime.exit(); exitApplication() }
         fun pick(folder: Boolean) {
             val chooser = JFileChooser().apply {
@@ -44,6 +46,22 @@ fun main(args: Array<String>) {
             }
             if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
                 model.importFiles(if (folder) listOf(chooser.selectedFile) else chooser.selectedFiles.toList(), folder)
+            }
+        }
+        fun pickPlaylist(playlist: Playlist?) {
+            val chooser = JFileChooser().apply {
+                dialogTitle = if (playlist == null) "Import local playlist" else "Export ${playlist.name}"
+                fileFilter = FileNameExtensionFilter("Local playlists (M3U8, M3U)", "m3u8", "m3u")
+                if (playlist != null) selectedFile = File(playlist.name.replace(Regex("[<>:\"/\\\\|?*]"), "_") + ".m3u8")
+            }
+            val result = if (playlist == null) chooser.showOpenDialog(null) else chooser.showSaveDialog(null)
+            if (result == JFileChooser.APPROVE_OPTION) {
+                if (playlist == null) model.importPlaylist(chooser.selectedFile)
+                else {
+                    var selected = chooser.selectedFile
+                    if (selected.extension.lowercase() !in setOf("m3u8", "m3u")) selected = File(selected.absolutePath + ".m3u8")
+                    if (!selected.exists() || javax.swing.JOptionPane.showConfirmDialog(null, "Replace ${selected.name}?", "Export playlist", javax.swing.JOptionPane.YES_NO_OPTION) == javax.swing.JOptionPane.YES_OPTION) model.exportPlaylist(playlist.id, selected)
+                }
             }
         }
         Window(onCloseRequest = { if (model.state.value.preferences.closeToTray && tray != null) visible = false else shutdown() }, title = "Podium Air — Windows Edition", state = windowState, visible = visible) {
@@ -74,13 +92,19 @@ fun main(args: Array<String>) {
                     }.onFailure { model.message.value = "System tray is unavailable: ${it.message}" }
                 }
             }
-            PodiumApp(model, ::pick, smoke = smoke, onReady = {
+            PodiumApp(model, ::pick, ::pickPlaylist, smoke = smoke, onSmokePage = { page ->
+                val screenshots = args.firstOrNull { it.startsWith("--screenshots=") }?.substringAfter("=")
+                if (screenshots != null) {
+                    val output = File(screenshots).apply { mkdirs() }
+                    ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(output, "$page.png"))
+                }
+            }, onReady = {
                 if (smoke) {
                     // Start only after composition reaches content; captures render/runtime initialization failures.
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(2500)
                         val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                        File(result).writeText("PASS: Compose desktop window, all 14 navigation routes and populated playlist/album detail rendered.\n")
+                        File(result).writeText("PASS: Compose desktop window, all 15 navigation routes and populated playlist/album detail rendered.\n")
                         val png = args.firstOrNull { it.startsWith("--screenshot=") }?.substringAfter("=")
                         if (png != null) runCatching {
                             ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(png))
@@ -91,6 +115,19 @@ fun main(args: Array<String>) {
             })
         }
     }
+}
+
+private fun platformSmoke(args: Array<String>) {
+    val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "platform-smoke.txt")
+    val directory = java.nio.file.Files.createTempDirectory("podium-platform-smoke").toFile()
+    try {
+        val process = ProcessBuilder(extractMediaBridge(directory).absolutePath, "--self-test").redirectErrorStream(true).start()
+        if (!process.waitFor(15000, java.util.concurrent.TimeUnit.MILLISECONDS)) { process.destroyForcibly(); error("Packaged Windows media helper timed out") }
+        val text = process.inputStream.bufferedReader().readText()
+        result.writeText(text)
+        check(process.exitValue() == 0 && text.contains("PASS:")) { text }
+    } catch (error: Exception) { result.writeText("FAIL: ${error.message}\n"); directory.deleteRecursively(); exitProcess(1) }
+    directory.deleteRecursively(); exitProcess(0)
 }
 
 /** Optional hardware integration check. Fails explicitly if no usable audio output exists. */
