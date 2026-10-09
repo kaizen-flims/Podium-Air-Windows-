@@ -39,8 +39,10 @@ source ZIP and SHA256SUMS. A successful run is required; workflow configuration
 alone does not prove a package exists. Artifacts expire after 30 days.
 
 The `Windows-verification` artifact contains test reports and a startup screenshot.
-A separate opt-in `audio_smoke` workflow input runs real WAV playback/pause/seek
-and crossfade. It requires an available audio output; cloud runners may lack one.
+CI attempts real WAV playback/pause/seek and crossfade. If the runner has no
+audio device, a recognized native media/output error is recorded as Blocked,
+without calling it a pass. The `audio_smoke` workflow input forces such a failure
+to fail the job too. Unexpected failures always fail CI.
 On your PC, the same check can be run against the portable executable:
 
 ```powershell

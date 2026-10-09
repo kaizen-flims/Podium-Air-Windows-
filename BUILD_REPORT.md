@@ -37,3 +37,24 @@ reuse/decoder/model assessment. SMTC, hardware keys, device hotplug, performance
 DPI, offline errors across real formats, runtime-native licenses, signing and
 installer install/uninstall behavior remain to be tested. No public release,
 main merge or auto-update has been performed.
+
+## Recorded Windows evidence (initial working preview)
+
+Commit `42911db61e80261de1e7b57ea28fb89c1cabbc76` passed the Windows build:
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37940753717
+
+Both `:shared-domain:check` and `:app-desktop:check` passed; Kotlin/Compose code
+compiled. `createDistributable`, `packageMsi` and `packageExe` completed. The
+packaged executable launched and wrote `PASS: Compose desktop window and
+navigation rendered.` A screenshot and test XML/HTML reports were uploaded.
+Runner: Windows Server 2025, x64; JDK Temurin 21.0.12+101.0. Windows 10/11
+consumer installation, UI interaction and audio device tests remain pending.
+
+Initial package artifact:
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37940753717/artifacts/11620239487
+
+This confirms build/startup/packaging gates, not audible output or complete
+feature parity. A follow-up commit adds full version-specific OpenJFX native
+notices, source bundles, a license selector, dependency inventory, Gradle
+distribution checksum and a default real-audio smoke attempt. Its CI result
+must be recorded separately before relying on the updated package.

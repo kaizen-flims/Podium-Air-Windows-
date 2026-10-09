@@ -36,19 +36,21 @@ licenses and notices; the root GPL license does not erase the AGPL headers.
 | Kotlin serialization | 1.9.0 | Apache-2.0, https://github.com/Kotlin/kotlinx.serialization |
 | Skiko / Skia (transitive Compose renderer) | resolved by Compose; see packaged inventory | Apache-2.0 / BSD and bundled notices, https://github.com/JetBrains/skiko, https://skia.googlesource.com/skia/ |
 | OpenJFX base / graphics / media | 21.0.9 | GPL-2.0 with Classpath Exception; additional native-library licenses. https://github.com/openjdk/jfx21u |
-| jaudiotagger | 3.0.1 | LGPL; verify exact artifact license in dependency notices/POM. https://bitbucket.org/ijabz/jaudiotagger/ |
+| jaudiotagger | 3.0.1 | LGPL-2.1-or-later (source headers), LGPL in published POM. https://bitbucket.org/ijabz/jaudiotagger/ |
 | Eclipse Temurin runtime | JDK 21 build resolved by setup-java | GPL-2.0 with Classpath Exception and runtime legal notices. https://adoptium.net/ |
 | Gradle wrapper | 8.14.3 distribution | Apache-2.0, https://github.com/gradle/gradle |
 
 The Gradle dependencyNotices task retains LICENSE, NOTICE, COPYING and legal
-files from resolved dependency JARs under licenses/dependencies. OpenJFX GPL,
+files from resolved dependency JARs under licenses/dependencies. OpenJFX 21.0.9+1 GPL, native-library legal files,
 Classpath information and assembly exception are additionally bundled under
 licenses/openjfx. The packaged JDK retains its runtime/legal notices.
 
 Before a public release, check the resolved dependency inventory and all native
 library notices in the actual Windows artifact. Preserve corresponding source
 access for LGPL/GPL runtime components and ensure license texts match the
-specific versions resolved. Public release remains blocked until this review
+specific versions resolved. jaudiotagger LGPL-2.1 is additionally bundled. CI
+archives jaudiotagger/OpenJFX source JARs and full OpenJFX 21.0.9+1 native
+source beside the packages. Public release remains blocked until this review
 and audio/device testing are complete. The CI artifact includes this app's
 matching source ZIP and dependency notices for review; it is a test build.
 

@@ -434,6 +434,8 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, onReady: () ->
 }
 @Composable private fun About() {
     var licenses by remember { mutableStateOf<String?>(null) }
+    var showLicenseMenu by remember { mutableStateOf(false) }
+    val licensePaths = remember { readResource("/licenses/INDEX.txt").lineSequence().filter { it.startsWith("licenses/") }.toList() }
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Podium Air — Windows Edition", style = MaterialTheme.typography.headlineMedium)
         Text("0.1.0 • Native desktop preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
@@ -442,6 +444,16 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, onReady: () ->
         TextButton({ licenses = readResource("/licenses/THIRD_PARTY_NOTICES.md") + "\n\n" + readResource("/licenses/LICENSE") }) { Text("Third-party licenses & legal notices") }
         Text("Free software under GNU GPL version 3. No warranty. You may redistribute it under the license terms.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    if (licenses != null) AlertDialog(onDismissRequest = { licenses = null }, title = { Text("Licenses & legal notices") }, text = { Text(licenses!!, Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), fontSize = 11.sp) }, confirmButton = { TextButton({ licenses = null }) { Text("Close") } })
+    if (licenses != null) AlertDialog(onDismissRequest = { licenses = null }, title = { Text("Licenses & legal notices") }, text = {
+        Column {
+            Box {
+                TextButton({ showLicenseMenu = true }) { Text("View bundled license…") }
+                DropdownMenu(showLicenseMenu, { showLicenseMenu = false }, modifier = Modifier.heightIn(max = 320.dp)) {
+                    licensePaths.forEach { path -> DropdownMenuItem({ Text(path.removePrefix("licenses/"), fontSize = 11.sp) }, { licenses = readResource("/$path"); showLicenseMenu = false }) }
+                }
+            }
+            androidx.compose.foundation.text.selection.SelectionContainer { Text(licenses!!, Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()), fontSize = 11.sp) }
+        }
+    }, confirmButton = { TextButton({ licenses = null }) { Text("Close") } })
 }
 private fun readResource(path: String): String = object {}.javaClass.getResourceAsStream(path)?.bufferedReader()?.use { it.readText() } ?: "See the corresponding source for $path."

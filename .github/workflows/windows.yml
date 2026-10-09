@@ -49,8 +49,7 @@ jobs:
           if (-not (Test-Path $result)) { throw 'App exited without rendering the Compose window' }
           Get-Content $result
           if ($p.ExitCode -ne 0) { throw "UI process failed with $($p.ExitCode)" }
-      - name: Real audio integration smoke
-        if: github.event_name == 'workflow_dispatch' && inputs.audio_smoke
+      - name: Attempt real audio integration smoke
         shell: pwsh
         run: |
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
@@ -58,13 +57,42 @@ jobs:
           $p = Start-Process -FilePath $exe -ArgumentList @('--audio-smoke', "--result=`"$result`"") -PassThru
           if (-not $p.WaitForExit(45000)) { $p.Kill(); throw 'Audio integration smoke timed out' }
           if (Test-Path $result) { Get-Content $result }
-          if ($p.ExitCode -ne 0 -or -not (Test-Path $result)) { throw 'Real audio integration failed; inspect audio-smoke.txt' }
+          if (-not (Test-Path $result)) { throw 'Audio process exited without a result (runtime/packaging failure)' }
+          if ($p.ExitCode -ne 0) {
+            $devices = @(Get-CimInstance Win32_SoundDevice)
+            $failure = Get-Content $result -Raw
+            $force = '${{ inputs.audio_smoke }}' -eq 'true'
+            if ($devices.Count -eq 0 -and -not $force -and $failure -match 'Could not create player|MEDIA_UNAVAILABLE|Timed out waiting for') {
+              "BLOCKED: This cloud runner has no audio output device. Native audio smoke was attempted: $failure" | Set-Content $result
+              Get-Content $result
+            } else { throw "Real audio integration failed: $failure" }
+          }
+      - name: Summarize test and runtime evidence
+        shell: pwsh
+        run: |
+          $tests = 0; $failures = 0
+          Get-ChildItem -Recurse -Path . -Filter 'TEST-*.xml' | Where-Object FullName -Match 'test-results' | ForEach-Object {
+            [xml]$report = Get-Content $_.FullName
+            $tests += [int]$report.testsuite.tests
+            $failures += [int]$report.testsuite.failures + [int]$report.testsuite.errors
+          }
+          "Tests: $tests; failures/errors: $failures" | Tee-Object -FilePath test-summary.txt
+          Get-Content "$env:JAVA_HOME/release" | Out-File runtime-build.txt
+          Get-Content app-desktop/build/generated/notices/licenses/DEPENDENCIES.txt | Out-File dependency-inventory.txt
+          if ($tests -lt 18 -or $failures -ne 0) { throw 'Expected test suites did not all run successfully' }
+      - name: Collect separately licensed dependency sources
+        shell: pwsh
+        run: |
+          .\gradlew.bat --no-daemon :app-desktop:collectDependencySources
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency source collection failed' }
+          Invoke-WebRequest 'https://github.com/openjdk/jfx21u/archive/refs/tags/21.0.9%2B1.zip' -OutFile 'build/dependency-sources/OpenJFX-21.0.9-native-source.zip'
+          Compress-Archive -Path 'build/dependency-sources/*' -DestinationPath dependency-sources.zip
       - name: Archive corresponding source and portable app
         shell: pwsh
         run: |
           git archive --format=zip -o podium-air-windows-source.zip HEAD
           Compress-Archive -Path 'app-desktop/build/compose/binaries/main/app/Podium Air' -DestinationPath podium-air-windows-portable.zip
-          Get-FileHash app-desktop/build/compose/binaries/main/msi/*.msi, app-desktop/build/compose/binaries/main/exe/*.exe, podium-air-windows-portable.zip, podium-air-windows-source.zip -Algorithm SHA256 | Format-List | Out-File SHA256SUMS.txt
+          Get-FileHash app-desktop/build/compose/binaries/main/msi/*.msi, app-desktop/build/compose/binaries/main/exe/*.exe, podium-air-windows-portable.zip, podium-air-windows-source.zip, dependency-sources.zip -Algorithm SHA256 | Format-List | Out-File SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: Podium-Air-Windows-x64
@@ -75,6 +103,7 @@ jobs:
             app-desktop/build/compose/binaries/main/exe/*.exe
             podium-air-windows-portable.zip
             podium-air-windows-source.zip
+            dependency-sources.zip
             SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         if: always()
@@ -86,3 +115,6 @@ jobs:
             ui-smoke.txt
             ui-smoke.png
             audio-smoke.txt
+            test-summary.txt
+            runtime-build.txt
+            dependency-inventory.txt

@@ -1,6 +1,7 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.util.zip.ZipFile
 import java.io.File
+import java.security.MessageDigest
 plugins {
     kotlin("jvm")
     kotlin("plugin.compose")
@@ -55,7 +56,13 @@ val dependencyNotices by tasks.registering {
     doLast {
         val dest = output.get().asFile
         dest.deleteRecursively(); dest.mkdirs()
-        configurations.runtimeClasspath.get().files.filter { it.extension == "jar" }.forEach { jar ->
+        val jars = configurations.runtimeClasspath.get().files.filter { it.extension == "jar" }
+        val inventory = jars.sortedBy { it.name }.joinToString("\n") { jar ->
+            val digest = MessageDigest.getInstance("SHA-256").digest(jar.readBytes()).joinToString("") { "%02x".format(it) }
+            "$digest  ${jar.name}"
+        }
+        dest.resolve("licenses/DEPENDENCIES.txt").apply { parentFile.mkdirs(); writeText(inventory + "\n") }
+        jars.forEach { jar ->
             ZipFile(jar).use { zip ->
                 zip.entries().asSequence().filter { !it.isDirectory &&
                     (it.name.contains("LICENSE", true) || it.name.contains("NOTICE", true) ||
@@ -66,6 +73,9 @@ val dependencyNotices by tasks.registering {
                 }
             }
         }
+        val manual = project.file("src/main/resources/licenses").walkTopDown().filter { it.isFile }.map { "licenses/" + it.relativeTo(project.file("src/main/resources/licenses")).invariantSeparatorsPath }.toList()
+        val generated = dest.walkTopDown().filter { it.isFile }.map { it.relativeTo(dest).invariantSeparatorsPath }.toList()
+        dest.resolve("licenses/INDEX.txt").writeText((listOf("licenses/LICENSE", "licenses/THIRD_PARTY_NOTICES.md") + manual + generated).distinct().sorted().joinToString("\n"))
     }
 }
 tasks.processResources {
@@ -73,4 +83,17 @@ tasks.processResources {
     from(layout.buildDirectory.dir("generated/notices"))
     from(rootProject.file("LICENSE")) { into("licenses") }
     from(rootProject.file("THIRD_PARTY_NOTICES.md")) { into("licenses") }
+}
+
+val dependencySources by configurations.creating {
+    isTransitive = false
+    isCanBeConsumed = false
+}
+dependencies {
+    dependencySources("net.jthink:jaudiotagger:3.0.1:sources")
+    for (module in listOf("base", "graphics", "media")) dependencySources("org.openjfx:javafx-$module:21.0.9:sources")
+}
+tasks.register<Copy>("collectDependencySources") {
+    from(dependencySources)
+    into(rootProject.layout.buildDirectory.dir("dependency-sources"))
 }

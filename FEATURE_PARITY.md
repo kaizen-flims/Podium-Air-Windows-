@@ -7,14 +7,14 @@ No claim of full Android parity is made.
 
 | Feature | Status | Implementation / evidence needed |
 |---|---|---|
-| Native Compose desktop window / navigation | Partial | Implemented; packaged Windows startup smoke pending CI |
+| Native Compose desktop window / navigation | Verified | Packaged window started in Windows Server 2025 run 37940753717; consumer Windows interaction/DPI still pending |
 | Home / Explore | Partial | Real local recents, added tracks, favorites, albums/artists; provider feed blocked |
 | Search | Partial | Local title/artist/album search; online search blocked |
 | Library / favorites / history | Partial | Implemented with persisted local state; test execution pending |
 | Playlists create/rename/delete/add/remove/move | Partial | Local playlists and duplicates; remote sync blocked |
 | Album / artist detail | Partial | Groups imported tagged music; no remote detail pages |
 | Now Playing / mini player / volume / seek | Partial | JavaFX real media pipeline; hardware smoke pending |
-| Queue / repeat / shuffle / duplicates | Partial | Domain and coordinator tests authored; execution pending |
+| Queue / repeat / shuffle / duplicates | Verified | Domain and coordinator tests passed in run 37940753717; real device transitions remain pending |
 | Crossfade 0–12 seconds | Partial | Two-player equal-power local overlap at 1×; real output test pending |
 | Sample-accurate gapless / Automix beat/tempo transitions | Blocked | No beat analysis or time-stretch pipeline; not simulated |
 | Speed / equalizer / sleep timer | Partial | Actual JavaFX rate/equalizer and coroutine pause timer; device checks pending |
@@ -27,8 +27,8 @@ No claim of full Android parity is made.
 | Keyboard / native picker / standard window controls / tray | Partial | Implemented; interactive Windows checks pending |
 | Windows multimedia keys / SMTC / device changes / notifications | Blocked | Native Windows bridge and device tests pending |
 | DPI / accessibility / responsiveness | Partial | Logical dp layout, labels, keyboard shortcuts, minimum size, scrolling; 100/150/200% DPI checks pending |
-| Atomic save / corrupt-file recovery | Partial | Tests authored; execution pending |
-| Windows installer / portable bundle | Partial | CI configured for MSI/EXE/portable with matching source; build pending |
+| Atomic save / corrupt-file recovery | Verified | State round-trip, corrupt-file preservation and filtered restore tests passed in run 37940753717 |
+| Windows installer / portable bundle | Verified | MSI, EXE and portable/source artifacts produced in run 37940753717; installer installation/uninstallation still pending |
 
 The source inventory lists additional Android surfaces (Sources, Listen
 Together, Discord, Replay, Equalizer, Local Music, Account/Scrobbling, canvas
