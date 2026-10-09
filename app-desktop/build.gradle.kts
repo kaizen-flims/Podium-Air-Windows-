@@ -1,4 +1,6 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import java.util.zip.ZipFile
+import java.io.File
 plugins {
     kotlin("jvm")
     kotlin("plugin.compose")
@@ -54,12 +56,12 @@ val dependencyNotices by tasks.registering {
         val dest = output.get().asFile
         dest.deleteRecursively(); dest.mkdirs()
         configurations.runtimeClasspath.get().files.filter { it.extension == "jar" }.forEach { jar ->
-            java.util.zip.ZipFile(jar).use { zip ->
+            ZipFile(jar).use { zip ->
                 zip.entries().asSequence().filter { !it.isDirectory &&
                     (it.name.contains("LICENSE", true) || it.name.contains("NOTICE", true) ||
                      it.name.contains("COPYING", true) || it.name.contains("legal/", true)) }.forEach { entry ->
                     val out = dest.resolve("licenses/dependencies/${jar.name}/${entry.name}")
-                    require(out.canonicalPath.startsWith(dest.canonicalPath + java.io.File.separator))
+                    require(out.canonicalPath.startsWith(dest.canonicalPath + File.separator))
                     out.parentFile.mkdirs(); zip.getInputStream(entry).use { input -> out.outputStream().use { input.copyTo(it) } }
                 }
             }

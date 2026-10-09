@@ -31,7 +31,7 @@ fun main(args: Array<String>) {
                 dialogTitle = if (folder) "Import music folder" else "Import music"
                 fileSelectionMode = if (folder) JFileChooser.DIRECTORIES_ONLY else JFileChooser.FILES_ONLY
                 isMultiSelectionEnabled = !folder
-                if (!folder) fileFilter = FileNameExtensionFilter("Supported audio (MP3, WAV, AIFF, M4A, AAC)", "mp3", "wav", "aif", "aiff", "m4a", "aac")
+                if (!folder) fileFilter = FileNameExtensionFilter("Supported audio (MP3, WAV, AIFF, M4A AAC in M4A)", "mp3", "wav", "aif", "aiff", "m4a")
             }
             if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
                 model.importFiles(if (folder) listOf(chooser.selectedFile) else chooser.selectedFiles.toList(), folder)

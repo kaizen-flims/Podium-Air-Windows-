@@ -51,7 +51,7 @@ Get-Content audio-smoke.txt
 ## Use
 
 Import files with Ctrl+O, or a folder with Ctrl+Shift+O. Supported baseline
-formats are MP3, PCM WAV, AIFF and compatible AAC/M4A. Files stay in their
+formats are MP3, PCM WAV, AIFF and compatible AAC in M4A. Files stay in their
 original locations; moving them later requires reimporting. Menu → Play Next /
 Add to Queue and Add to Playlist work on imported tracks. Sidecar `.lrc` files
 should have the same basename as the audio file. Library state is stored in

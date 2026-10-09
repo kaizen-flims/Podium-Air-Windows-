@@ -57,7 +57,7 @@ class DesktopModel(
                     localLibrary.import(candidates)
                 }
                 change { copy(library = (library + newTracks).associateBy { it.id }.values.toList()) }
-                message.value = if (failures.isEmpty()) "Imported ${newTracks.size} tracks." else "Imported ${newTracks.size} tracks. ${failures.take(4).joinToString("; ")}" 
+                message.value = if (failures.isEmpty()) "Imported ${newTracks.size} tracks." else "Imported ${newTracks.size} tracks. ${failures.take(4).joinToString("; ")}"
             } catch (error: Exception) { message.value = "Import failed: ${error.message}" }
             finally { importing.value = false }
         }

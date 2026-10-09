@@ -80,7 +80,7 @@ fun formatTime(ms: Long): String { val seconds = ms.coerceAtLeast(0) / 1000; ret
 
 /** JavaFX baseline supports MP3, PCM WAV, AAC and M4A; no FLAC/Opus claim. */
 class LocalLibrary(private val directory: File = defaultDataDirectory()) {
-    val extensions = setOf("mp3", "wav", "aif", "aiff", "m4a", "aac")
+    val extensions = setOf("mp3", "wav", "aif", "aiff", "m4a")
     fun import(files: List<File>): Pair<List<StoredTrack>, List<String>> {
         val failures = mutableListOf<String>()
         val tracks = files.distinctBy { it.canonicalPath }.mapNotNull { file ->

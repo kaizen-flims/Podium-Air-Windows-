@@ -20,7 +20,7 @@ No claim of full Android parity is made.
 | Speed / equalizer / sleep timer | Partial | Actual JavaFX rate/equalizer and coroutine pause timer; device checks pending |
 | Lyrics | Partial | Local line/enhanced-word LRC, embedded text, click-to-seek; source word-growth timing reused but full animation not ported |
 | Artwork / colors / icon | Partial | Embedded still art, original logo/icon, source light/dark palette; dynamic mesh/canvas pending |
-| Local formats | Partial | JavaFX MP3/WAV/AIFF/AAC/M4A baseline; decoder/platform checks pending. FLAC/Opus not claimed |
+| Local formats | Partial | JavaFX MP3/WAV/AIFF/M4A (AAC) baseline; decoder/platform checks pending. FLAC/Opus not claimed |
 | Google login / YouTube streaming / downloads / sync | Blocked | Source private API/extraction route incompatible with prompt's policy gate |
 | Discord login/RPC, scrobbling, Listen Together, sources | Blocked | No supported desktop implementation yet |
 | Replay / statistics / translations / remote network libraries | Blocked | Not implemented |
