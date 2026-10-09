@@ -3,6 +3,9 @@ package com.podium.air.desktop
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.WindowPlacement
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -36,7 +39,9 @@ fun main(args: Array<String>) {
     var mediaControls: WindowsMediaControls? = null
     application {
         var visible by remember { mutableStateOf(!args.contains("--background") || !SystemTray.isSupported()) }
-        val windowState = rememberWindowState(width = if (args.contains("--small")) 760.dp else 1160.dp, height = if (args.contains("--small")) 560.dp else 800.dp)
+        val bounds = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
+        val windowState = rememberWindowState(placement = if (args.contains("--small")) WindowPlacement.Floating else WindowPlacement.Maximized,
+            position = WindowPosition(Alignment.Center), width = minOf(760, bounds.width - 24).coerceAtLeast(360).dp, height = minOf(560, bounds.height - 24).coerceAtLeast(280).dp)
         fun shutdown() { tray?.let { SystemTray.getSystemTray().remove(it) }; mediaControls?.close(); model.close(); FxRuntime.exit(); exitApplication() }
         fun pick(folder: Boolean) {
             val chooser = JFileChooser().apply {
@@ -67,7 +72,7 @@ fun main(args: Array<String>) {
         }
         Window(onCloseRequest = { if (model.state.value.preferences.closeToTray && tray != null) visible = false else shutdown() }, title = "Podium Air — Windows Edition", state = windowState, visible = visible) {
             LaunchedEffect(Unit) {
-                window.minimumSize = Dimension(720, 540)
+                window.minimumSize = Dimension(minOf(720, bounds.width - 24), minOf(540, bounds.height - 24))
                 window.toFront(); window.requestFocus()
                 if ((!smoke || performance) && System.getProperty("os.name").startsWith("Windows")) {
                     mediaControls = WindowsMediaControls(model)
@@ -100,6 +105,10 @@ fun main(args: Array<String>) {
                     val output = File(screenshots).apply { mkdirs() }
                     ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(output, "$page.png"))
                 }
+            }, onSmokeFailure = { error ->
+                val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
+                File(result).writeText("FAIL: ${error.javaClass.simpleName}: ${error.message}\n")
+                error.printStackTrace(); mediaControls?.close(); model.close(); FxRuntime.exit(); exitProcess(1)
             }, onReady = {
                 if (smoke) {
                     // Start only after composition reaches content; captures render/runtime initialization failures.

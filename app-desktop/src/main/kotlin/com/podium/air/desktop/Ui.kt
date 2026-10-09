@@ -19,6 +19,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -79,7 +81,7 @@ private enum class Page(val title: String, val icon: ImageVector) {
 private data class Route(val page: Page = Page.HOME, val detail: String? = null, val title: String = page.title)
 
 @Composable
-fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}) {
+fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}, onSmokeFailure: (Throwable) -> Unit = { throw it }) {
     val state by model.state.collectAsState()
     val audio by model.engine.state.collectAsState()
     val message by model.message.collectAsState()
@@ -88,7 +90,9 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     var route by remember { mutableStateOf(Route()) }
     var search by remember { mutableStateOf("") }
     var createName by remember { mutableStateOf<String?>(null) }
+    val rootFocus = remember { FocusRequester() }
     val colors = if (state.preferences.dark) Dark else Light
+    val compact = LocalWindowInfo.current.containerSize.width / LocalDensity.current.density < 900f
     MaterialTheme(colorScheme = colors, typography = Typography) {
         Surface(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -103,21 +107,22 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 event.key == Key.Escape && route.detail != null -> { route = Route(route.page); true }
                 else -> false
             }
-        }) {
+        }.focusRequester(rootFocus).focusable()) {
             Column {
                 Row(Modifier.weight(1f)) {
                     BoxWithConstraints {
                         // The sidebar stays scrollable at small window heights and at 200% DPI.
-                        Navigation(route, state.preferences.dark, { route = Route(it) })
+                        Navigation(route, state.preferences.dark, compact, { route = Route(it) })
                     }
                     VerticalDivider(color = colors.outline)
                     Column(Modifier.weight(1f).fillMaxHeight()) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = if (compact) 12.dp else 28.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (route.detail != null) Control(Icons.Rounded.ArrowBack, "Back") { route = Route(route.page) }
                             Text(if (route.page == Page.PLAYLISTS && route.detail != null) state.playlists.find { it.id == route.detail }?.name ?: route.title else route.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (importing) { progress?.let { Text("${it.first}/${it.second}", fontSize = 12.sp) }; CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp); Control(Icons.Rounded.Close, "Cancel import") { model.cancelImport() } }
                             else {
-                                TextButton(onClick = { filePicker(false) }) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Import music") }
+                                if (compact) Control(Icons.Rounded.Add, "Import music (Ctrl+O)") { filePicker(false) }
+                                else TextButton(onClick = { filePicker(false) }) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Import music") }
                                 Control(Icons.Rounded.FolderOpen, "Import folder (Ctrl+Shift+O)") { filePicker(true) }
                             }
                         }
@@ -136,7 +141,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                                     TrackList(results, model, state, Modifier.weight(1f), emptyText = "No matching tracks in your local library.")
                                 }
                                 Page.LIBRARY -> Column(Modifier.padding(horizontal = 28.dp)) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         FilterChip(selected.detail == "favorites", { route = if (selected.detail == "favorites") Route(Page.LIBRARY) else Route(Page.LIBRARY, "favorites", "Favorites") }, { Text("Favorites") })
                                         AssistChip({ route = Route(Page.PLAYLISTS) }, { Text("Playlists") })
                                         AssistChip({ route = Route(Page.ALBUMS) }, { Text("Albums") })
@@ -170,12 +175,14 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
             confirmButton = { TextButton({ model.createPlaylist(createName!!); createName = null }, enabled = !createName.isNullOrBlank()) { Text("Create") } },
             dismissButton = { TextButton({ createName = null }) { Text("Cancel") } })
         LaunchedEffect(Unit) {
+            rootFocus.requestFocus()
+            try {
             if (smoke) {
                 for (page in Page.entries) { route = Route(page); delay(450); onSmokePage(page.name.lowercase()) }
                 val playlist = state.playlists.firstOrNull()
                 if (playlist != null) { route = Route(Page.PLAYLISTS, playlist.id, playlist.name); delay(450); onSmokePage("playlist-detail") }
                 state.library.firstOrNull()?.let { route = Route(Page.ALBUMS, it.albumKey, it.album); delay(450); onSmokePage("album-detail") }
-                route = Route(Page.HOME); delay(300)
+                route = Route(Page.HOME); delay(300); rootFocus.requestFocus()
                 val robot = java.awt.Robot()
                 fun shortcut(key: Int) {
                     robot.keyPress(java.awt.event.KeyEvent.VK_CONTROL); robot.keyPress(key)
@@ -190,24 +197,28 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 route = Route(Page.HOME); delay(300)
             }
             onReady()
+            } catch (error: Exception) {
+                if (error is kotlinx.coroutines.CancellationException && error !is kotlinx.coroutines.TimeoutCancellationException) throw error
+                if (smoke) onSmokeFailure(error) else throw error
+            }
         }
     }
 }
 
-@Composable private fun Navigation(route: Route, dark: Boolean, navigate: (Page) -> Unit) {
-    Column(Modifier.width(190.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(12.dp)) {
+@Composable private fun Navigation(route: Route, dark: Boolean, compact: Boolean, navigate: (Page) -> Unit) {
+    Column(Modifier.width(if (compact) 64.dp else 190.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(12.dp)) {
         val logo = remember { SkiaImage.makeFromEncoded(requireNotNull(object {}.javaClass.getResourceAsStream("/brand/mono.png")).readBytes()).asImageBitmap() }
         Row(Modifier.padding(8.dp, 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Image(logo, "Podium Air", Modifier.size(32.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (dark) Color.White else Color.Black))
-            Spacer(Modifier.width(8.dp)); Text("Podium Air", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            if (!compact) { Spacer(Modifier.width(8.dp)); Text("Podium Air", fontWeight = FontWeight.Bold, fontSize = 18.sp) }
         }
-        Text("WINDOWS EDITION", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(10.dp, 0.dp, 0.dp, 12.dp))
+        if (!compact) Text("WINDOWS EDITION", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(10.dp, 0.dp, 0.dp, 12.dp))
         Page.entries.forEach { page ->
             if (page == Page.PLAYER || page == Page.ACCOUNT) HorizontalDivider(Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline)
             val background by animateColorAsState(if (route.page == page) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent, label = "tab")
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(background).clickable { navigate(page) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(page.icon, page.title, Modifier.size(19.dp), tint = if (route.page == page) AccentRed else MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.width(10.dp)); Text(page.title, fontSize = 13.sp, fontWeight = if (route.page == page) FontWeight.Bold else FontWeight.Normal)
+                if (!compact) { Spacer(Modifier.width(10.dp)); Text(page.title, fontSize = 13.sp, fontWeight = if (route.page == page) FontWeight.Bold else FontWeight.Normal) }
             }
         }
     }
@@ -353,18 +364,20 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 @Composable private fun MiniPlayer(model: DesktopModel, state: SavedState, open: () -> Unit) {
     val audio by model.engine.state.collectAsState()
+    BoxWithConstraints {
     Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).clickable(onClick = open), verticalAlignment = Alignment.CenterVertically) {
             Art(audio.entry?.song, 46); Spacer(Modifier.width(12.dp)); Column {
                 Text(audio.entry?.song?.title ?: "Podium Air", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                Text(audio.entry?.song?.artist ?: "Choose a track to start listening", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(audio.entry?.song?.artist ?: "Choose a track to start listening", maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Control(Icons.Rounded.SkipPrevious, "Previous track", audio.entry != null) { model.previous() }
         Control(if (audio.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (audio.playing) "Pause" else "Play", model.queue.value.current != null) { model.toggle() }
         Control(Icons.Rounded.SkipNext, "Next track", model.queue.value.nextIndex() != null) { model.next() }
-        Spacer(Modifier.width(18.dp)); Icon(Icons.Rounded.VolumeUp, "Volume", Modifier.size(18.dp))
-        Slider(state.preferences.volume, { model.preferences(state.preferences.copy(volume = it)) }, Modifier.width(96.dp), valueRange = 0f..1f)
+        if (maxWidth > 680.dp) { Spacer(Modifier.width(18.dp)); Icon(Icons.Rounded.VolumeUp, "Volume", Modifier.size(18.dp))
+        Slider(state.preferences.volume, { model.preferences(state.preferences.copy(volume = it)) }, Modifier.width(96.dp), valueRange = 0f..1f) }
+    }
     }
 }
 @Composable private fun NowPlaying(model: DesktopModel, state: SavedState) {
