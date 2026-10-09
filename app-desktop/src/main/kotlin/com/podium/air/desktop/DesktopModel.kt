@@ -51,15 +51,23 @@ class DesktopModel(
                 if (!audio.playing || now - lastStatsFlush >= 5000) { flushListening(); lastStatsFlush = now }
             }
         }
-        engine.onEnd = { key -> scope.launch {
-            if (queue.value.current?.key == key) {
-                val nextIndex = queue.value.nextIndex(automatic = true)
-                if (nextIndex != null) playQueue(queue.value.select(nextIndex))
+        engine.onEnd = { key ->
+            val endedSession = engine.state.value.session
+            scope.launch {
+                if (queue.value.current?.key == key && engine.state.value.session == endedSession) {
+                    val nextIndex = queue.value.nextIndex(automatic = true)
+                    if (nextIndex != null) playQueue(queue.value.select(nextIndex))
+                }
             }
-        } }
+        }
         engine.onAdvance = { entry -> scope.launch {
             val index = queue.value.entries.indexOfFirst { it.key == entry.key }
             if (index >= 0) { updateQueue(queue.value.select(index)); loadLyrics(entry.song); primeNext() }
+            else if (engine.state.value.entry?.key == entry.key) {
+                // A queue edit can arrive on EDT before the already-started fade's callback.
+                // Reconcile that removed incoming player; older callbacks for another player are ignored.
+                if (queue.value.current == null) engine.stop() else playQueue(queue.value)
+            }
         } }
         // Restore selection and queue without unexpectedly starting music.
         queue.value.current?.let { engine.open(it, play = false); loadLyrics(it.song); primeNext() }
@@ -115,7 +123,7 @@ class DesktopModel(
     fun selectQueue(index: Int) = playQueue(queue.value.select(index))
     fun toggle() {
         val current = queue.value.current ?: return
-        if (engine.state.value.entry == null || engine.state.value.error != null) { engine.open(current) } else engine.toggle()
+        if (engine.state.value.entry == null || engine.state.value.error != null || engine.state.value.completed) { engine.open(current) } else engine.toggle()
     }
     fun next() { val index = queue.value.nextIndex() ?: return; playQueue(queue.value.select(index)) }
     fun previous() { if (engine.state.value.positionMs > 3000) engine.seek(0) else playQueue(queue.value.previous()) }

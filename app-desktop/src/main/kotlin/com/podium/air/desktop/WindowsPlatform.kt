@@ -75,6 +75,7 @@ internal fun handleMediaCommand(model: DesktopModel, command: String) {
         "SEEK" -> command.substringAfter('\t', "").toLongOrNull()?.let(model::seek)
     }
 }
+@Synchronized
 internal fun extractMediaBridge(directory: File = File(defaultDataDirectory(), "platform")): File {
     val bytes = requireNotNull(object {}.javaClass.getResourceAsStream("/windows/PodiumMediaBridge.exe")) {
         "The native Windows helper is absent. Build it using platform-windows/build.ps1 before packaging."
@@ -100,7 +101,7 @@ object WindowsStartup {
         require(!executable.absolutePath.contains('\n') && !executable.absolutePath.contains('\r'))
         folder.mkdirs()
         val escaped = executable.absolutePath.replace("%", "%%")
-        script.writeText("@echo off\r\nchcp 65001 >nul\r\nstart \"\" \"$escaped\" --background\r\n", Charsets.UTF_8)
+        script.writeText("@echo off\r\nsetlocal DisableDelayedExpansion\r\nchcp 65001 >nul\r\nstart \"\" \"$escaped\" --background\r\n", Charsets.UTF_8)
     }
     fun packagedExecutable(): File? = System.getProperty("jpackage.app-path")?.let(::File)
         ?: ProcessHandle.current().info().command().orElse(null)?.let(::File)?.takeIf { it.name == "Podium Air.exe" }

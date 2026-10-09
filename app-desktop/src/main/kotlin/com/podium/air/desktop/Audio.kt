@@ -19,7 +19,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 data class AudioState(val entry: QueueEntry? = null, val playing: Boolean = false, val loading: Boolean = false,
-    val positionMs: Long = 0, val durationMs: Long = 0, val error: String? = null, val fading: Boolean = false, val session: Long = 0)
+    val positionMs: Long = 0, val durationMs: Long = 0, val error: String? = null, val fading: Boolean = false, val session: Long = 0, val completed: Boolean = false)
 interface AudioEngine : AutoCloseable {
     val state: StateFlow<AudioState>
     var onEnd: (String) -> Unit
@@ -105,7 +105,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
             setOnEndOfMedia {
                 if (player === this && !closed.get()) {
                     finishFade()
-                    mutable.value = mutable.value.copy(playing = false, positionMs = finiteMs(totalDuration))
+                    mutable.value = mutable.value.copy(playing = false, positionMs = finiteMs(totalDuration), completed = true)
                     onEnd(entry.key)
                 }
             }

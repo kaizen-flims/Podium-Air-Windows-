@@ -72,7 +72,7 @@ class PlaybackModelTest {
             assertEquals("506f6469756d20e29da4", mediaText("Podium ❤"))
         } finally { model.close() }
     }
-    @Test fun repeatOneCountsASecondStartButPauseResumeDoesNot() {
+    @Test fun repeatsAndCompletedRestartsCountButPauseResumeDoesNot() {
         val audio = FakeAudio(); val store = MemoryState(); val model = DesktopModel(audio, store, dispatcher = Dispatchers.Unconfined)
         try {
             model.play(listOf(store.value.library.first().song()))
@@ -83,6 +83,11 @@ class PlaybackModelTest {
             audio.onEnd(key); audio.pause()
             assertEquals(key, model.queue.value.current!!.key)
             assertEquals(2, model.state.value.listening.sumOf { it.plays })
+            audio.state.value = audio.state.value.copy(playing = false, positionMs = audio.state.value.durationMs, completed = true)
+            model.previous() // Rewind after completion must still begin a new listening session on Play.
+            model.toggle(); audio.pause()
+            assertEquals(3, model.state.value.listening.sumOf { it.plays })
+            assertEquals(0L, audio.state.value.positionMs)
         } finally { model.close() }
     }
     @Test fun shutdownFinalSnapshotWinsOverAnInFlightCancelledSave() {
@@ -116,6 +121,39 @@ class PlaybackModelTest {
             assertTrue("a" in writes.last().favorites, "An older snapshot must not overwrite the shutdown snapshot")
             assertFalse(model.message.value.orEmpty().contains("Could not save"), "Normal save cancellation is not an error")
         } finally { release.countDown(); closer?.join(3000); model.close() }
+    }
+    @Test fun lateCrossfadeOfRemovedEntryCannotReplaceTheCurrentSelection() {
+        val audio = FakeAudio(); val store = MemoryState(); val model = DesktopModel(audio, store, dispatcher = Dispatchers.Unconfined)
+        try {
+            model.play(store.value.library.map { it.song() })
+            val current = model.queue.value.current!!; val removed = audio.next!!
+            model.removeQueue(removed.key)
+            audio.state.value = AudioState(removed, playing = true, positionMs = 100, fading = true)
+            audio.onAdvance(removed)
+            assertEquals(current.key, model.queue.value.current?.key)
+            assertEquals(current.key, audio.state.value.entry?.key)
+            val session = audio.state.value.session
+            audio.onAdvance(removed) // A second stale callback must not restart the reconciled player.
+            assertEquals(session, audio.state.value.session)
+        } finally { model.close() }
+    }
+    @Test fun olderEndCallbackCannotAdvanceAManuallyRestartedQueueEntry() {
+        val tasks = java.util.concurrent.ConcurrentLinkedQueue<Runnable>()
+        val dispatcher = object : kotlinx.coroutines.CoroutineDispatcher() {
+            override fun dispatch(context: kotlin.coroutines.CoroutineContext, block: Runnable) { tasks.add(block) }
+        }
+        val audio = FakeAudio(); val store = MemoryState(); val model = DesktopModel(audio, store, dispatcher = dispatcher)
+        try {
+            model.play(store.value.library.map { it.song() })
+            val key = model.queue.value.current!!.key
+            audio.onEnd(key) // The old end waits for the UI thread while the user restarts this entry.
+            model.selectQueue(0)
+            val restartedSession = audio.state.value.session
+            while (true) { val task = tasks.poll() ?: break; task.run() }
+            assertEquals(key, model.queue.value.current?.key)
+            assertEquals(restartedSession, audio.state.value.session)
+            assertEquals("a", audio.state.value.entry?.song?.videoId)
+        } finally { model.close() }
     }
     @Test fun crossfadeAdvanceDoesNotReopenIncomingPlayer() {
         val audio = FakeAudio(); val store = MemoryState(); val model = DesktopModel(audio, store, dispatcher = Dispatchers.Unconfined)

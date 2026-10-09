@@ -39,3 +39,9 @@
 - Commit 8cb1877 passed the full Windows workflow 37957264531: 36 tests, native Unicode shell selections/cancellation, packaged JVM/native protocol and open-dialog cancellation cleanup, all routes/keyboard/DPI smokes, six codec natural-end checks, bad-file recovery, MSI install/run/uninstall and all uploads. Pinned runtime/source checksum/build-source collection passed. Paused sample: 0.69% of one core, 258.16 MB peak sampled app/direct-helper working set.
 
 - Implementation 84df7fb passed all 38 tests, all native/packaged controls/dialogs, keyboard/DPI/six-codec natural-end/recovery smokes, MSI install/run/uninstall and source/package uploads in run 37958815393. Paused sample: 1.38% of one core and 226.34 MB peak sampled working set. A final small-screen correction exposes volume in Settings when the compact mini player hides its slider; packaging validation pending.
+
+- Added a regression for an already-started crossfade callback arriving after its incoming entry was removed: the active player reconciles with the remaining queue, while older callbacks remain ignored. Serialized helper extraction and disabled delayed batch expansion for startup paths. Final suite expects 39 tests; final validation pending.
+
+- Completed-track state now survives a rewind until Play starts a fresh session, so Replay counts manual restarts too. End callbacks retain the ended session identity and cannot advance a newer restart of the same queue entry. Covered completed/rewound restart counting in the coordinator regression.
+
+- The volume correction passed the complete Windows run 37960508751 with all 38 tests and packaging/integration checks. Added a queued-UI regression for an old end callback delivered after the user restarts the same queue entry; the final suite now expects 40 tests.

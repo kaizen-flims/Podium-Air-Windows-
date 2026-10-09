@@ -197,7 +197,7 @@ jobs:
           "Tests: $tests; failures/errors: $failures" | Tee-Object -FilePath test-summary.txt
           Get-Content "$env:JAVA_HOME/release" | Out-File runtime-build.txt
           Get-Content app-desktop/build/generated/notices/licenses/DEPENDENCIES.txt | Out-File dependency-inventory.txt
-          if ($tests -lt 38 -or $failures -ne 0) { throw 'Expected test suites did not all run successfully' }
+          if ($tests -lt 40 -or $failures -ne 0) { throw 'Expected test suites did not all run successfully' }
       - name: Collect separately licensed dependency sources
         shell: pwsh
         run: |
