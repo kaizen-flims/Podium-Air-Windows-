@@ -41,7 +41,7 @@ data class SavedState(
     fun playbackQueue(): PlaybackQueue {
         val known = library.associateBy { it.id }
         val selectedKey = queue.getOrNull(cursor)?.key
-        val restored = queue.mapNotNull { saved -> known[saved.trackId]?.let { QueueEntry(saved.key, it.song()) } }
+        val restored = queue.distinctBy { it.key }.mapNotNull { saved -> known[saved.trackId]?.let { QueueEntry(saved.key, it.song()) } }
         val restoredIndex = restored.indexOfFirst { it.key == selectedKey }.takeIf { it >= 0 } ?: if (restored.isEmpty()) -1 else 0
         return PlaybackQueue(restored, restoredIndex, runCatching { RepeatMode.valueOf(repeat) }.getOrDefault(RepeatMode.OFF), originalOrder)
     }
@@ -51,6 +51,7 @@ interface StatePersistence { fun load(): SavedState; fun save(state: SavedState)
 class StateStore(val directory: File = defaultDataDirectory()) : StatePersistence {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true; encodeDefaults = true }
     private val file = File(directory, "library.json")
+    private var recoveryBlocked = false
     var recoveryMessage: String? = null
         private set
     @Synchronized override fun load(): SavedState {
@@ -58,17 +59,26 @@ class StateStore(val directory: File = defaultDataDirectory()) : StatePersistenc
         return try {
             val state = json.decodeFromString<SavedState>(file.readText())
             require(state.schema == 1) { "Unsupported library schema ${state.schema}" }
-            state.copy(preferences = state.preferences.copy(
+            val known = state.library.map { it.id }.toSet()
+            val selected = state.queue.getOrNull(state.cursor)?.key
+            val normalizedQueue = state.queue.filter { it.key.isNotBlank() }.distinctBy { it.key }
+            state.copy(library = state.library.distinctBy { it.id }, playlists = state.playlists.distinctBy { it.id }.map { it.copy(tracks = it.tracks.filter(known::contains)) },
+                favorites = state.favorites.filter(known::contains).toSet(), history = state.history.distinct().filter(known::contains).take(200),
+                queue = normalizedQueue, cursor = normalizedQueue.indexOfFirst { it.key == selected }.takeIf { it >= 0 } ?: if (normalizedQueue.isEmpty()) -1 else 0, lyricOffsets = state.lyricOffsets.filterKeys(known::contains).mapValues { it.value.coerceIn(-10000, 10000) },
+                listening = state.listening.filter { it.milliseconds >= 0 && it.plays >= 0 }.take(20000), preferences = state.preferences.copy(
                 volume = state.preferences.volume.coerceIn(0f, 1f), crossfadeSeconds = state.preferences.crossfadeSeconds.coerceIn(0, 12),
                 speed = state.preferences.speed.coerceIn(0.5f, 2f), equalizer = List(10) { state.preferences.equalizer.getOrElse(it) { 0.0 }.coerceIn(-12.0, 12.0) }))
         } catch (error: Exception) {
             val backup = File(directory, "library-unreadable-${System.currentTimeMillis()}.json")
-            Files.copy(file.toPath(), backup.toPath())
-            recoveryMessage = "Your saved library could not be read. A copy was preserved at ${backup.absolutePath}."
+            val preserved = runCatching { Files.copy(file.toPath(), backup.toPath()) }.isSuccess
+            recoveryBlocked = !preserved
+            recoveryMessage = if (preserved) "Your saved library could not be read. A copy was preserved at ${backup.absolutePath}."
+                else "Your saved library could not be read and a recovery copy could not be created. The original file is at ${file.absolutePath}."
             SavedState()
         }
     }
     @Synchronized override fun save(state: SavedState) {
+        check(!recoveryBlocked) { "The unreadable original library must be preserved before saving a new one." }
         directory.mkdirs()
         val temp = Files.createTempFile(directory.toPath(), "library-", ".tmp")
         try {

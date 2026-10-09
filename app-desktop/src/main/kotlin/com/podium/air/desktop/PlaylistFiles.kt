@@ -11,7 +11,12 @@ object PlaylistFiles {
     fun read(file: File): Pair<List<File>, List<String>> {
         require(file.isFile && file.length() <= 2_000_000) { "Choose a local M3U/M3U8 playlist smaller than 2 MB." }
         val errors = mutableListOf<String>()
-        val tracks = file.readText(Charsets.UTF_8).removePrefix("\uFEFF").lineSequence().map { it.trim() }
+        val bytes = file.readBytes()
+        val text = runCatching { Charsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString() }.getOrElse {
+            require(file.extension.equals("m3u", true)) { "M3U8 must be valid UTF-8." }
+            bytes.toString(java.nio.charset.Charset.forName("windows-1252"))
+        }
+        val tracks = text.removePrefix("\uFEFF").lineSequence().map { it.trim() }
             .filter { it.isNotBlank() && !it.startsWith("#") }.take(10000).mapNotNull { path ->
                 when {
                     path.startsWith("file:", true) -> runCatching { File(URI(path)) }.getOrElse { errors += "Invalid file URI: $path"; null }
@@ -31,7 +36,7 @@ object PlaylistFiles {
                 val absolute = File(track.path).absoluteFile.toPath()
                 val path = runCatching { parent.toPath().relativize(absolute).toString() }.getOrElse { absolute.toString() }
                 require('\n' !in path && '\r' !in path) { "A track path contains a line break and cannot be exported to M3U." }
-                appendLine(path)
+                appendLine(if (path.startsWith("#")) ".${File.separator}$path" else path)
             }
         }
         val temp = Files.createTempFile(parent.toPath(), "playlist-", ".tmp")

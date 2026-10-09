@@ -19,16 +19,17 @@ import kotlin.system.exitProcess
 fun main(args: Array<String>) {
     if (args.contains("--platform-smoke")) { platformSmoke(args); return }
     if (args.contains("--audio-smoke")) { audioSmoke(args); return }
-    val smoke = args.contains("--ui-smoke")
+    val performance = args.contains("--performance-smoke")
+    val smoke = args.contains("--ui-smoke") || performance
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
     if (smoke) {
         store.directory.mkdirs()
-        val first = File(store.directory, "test-tone.wav"); generateTestWave(first, 1)
-        val second = File(store.directory, "second-tone.wav"); generateTestWave(second, 1)
-        val a = StoredTrack("smoke-a", first.absolutePath, "Generated test tone", "UI smoke fixture", "Test album", 1000)
-        val b = StoredTrack("smoke-b", second.absolutePath, "Second test tone", "UI smoke fixture", "Test album", 1000)
+        val first = File(store.directory, "test-tone.wav"); generateTestWave(first, 6)
+        val second = File(store.directory, "second-tone.wav"); generateTestWave(second, 6)
+        val a = StoredTrack("smoke-a", first.absolutePath, "Generated test tone", "UI smoke fixture", "Test album", 6000)
+        val b = StoredTrack("smoke-b", second.absolutePath, "Second test tone", "UI smoke fixture", "Test album", 6000)
         File(store.directory, "test-tone.ttml").writeText("<tt><body><p begin='0' end='2'><span begin='0' end='1.2'>Podium </span><span begin='1.2' end='2'>Air</span></p></body></tt>")
-        store.save(SavedState(queue = listOf(SavedQueueEntry("ui-current", a.id)), cursor = 0, library = listOf(a, b), playlists = listOf(Playlist(name = "Smoke playlist", tracks = listOf(a.id, b.id))), favorites = setOf(a.id), history = listOf(b.id, a.id)))
+        store.save(SavedState(queue = listOf(SavedQueueEntry("ui-current", a.id), SavedQueueEntry("ui-next", b.id)), cursor = 0, library = listOf(a, b), playlists = listOf(Playlist(name = "Smoke playlist", tracks = listOf(a.id, b.id))), favorites = setOf(a.id), history = listOf(b.id, a.id)))
     }
     val model = DesktopModel(JavaFxAudioEngine(), store)
     var tray: TrayIcon? = null
@@ -67,7 +68,8 @@ fun main(args: Array<String>) {
         Window(onCloseRequest = { if (model.state.value.preferences.closeToTray && tray != null) visible = false else shutdown() }, title = "Podium Air — Windows Edition", state = windowState, visible = visible) {
             LaunchedEffect(Unit) {
                 window.minimumSize = Dimension(720, 540)
-                if (!smoke && System.getProperty("os.name").startsWith("Windows")) {
+                window.toFront(); window.requestFocus()
+                if ((!smoke || performance) && System.getProperty("os.name").startsWith("Windows")) {
                     mediaControls = WindowsMediaControls(model)
                     launch { mediaControls!!.status.collect { model.platformStatus.value = it } }
                 }
@@ -92,7 +94,7 @@ fun main(args: Array<String>) {
                     }.onFailure { model.message.value = "System tray is unavailable: ${it.message}" }
                 }
             }
-            PodiumApp(model, ::pick, ::pickPlaylist, smoke = smoke, onSmokePage = { page ->
+            PodiumApp(model, ::pick, ::pickPlaylist, smoke = smoke && !performance, onSmokePage = { page ->
                 val screenshots = args.firstOrNull { it.startsWith("--screenshots=") }?.substringAfter("=")
                 if (screenshots != null) {
                     val output = File(screenshots).apply { mkdirs() }
@@ -102,9 +104,9 @@ fun main(args: Array<String>) {
                 if (smoke) {
                     // Start only after composition reaches content; captures render/runtime initialization failures.
                     CoroutineScope(Dispatchers.Main).launch {
-                        delay(2500)
+                        delay(if (performance) 20000 else 2500)
                         val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                        File(result).writeText("PASS: Compose desktop window, all 15 navigation routes and populated playlist/album detail rendered.\n")
+                        File(result).writeText(if (performance) "PASS: Paused native window and Windows media helper stayed responsive during the performance observation.\n" else "PASS: Compose desktop window, all 15 navigation routes, populated playlist/album detail, Ctrl+F and Ctrl+Space playback/pause verified.\n")
                         val png = args.firstOrNull { it.startsWith("--screenshot=") }?.substringAfter("=")
                         if (png != null) runCatching {
                             ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(png))

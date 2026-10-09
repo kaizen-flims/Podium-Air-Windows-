@@ -123,6 +123,35 @@ jobs:
             Get-Content $result
             if ($p.ExitCode -ne 0) { throw "$extension integration failed" }
           }
+      - name: Measure paused desktop CPU, memory and shutdown
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'performance-smoke.txt'
+          $p = Start-Process $exe -ArgumentList @('--performance-smoke', "--result=`"$result`"") -PassThru
+          Start-Sleep -Seconds 5
+          $children = @(Get-CimInstance Win32_Process | Where-Object ParentProcessId -eq $p.Id | Select-Object -ExpandProperty ProcessId)
+          $ids = @($p.Id) + $children
+          $samples = @()
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          for ($i = 0; $i -lt 10; $i++) {
+            $cpu = 0; $memory = 0
+            foreach ($processId in $ids) {
+              $current = Get-Process -Id $processId -ErrorAction SilentlyContinue
+              if ($current) { $cpu += $current.TotalProcessorTime.TotalSeconds; $memory += $current.WorkingSet64 }
+            }
+            $samples += [pscustomobject]@{Seconds=$timer.Elapsed.TotalSeconds; CpuSeconds=$cpu; WorkingSetMB=[Math]::Round($memory / 1MB, 2)}
+            Start-Sleep -Seconds 1
+          }
+          $samples | Export-Csv performance-samples.csv -NoTypeInformation
+          $used = ($samples[-1].CpuSeconds - $samples[0].CpuSeconds) / ($samples[-1].Seconds - $samples[0].Seconds)
+          $peak = ($samples | Measure-Object WorkingSetMB -Maximum).Maximum
+          if (-not $p.WaitForExit(20000)) { $p.Kill(); throw 'Performance app failed to shut down' }
+          Get-Content $result
+          if ($p.ExitCode -ne 0) { throw 'Performance app failed' }
+          "Observed paused CPU: $([Math]::Round($used * 100, 2))% of one logical core; peak sampled working set: $peak MB (app plus direct helper processes)." | Tee-Object -FilePath performance-metrics.txt
+          if ($used -gt 0.50 -or $peak -gt 1500) { throw 'Paused app exceeds the conservative CPU/memory smoke budget' }
+          if ($children | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }) { throw 'Native media helper remained alive after app shutdown' }
       - name: Install MSI, launch installed app and uninstall
         shell: pwsh
         run: |
@@ -158,7 +187,7 @@ jobs:
           "Tests: $tests; failures/errors: $failures" | Tee-Object -FilePath test-summary.txt
           Get-Content "$env:JAVA_HOME/release" | Out-File runtime-build.txt
           Get-Content app-desktop/build/generated/notices/licenses/DEPENDENCIES.txt | Out-File dependency-inventory.txt
-          if ($tests -lt 18 -or $failures -ne 0) { throw 'Expected test suites did not all run successfully' }
+          if ($tests -lt 32 -or $failures -ne 0) { throw 'Expected test suites did not all run successfully' }
       - name: Collect separately licensed dependency sources
         shell: pwsh
         run: |
@@ -202,6 +231,8 @@ jobs:
             installed-ui-smoke.txt
             installer-smoke.txt
             installer-*.log
+            performance-*.txt
+            performance-samples.csv
             test-summary.txt
             runtime-build.txt
             dependency-inventory.txt

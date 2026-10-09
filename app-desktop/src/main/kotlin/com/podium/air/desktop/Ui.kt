@@ -25,6 +25,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -119,12 +123,14 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                         }
                         if (message != null) Notice(message!!, onDismiss = { model.message.value = null })
                         if (audio.error != null) Notice(audio.error!!, error = true)
-                        AnimatedContent(route, transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(100)) }, label = "navigation", modifier = Modifier.weight(1f)) { selected ->
+                        AnimatedContent(route, transitionSpec = { fadeIn(tween(if (state.preferences.reducedMotion) 0 else 150)) togetherWith fadeOut(tween(if (state.preferences.reducedMotion) 0 else 100)) }, label = "navigation", modifier = Modifier.weight(1f)) { selected ->
                             when (selected.page) {
                                 Page.HOME -> Home(model, state, { route = it }, filePicker)
                                 Page.EXPLORE -> Explore(state) { route = it }
                                 Page.SEARCH -> Column(Modifier.padding(horizontal = 28.dp)) {
-                                    OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth(), singleLine = true,
+                                    val focus = remember { FocusRequester() }
+                                    LaunchedEffect(Unit) { focus.requestFocus() }
+                                    OutlinedTextField(search, { search = it }, Modifier.fillMaxWidth().focusRequester(focus), singleLine = true,
                                         placeholder = { Text("Search your music") }, leadingIcon = { Icon(Icons.Rounded.Search, null) })
                                     val results = state.library.filter { "${it.title} ${it.artist} ${it.album}".contains(search, true) }.map { it.song() }
                                     TrackList(results, model, state, Modifier.weight(1f), emptyText = "No matching tracks in your local library.")
@@ -169,6 +175,18 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 val playlist = state.playlists.firstOrNull()
                 if (playlist != null) { route = Route(Page.PLAYLISTS, playlist.id, playlist.name); delay(450); onSmokePage("playlist-detail") }
                 state.library.firstOrNull()?.let { route = Route(Page.ALBUMS, it.albumKey, it.album); delay(450); onSmokePage("album-detail") }
+                route = Route(Page.HOME); delay(300)
+                val robot = java.awt.Robot()
+                fun shortcut(key: Int) {
+                    robot.keyPress(java.awt.event.KeyEvent.VK_CONTROL); robot.keyPress(key)
+                    robot.keyRelease(key); robot.keyRelease(java.awt.event.KeyEvent.VK_CONTROL)
+                }
+                shortcut(java.awt.event.KeyEvent.VK_F); delay(500)
+                check(route.page == Page.SEARCH) { "Ctrl+F did not open search" }
+                shortcut(java.awt.event.KeyEvent.VK_SPACE)
+                withTimeout(5000) { model.engine.state.first { it.playing || it.error != null } }.let { check(it.error == null) { it.error.orEmpty() } }
+                shortcut(java.awt.event.KeyEvent.VK_SPACE)
+                withTimeout(3000) { model.engine.state.first { !it.playing } }
                 route = Route(Page.HOME); delay(300)
             }
             onReady()
@@ -505,7 +523,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         item { Text("Appearance", style = MaterialTheme.typography.headlineMedium); Row(verticalAlignment = Alignment.CenterVertically) { Text("Dark theme", Modifier.weight(1f)); Switch(prefs.dark, { model.preferences(prefs.copy(dark = it)) }) }
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Reduce motion", Modifier.weight(1f)); Switch(prefs.reducedMotion, { model.preferences(prefs.copy(reducedMotion = it)) }) }
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Artwork background", Modifier.weight(1f)); Switch(prefs.dynamicBackground, { model.preferences(prefs.copy(dynamicBackground = it)) }) } }
-        item { Text("Playback", style = MaterialTheme.typography.headlineMedium); Text("Crossfade • ${prefs.crossfadeSeconds}s"); Slider(prefs.crossfadeSeconds.toFloat(), { model.preferences(prefs.copy(crossfadeSeconds = it.toInt())) }, valueRange = 0f..12f, steps = 11); Text("Equal-power volume overlap. Crossfade pauses during seeking and is disabled at playback speeds other than 1×. Automix beat matching is not available.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Playback", style = MaterialTheme.typography.headlineMedium); Text("Crossfade • ${prefs.crossfadeSeconds}s"); Slider(prefs.crossfadeSeconds.toFloat(), { model.preferences(prefs.copy(crossfadeSeconds = it.toInt())) }, valueRange = 0f..12f, steps = 11); Text("Equal-power volume overlap. Crossfade is cancelled by seeking and is disabled at playback speeds other than 1×. Automix beat matching is not available.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { Text("Playback speed • ${"%.2f".format(prefs.speed)}×"); Slider(prefs.speed, { model.preferences(prefs.copy(speed = it)) }, valueRange = 0.5f..2f, steps = 5) }
         item { Text("Sleep timer", style = MaterialTheme.typography.titleLarge); if (sleep != null) Text("Pauses in ${formatTime(sleep!! * 1000)}"); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(15, 30, 60).forEach { minutes -> AssistChip({ model.sleepTimer(minutes) }, { Text("${minutes}m") }) }; AssistChip({ model.sleepTimer(null) }, { Text("Cancel") }) } }
         item { Text("Equalizer", style = MaterialTheme.typography.headlineMedium); TextButton({ model.preferences(prefs.copy(equalizer = List(10) { 0.0 })) }) { Text("Reset to flat") } }
@@ -537,7 +555,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     val licensePaths = remember { readResource("/licenses/INDEX.txt").lineSequence().filter { it.startsWith("licenses/") }.toList() }
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Podium Air — Windows Edition", style = MaterialTheme.typography.headlineMedium)
-        Text("0.1.0 • Native desktop preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
+        Text("0.2.0 • Native local music preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
         Text("This preview supports local music. Streaming, full Android feature parity, and Automix are pending. Windows system media controls are included.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton({ Desktop.getDesktop().browse(URI("https://github.com/kaizen-flims/Podium-Air-Windows-")) }) { Text("Corresponding source & build instructions") }
         TextButton({ licenses = readResource("/licenses/THIRD_PARTY_NOTICES.md") + "\n\n" + readResource("/licenses/LICENSE") }) { Text("Third-party licenses & legal notices") }

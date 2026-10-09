@@ -128,8 +128,10 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
                 val file = mediaFiles.prepare(File(requireNotNull(next.song.localPath))) { ensureActive() }
                 command {
                     if (request == generation && upcoming?.key == next.key && standby == null) {
-                        standby = makePlayer(next, file).apply { volume = 0.0; setOnReady { applyPreferences(this); volume = 0.0 } }
-                        standbyKey = next.key
+                        runCatching { makePlayer(next, file) }.onSuccess { prepared ->
+                            standby = prepared.apply { volume = 0.0; setOnReady { applyPreferences(this); volume = 0.0 } }
+                            standbyKey = next.key
+                        }
                     }
                 }
             } catch (cancelled: CancellationException) { throw cancelled }

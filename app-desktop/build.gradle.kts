@@ -35,7 +35,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Podium Air"
-            packageVersion = "0.1.0"
+            packageVersion = "0.2.0"
             description = "Podium Air — Windows Edition"
             vendor = "Prem Das aka Kaizen"
             copyright = "Copyright © 2026 Prem Das and upstream contributors"

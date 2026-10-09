@@ -45,6 +45,20 @@ class StorageTest {
             assertEquals(listOf(600L, 1000L), library.lyrics(imported.first.single().song()).map { it.timeMs })
         } finally { dir.deleteRecursively() }
     }
+    @Test fun invalidSavedReferencesAndDuplicateIdentitiesAreNormalized() {
+        val dir = Files.createTempDirectory("podium-normalize").toFile()
+        try {
+            val track = StoredTrack("a", "a.wav", "A", "Artist", "Album")
+            StateStore(dir).save(SavedState(library = listOf(track, track), favorites = setOf("a", "missing"), history = listOf("a", "a", "missing"),
+                playlists = listOf(Playlist("p", "Mix", listOf("a", "a", "missing"))), queue = listOf(SavedQueueEntry("key", "a"), SavedQueueEntry("key", "a")), cursor = 0, lyricOffsets = mapOf("a" to 20000)))
+            val saved = StateStore(dir).load()
+            assertEquals(1, saved.library.size); assertEquals(listOf("a", "a"), saved.playlists.single().tracks)
+            assertEquals(setOf("a"), saved.favorites); assertEquals(listOf("a"), saved.history)
+            assertEquals(1, saved.playbackQueue().entries.size); assertEquals(10000L, saved.lyricOffsets["a"])
+            assertNotEquals(track.albumKey, track.copy(artist = "Different artist").albumKey)
+            assertEquals(track.copy(albumArtist = "Compilation").albumKey, track.copy(artist = "Different artist", albumArtist = "Compilation").albumKey)
+        } finally { dir.deleteRecursively() }
+    }
     @Test fun unsupportedAndMissingFilesAreReported() {
         val dir = Files.createTempDirectory("podium-invalid").toFile()
         try { assertEquals(2, LocalLibrary(dir).import(listOf(File(dir, "missing.mp3"), File(dir, "fake.flac"))).second.size) }

@@ -31,6 +31,7 @@ class DesktopModel(
     private var importJob: Job? = null
     private val recorder = ListeningRecorder()
     private var lastStatsFlush = 0L
+    private var historyKey: String? = null
     val lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val sleepRemaining = MutableStateFlow<Long?>(null)
     val platformStatus = MutableStateFlow("Windows media controls initialize when the window opens.")
@@ -42,6 +43,7 @@ class DesktopModel(
         scope.launch {
             engine.state.collect { audio ->
                 val now = System.nanoTime() / 1_000_000
+                if (audio.playing && audio.entry != null && historyKey != audio.entry.key) { historyKey = audio.entry.key; record(audio.entry.song) }
                 recorder.sample(audio.entry?.song?.videoId, audio.entry?.key, audio.playing, now, java.time.LocalDate.now().toString())
                 if (!audio.playing || now - lastStatsFlush >= 5000) { flushListening(); lastStatsFlush = now }
             }
@@ -54,7 +56,7 @@ class DesktopModel(
         } }
         engine.onAdvance = { entry -> scope.launch {
             val index = queue.value.entries.indexOfFirst { it.key == entry.key }
-            if (index >= 0) { updateQueue(queue.value.select(index)); record(entry.song); loadLyrics(entry.song); primeNext() }
+            if (index >= 0) { updateQueue(queue.value.select(index)); loadLyrics(entry.song); primeNext() }
         } }
         // Restore selection and queue without unexpectedly starting music.
         queue.value.current?.let { engine.open(it, play = false); loadLyrics(it.song); primeNext() }
@@ -106,11 +108,11 @@ class DesktopModel(
     fun reloadLyrics() { queue.value.current?.song?.let(::loadLyrics) }
     private fun flushListening() { val added = recorder.drain(); if (added.isNotEmpty()) change { copy(listening = mergeListening(listening, added)) } }
     fun play(songs: List<Song>, index: Int = 0) { if (songs.isNotEmpty()) playQueue(PlaybackQueue.from(songs, index, queue.value.repeat)) }
-    fun playQueue(value: PlaybackQueue) { updateQueue(value); value.current?.let { engine.open(it); record(it.song); loadLyrics(it.song) }; primeNext() }
+    fun playQueue(value: PlaybackQueue) { updateQueue(value); value.current?.let { engine.open(it); loadLyrics(it.song) }; primeNext() }
     fun selectQueue(index: Int) = playQueue(queue.value.select(index))
     fun toggle() {
         val current = queue.value.current ?: return
-        if (engine.state.value.entry == null || engine.state.value.error != null) { engine.open(current); record(current.song) } else engine.toggle()
+        if (engine.state.value.entry == null || engine.state.value.error != null) { engine.open(current) } else engine.toggle()
     }
     fun next() { val index = queue.value.nextIndex() ?: return; playQueue(queue.value.select(index)) }
     fun previous() { if (engine.state.value.positionMs > 3000) engine.seek(0) else playQueue(queue.value.previous()) }
@@ -164,7 +166,8 @@ class DesktopModel(
     fun sleepTimer(minutes: Int?) {
         sleepJob?.cancel(); sleepRemaining.value = minutes?.times(60L)
         if (minutes != null) sleepJob = scope.launch {
-            while ((sleepRemaining.value ?: 0) > 0) { delay(1000); sleepRemaining.value = (sleepRemaining.value ?: 1) - 1 }
+            val deadline = System.nanoTime() + minutes.coerceIn(1, 1440) * 60_000_000_000L
+            while (System.nanoTime() < deadline) { sleepRemaining.value = ((deadline - System.nanoTime()) / 1_000_000_000L + 1).coerceAtLeast(0); delay(1000) }
             engine.pause(); sleepRemaining.value = null; message.value = "Sleep timer paused playback."
         }
     }
