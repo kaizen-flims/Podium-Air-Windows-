@@ -23,7 +23,9 @@ internal class Mp4Aac(private val input: RandomAccessFile) {
     private fun children(box: Box) = boxes(box.data, box.end)
     private fun List<Box>.required(type: String): Box = firstOrNull { it.type == type } ?: error("Missing MP4 $type table.")
     private fun timescale(box: Box): Long {
+        require(box.end - box.data >= 4) { "Truncated MP4 full-box header." }
         input.seek(box.data); val version = input.readUnsignedByte(); require(version in 0..1)
+        require(box.end - box.data >= if (version == 0) 16 else 24) { "Truncated MP4 time scale." }
         input.seek(box.data + if (version == 0) 12 else 20)
         return (input.readInt().toLong() and 0xffffffffL).also { require(it > 0) }
     }
@@ -42,36 +44,50 @@ internal class Mp4Aac(private val input: RandomAccessFile) {
         val track = movie.filter { it.type == "trak" }.firstOrNull { candidate ->
             val media = children(candidate).firstOrNull { it.type == "mdia" } ?: return@firstOrNull false
             val handler = children(media).firstOrNull { it.type == "hdlr" } ?: return@firstOrNull false
+            require(handler.end - handler.data >= 12) { "Truncated MP4 handler." }
             input.seek(handler.data + 8); val type = ByteArray(4).also(input::readFully).toString(Charsets.ISO_8859_1)
             type == "soun"
         } ?: error("M4A contains no audio track.")
         val trackBoxes = children(track)
         val media = children(trackBoxes.required("mdia"))
         mediaTimescale = timescale(media.required("mdhd"))
-        val table = children(children(media.required("minf")).required("stbl"))
+        val mediaInfo = children(media.required("minf"))
+        val references = children(mediaInfo.required("dinf")).required("dref")
+        require(references.end - references.data >= 8) { "Truncated MP4 data references." }
+        input.seek(references.data + 4); require(input.readInt() == 1) { "Multiple MP4 data references are not supported." }
+        val reference = boxes(references.data + 8, references.end).single()
+        require(reference.type == "url " && reference.end - reference.data >= 4) { "External MP4 data references are not supported." }
+        input.seek(reference.data); require(input.readInt() and 0x00ffffff == 1) { "External MP4 data references are not supported." }
+        val table = children(mediaInfo.required("stbl"))
         val description = table.required("stsd")
+        require(description.end - description.data >= 8) { "Truncated MP4 sample descriptions." }
         input.seek(description.data + 4); require(input.readInt() == 1) { "Multiple AAC sample descriptions are not supported." }
         val entry = boxes(description.data + 8, description.end).single()
         require(entry.type == "mp4a") { "Only unencrypted AAC M4A tracks are supported (no ALAC/DRM)." }
+        require(entry.end - entry.data >= 28) { "Truncated MP4 audio sample entry." }
+        input.seek(entry.data + 6); require(input.readUnsignedShort() == 1) { "Invalid MP4 data reference index." }
         input.seek(entry.data + 8); require(input.readUnsignedShort() == 0) { "Unsupported MP4 audio sample entry version." }
-        val codecBoxes = boxes(entry.start + 36, entry.end)
+        val codecBoxes = boxes(entry.data + 28, entry.end)
         require(codecBoxes.none { it.type == "sinf" }) { "Protected audio is not supported." }
         val esds = codecBoxes.required("esds")
-        require(esds.size <= 65536)
+        require(esds.end - esds.data in 4..65528)
         input.seek(esds.data + 4)
         val descriptors = ByteArray((esds.end - esds.data - 4).toInt()).also(input::readFully)
         configuration = decoderConfiguration(descriptors) ?: error("Missing AAC decoder configuration.")
         val sampleSize = table.required("stsz")
+        require(sampleSize.end - sampleSize.data >= 12) { "Truncated MP4 sample size table." }
         input.seek(sampleSize.data + 4); val uniform = input.readInt(); val count = input.readInt()
         require(count in 1..1_000_000 && uniform >= 0)
         require(uniform != 0 || sampleSize.end - input.filePointer >= count * 4L) { "Truncated MP4 sample sizes." }
         sizes = IntArray(count) { if (uniform != 0) uniform else input.readInt() }
         require(sizes.all { it in 1..2_000_000 }) { "Invalid AAC sample sizes." }
         val chunks = table.firstOrNull { it.type == "co64" } ?: table.required("stco")
+        require(chunks.end - chunks.data >= 8) { "Truncated MP4 chunk table." }
         input.seek(chunks.data + 4); val chunkCount = input.readInt(); require(chunkCount in 1..count)
         require(chunks.end - input.filePointer >= chunkCount * if (chunks.type == "co64") 8L else 4L)
         val chunkOffsets = LongArray(chunkCount) { if (chunks.type == "co64") input.readLong() else input.readInt().toLong() and 0xffffffffL }
         val mapping = table.required("stsc")
+        require(mapping.end - mapping.data >= 8) { "Truncated MP4 sample mapping." }
         input.seek(mapping.data + 4); val mapCount = input.readInt(); require(mapCount in 1..chunkCount)
         require(mapping.end - input.filePointer >= mapCount * 12L)
         val map = List(mapCount) { Triple(input.readInt(), input.readInt(), input.readInt()) }
@@ -90,8 +106,10 @@ internal class Mp4Aac(private val input: RandomAccessFile) {
         val edits = trackBoxes.firstOrNull { it.type == "edts" }?.let(::children)?.firstOrNull { it.type == "elst" }
         var skip = 0L; var duration: Long? = null
         if (edits != null) {
+            require(edits.end - edits.data >= 8) { "Truncated MP4 edit list." }
             input.seek(edits.data); val version = input.readUnsignedByte(); require(version in 0..1)
             input.seek(edits.data + 4); val editCount = input.readInt(); require(editCount in 1..2)
+            require(edits.end - input.filePointer >= editCount * if (version == 1) 20L else 12L) { "Truncated MP4 edit entries." }
             repeat(editCount) {
                 val length = if (version == 1) input.readLong() else input.readInt().toLong() and 0xffffffffL
                 val time = if (version == 1) input.readLong() else input.readInt().toLong()
@@ -105,7 +123,8 @@ internal class Mp4Aac(private val input: RandomAccessFile) {
 }
 
 private fun decoderConfiguration(bytes: ByteArray): ByteArray? {
-    fun find(start: Int, end: Int): ByteArray? {
+    fun find(start: Int, end: Int, depth: Int = 0): ByteArray? {
+        require(depth <= 32) { "MP4 descriptors are nested too deeply." }
         var at = start
         while (at < end) {
             val tag = bytes[at++].toInt() and 255
@@ -131,7 +150,7 @@ private fun decoderConfiguration(bytes: ByteArray): ByteArray? {
                 else -> stop
             }
             require(child <= stop)
-            if (child < stop) find(child, stop)?.let { return it }
+            if (child < stop) find(child, stop, depth + 1)?.let { return it }
             at = stop
         }
         return null

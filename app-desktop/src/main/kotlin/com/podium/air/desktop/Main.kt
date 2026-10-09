@@ -155,6 +155,8 @@ private fun audioSmoke(args: Array<String>) {
             val first = com.podium.air.domain.QueueEntry(song = tracks[0].song())
             val next = com.podium.air.domain.QueueEntry(song = tracks[0].song())
             val advanced = CompletableDeferred<Unit>()
+            val ended = CompletableDeferred<Unit>()
+            engine.onEnd = { if (it == next.key) ended.complete(Unit) }
             engine.onAdvance = { if (it.key == next.key) advanced.complete(Unit) }
             engine.configure(Preferences(crossfadeSeconds = 1))
             engine.open(first)
@@ -167,7 +169,15 @@ private fun audioSmoke(args: Array<String>) {
             withTimeout(12000) { advanced.await() }
             engine.configure(Preferences(crossfadeSeconds = 1, volume = 0.5f))
             withTimeout(3000) { engine.state.first { it.entry?.key == next.key && it.playing && !it.fading } }
-            result.writeText("PASS: ${wave.extension.uppercase()} played, paused, sought to 2s, resumed and crossfaded to a second queue entry.\n")
+            withTimeout(12000) { ended.await() }
+            check(!engine.state.value.playing) { "Playback remained active after end of track." }
+            if (supplied == null) {
+                engine.open(first.copy(song = first.song.copy(localPath = File(wave.parentFile, "missing-${System.nanoTime()}.wav").absolutePath)))
+                withTimeout(5000) { engine.state.first { it.error != null && !it.loading && !it.playing } }
+                engine.open(first, play = false)
+                withTimeout(15000) { engine.state.first { !it.loading && it.entry?.key == first.key && it.error == null } }
+            }
+            result.writeText("PASS: ${wave.extension.uppercase()} played, paused, sought to 2s, resumed, crossfaded to a second queue entry and reached natural end.${if (supplied == null) " Missing-file error and subsequent recovery also passed." else ""}\n")
         }
     } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); engine.close(); FxRuntime.exit(); if (supplied == null) wave.delete(); exitProcess(1) }
     engine.close(); FxRuntime.exit(); if (supplied == null) wave.delete(); exitProcess(0)

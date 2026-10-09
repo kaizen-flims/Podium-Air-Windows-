@@ -1,92 +1,117 @@
 # Build report — 9 October 2026
 
-**Native local-music preview: compiled, tested, packaged and started on Windows.
-Full Android feature parity is not complete.**
+**Native Windows local-music preview: compiled, tested, packaged and installed.
+Full Android/provider/Automix parity is not complete.**
 
-## Verified Windows build
+## Recorded build evidence
 
-Implementation commit: `ab5b172321f85fca8b9e4d6c4ce4da0fe9327e7f`.
-Successful workflow:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37943444938
+Expanded implementation commit `6360d4ab14fa1d2a701c8aa9a7a71351cb689606` passed
+[Windows run 37950405605](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37950405605):
+31 tests with zero failures/errors, all 15 routes plus playlist/album detail,
+native and packaged SMTC checks, real WAV/FLAC/Opus/MP3/AAC-M4A/AIFF playback,
+pause/seek/resume/crossfade, and silent MSI install/run/uninstall. Its
+[installer/portable/source artifact](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37950405605/artifacts/11626425694)
+and [verification reports](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37950405605/artifacts/11625972342)
+are available.
 
-Download installer/portable/source artifact:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37943444938/artifacts/11622212580
+Follow-up commit `792ea3db86e3a5b3b2ecf0c4287603322d7fa8cc` runs at
+[37953260863](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863).
+Its test/package, all-route rendering, Robot Ctrl+F/Ctrl+Space, 150/200% startup,
+all codec, paused CPU/memory/helper-shutdown and MSI checks passed. [Packages and source](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863/artifacts/11627980078)
+and [verification](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863/artifacts/11627242158)
+uploaded successfully; final job conclusion is success, 32 tests passed. Paused
+resource observation: **0.86% of one logical core, 226.03 MB peak sampled working
+set** including direct helper processes. Fresh route/150/200% screenshots were
+inspected; content and mini player fit the visible window and short layouts
+scroll. DPI is simulated with Java2D scaling, not a physical mixed-monitor test. Subsequent
+changes add bounded MP4 reference/descriptor validation, four security fixtures
+and natural end/missing-file recovery integration; those changes need a final
+passing Windows run before being advertised as verified.
 
-Verification reports, screenshot, dependency inventory and runtime version:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37943444938/artifacts/11621922792
+Runner: Windows Server 2025 x64, Temurin 21.0.12+101.0, Kotlin 2.2.21, Compose
+1.9.3, Gradle 8.14.3, OpenJFX 21.0.9. CI builds the C++20 native helper with the
+Visual Studio x64 compiler and Windows SDK. The app bundles its runtime;
+end users need no Java/VLC/FFmpeg/.NET installation. All installers are unsigned.
 
-- `:shared-domain:check` and `:app-desktop:check`: **18 tests, zero failures/errors**.
-- Native `createDistributable`, `packageMsi`, `packageExe`: passed.
-- Packaged application startup: passed; all 14 routes and populated playlist/album details rendered.
-- Packaged JavaFX audio smoke: **passed**. Generated PCM WAV playback advanced,
-  pause worked, seek reached 2 seconds, resume worked, and the two-player
-  crossfade entered a second queue entry and finished the overlap.
-- Source collection and notices: passed. Matching application source ZIP,
-  jaudiotagger/OpenJFX source JARs, full OpenJFX native source, native-library
-  license texts, dependency SHA256 inventory and package checksums included.
+## Implemented scope
 
-Runner: Windows Server 2025 x64. JDK: Temurin 21.0.12+101.0. Kotlin 2.2.21,
-Compose 1.9.3, Gradle 8.14.3, OpenJFX 21.0.9. These are automated runtime/state
-checks, not a listening-quality or physical device hotplug assessment.
+- Native Compose/AWT window, source brand/icon/palette, dark/light themes,
+  compact navigation, scrollable narrow layouts, mini player and keyboard controls.
+- Real filesystem import with metadata, embedded artwork, progress/cancellation,
+  accessible mapped/UNC paths, album-artist identity and disc/track ordering.
+- Persisted local playlists/favorites/history/duplicate-safe queue, repeat,
+  reversible upcoming shuffle and local M3U8/M3U import/export.
+- JavaFX transport/rate/ten-band EQ, monotonic sleep timer and equal-power
+  two-player crossfade at 1×. Seeking cancels overlap; other speeds disable it.
+- Cancellable background FLAC/Opus/AAC decoding to disk-backed 16-bit PCM.
+  Opus pre-skip/gain/end trimming and supported AAC edit-list trimming; explicit
+  damaged/protected/unsupported errors. Originals are never modified.
+- Original TTML/LRC/alignment/focus/clock reuse with timed word growth/lift/bloom,
+  overlapping/duet/backing vocals, per-track offsets, reload and autoscroll.
+- Embedded-art dominant-color motion with reduced-motion/paused behavior.
+  Actual elapsed-time Replay by 7/30/365 days, tracks/artists/minutes/starts;
+  pauses and seeking do not inflate listening minutes.
+- Real Windows SMTC metadata/timeline/transport bridge, tray controls, optional
+  notifications, close-to-tray and launch-at-sign-in (all opt-in).
+- Atomic JSON writes and corrupt-original preservation/restore normalization.
+  Shutdown cancels workers, disposes players, flushes state and closes helper.
 
-The populated UI smoke passed every navigation route and playlist/album detail
-using actual generated WAV files. The final audio smoke also changed volume
-mid-transition and completed the fade. Both gain envelopes are preserved when
-preferences change. Manual license files are explicit Gradle inputs. All final
-implementation changes passed the workflow linked above. This later reporting
-commit changes documentation only; the downloaded app/source artifact matches
-the verified implementation commit exactly.
+Source commit `48902e6b20fdcfeb1723e02d4744849e82d5067a` remains untouched.
+The GPL source provenance and required library/native notices are bundled and
+visible from About. Matching application source, exact separately licensed
+codec/tag/OpenJFX source JARs, full OpenJFX native source, dependency hashes and
+package SHA256 inventory accompany each successful build. LGPL libraries remain
+replaceable separate JARs. C++/WinRT MIT text is included. SF Pro fonts, AGPL
+Automix code/models, provider secrets and Android binaries are not redistributed.
 
-## Implementation
-
-Native Kotlin/Compose Desktop UI and AWT Windows shell; JavaFX native audio;
-local file/folder library and metadata/artwork; local playlists, favorites and
-history; atomic JSON persistence/recovery; duplicate-safe queue operations,
-repeat and reversible upcoming shuffle; play/pause/seek/volume/next/previous;
-speed, ten-band equalizer, sleep timer; local sidecar/embedded lyrics; two-player
-equal-power crossfade; light/dark source palette, original brand assets; native
-file chooser, tray and keyboard shortcuts. Original domain and lyrics code is
-reused from Android source SHA `48902e6b20fdcfeb1723e02d4744849e82d5067a`.
-
-Tests cover duplicate queue entries; removal/reordering while retaining current
-selection; repeat policies; reversible shuffle after additions/removals; word
-lyric timing/entity decoding; persistence round-trip/corruption recovery and
-missing references; generated WAV import and LRC offsets; playback coordinator
-commands, cleanup and stale end callbacks; crossfade queue handoff.
+Tests cover queue/repeat/shuffle/selection/stale callbacks; state round-trip,
+corruption/references/normalization; local WAV/lyrics import; actual Opus decode,
+CRC/truncation/cancellation/cache invalidation; TTML security/duets and clock
+seek/pause; elapsed-time statistics and M3U interchange; native-command coordinator
+behavior. New MP4 fixtures cover inline media bounds, external/protected
+references, truncated tables, deep descriptors and fragmented tracks.
 
 ## Acceptance gates
 
 | Gate | Result |
 |---|---|
-| A — source audit / reuse | Structural inventory and assessed reuse complete. GPL/AGPL/font/provider constraints documented; native notices and sources bundled. Full public-release dependency review remains |
-| B — native Windows startup | Passed packaged startup and all 14 navigation routes plus populated detail smoke on Windows Server 2025 |
-| C — audio plays/pauses/seeks/transitions | Passed packaged real JavaFX PCM WAV integration with crossfade; output quality and physical-device tests pending |
-| D — honest feature parity | FEATURE_PARITY.md identifies all major incomplete/blocked source features |
-| E — installable Windows CI artifact | Successful MSI/EXE/portable build and artifact upload verified |
-| F — handoff / documentation | README, audit, parity, credits/notices, matching source, progress log and draft PR #1 provided |
+| A — audit/reuse | Exact source inventory, structural audit, module/license/provider assessment and codec/native notices/source recorded |
+| B — native startup | Packaged route/detail render passed; compact/DPI screenshots inspected; consumer client acceptance remains |
+| C — real audio | Six codec controls/crossfade passed; final natural-end/error-recovery check pending; physical output/hotplug pending |
+| D — honest parity | FEATURE_PARITY.md distinguishes tested local scope from missing source features |
+| E — installable artifact | Verified MSI/EXE/portable build, installed launch/uninstall and artifacts; unsigned |
+| F — documentation/handoff | README/audit/parity/notices/source/test instructions/progress and draft PR #1 provided; final evidence update pending |
 
-## Remaining constraints and release status
+## Remaining capabilities and limits
 
-YouTube Music streaming, Google login, remote playlists and bidirectional sync
-are blocked by the source's private API/extraction pipeline and the prompt's
-supported-provider requirement. The Account screen explicitly discloses this
-and opens the official service in the default browser; it does not invent sync.
-The first preview therefore uses the authorized local-playback baseline.
+YouTube/Google streaming, login, downloads and remote sync need a supported
+provider interface consistent with the locked prompt. The source private
+API/extraction pipeline was not transplanted. Account clearly discloses this
+and opens the official browser service without claiming app sync.
 
-Automix requires separate AGPL reuse, decoder/model and beat/tempo pipeline
-work. FLAC/Opus, animated canvas, translations/online lyric providers, remote
-network sources, Replay, scrobbling, Discord, Listen Together, SMTC, global
-media keys and notifications are not implemented. They are not advertised as
-working features. Source light/dark themes and branding are adapted, but full
-pixel/animation parity is not claimed; SF Pro fonts are not redistributed.
+Automix requires Android/JNI/model analysis and a time-stretch/beat pipeline;
+the AGPL headers must be retained if adapted. Online canvas video, remote
+lyrics/translation, scrobbling, Discord RPC, Listen Together and WebDAV/SMB
+account clients/addons are missing. Replay lacks the source's annual share
+presentation. Source brand/colors and some lyric motion are adapted; exact
+pixel/animation parity is not claimed.
 
-Windows 10/11 client installation/uninstallation, 100/150/200% DPI, interactive
-keyboard/picker/tray checks, MP3/AIFF/M4A decoding, end-of-track across a large
-collection, audio-device changes, performance/memory/idle CPU and listening
-quality remain practical checks. Installers are unsigned; no code-signing
-credentials were supplied. They may show SmartScreen warnings.
+FLAC above 16 bits is converted to 16-bit PCM. Opus supports mono/stereo mapping
+family 0; Ogg Vorbis/chained/multichannel files are rejected. M4A supports
+unencrypted nonfragmented AAC with the supported sample/edit tables, not
+ALAC/DRM/external references. Decoded tracks are capped at 750 MB. Cache pruning
+starts when existing WAVs reach 1.5 GB before a decode; this is not a strict total
+cap. First preparation of long tracks takes time. No sample-accurate gapless or
+high-resolution lossless playback claim is made.
+
+Real Windows 10/11 consumer installation/upgrade, physical picker/tray/startup/
+media keys/notifications, mixed-monitor DPI, audio routing/hotplug, long-session
+resource use and listening quality require [client acceptance](docs/WINDOWS_ACCEPTANCE.md).
+The paused resource sample is a short observation, not a leak or long-run proof.
+Signing credentials were not supplied; SmartScreen warnings are expected.
 
 No merge to main, public release, Android changes or auto-update occurred.
-The connected GitHub tools were used to create the feature branch and PR;
-local dependency downloads were unavailable in the Linux workspace, so actual
-compilation, tests and target-platform verification ran on Windows Actions.
+Implementation remains on `feat/native-windows-port` in
+[draft PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1).
+Compilation and target-platform checks ran through Windows Actions because
+the Linux workspace could not download the needed build dependencies.

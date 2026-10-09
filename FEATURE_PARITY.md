@@ -1,35 +1,49 @@
 # Feature parity
 
-Statuses mean: **Verified** = a recorded passing check; **Partial** = implemented
-but missing source behavior or runtime/device evidence; **Blocked** = requires
-provider rights, a dependency, hardware verification or further implementation.
-No claim of full Android parity is made.
+**Verified** means recorded passing automated evidence for the stated scope.
+**Partial** means implemented but missing source behavior or broader device
+acceptance. **Blocked** identifies a supported integration or missing pipeline.
+A passing smoke is not proof of every feature or full Android parity.
 
-| Feature | Status | Implementation / evidence needed |
+Expanded integration evidence: Windows run
+[37953260863](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863),
+source commit `792ea3db86e3a5b3b2ecf0c4287603322d7fa8cc`.
+This run also passed Robot Ctrl+F/Ctrl+Space, simulated 150/200% startup,
+paused resource/shutdown checks and MSI install/run/uninstall. Fresh screenshots
+were inspected: navigation/content/mini player stay within the visible area;
+short layouts scroll. Further MP4/natural-end tests are pending a final run.
+
+| Feature | Status | Implementation and evidence |
 |---|---|---|
-| Native Compose desktop window / navigation | Verified | Packaged window and all 14 routes plus populated playlist/album detail rendered in Windows Server 2025 run 37943444938; consumer Windows interaction/DPI still pending |
-| Home / Explore | Partial | Real local recents, added tracks, favorites, albums/artists; provider feed blocked |
-| Search | Partial | Local title/artist/album search; online search blocked |
-| Library / favorites / history | Partial | Implemented with persisted local state; coordinator/storage tests pass, interactive UI checks pending |
-| Playlists create/rename/delete/add/remove/move | Partial | Local playlists and duplicates; remote sync blocked |
-| Album / artist detail | Partial | Groups imported tagged music; no remote detail pages |
-| Now Playing / mini player / volume / seek | Partial | Packaged WAV integration passed play/pause/seek/resume in run 37943444938; physical controls/volume checks pending |
-| Queue / repeat / shuffle / duplicates | Verified | Domain and coordinator tests passed in run 37943444938; real device transitions remain pending |
-| Crossfade 0–12 seconds | Partial | Packaged real JavaFX two-player WAV crossfade passed in run 37943444938; timing/quality across formats remains partial |
-| Sample-accurate gapless / Automix beat/tempo transitions | Blocked | No beat analysis or time-stretch pipeline; not simulated |
-| Speed / equalizer / sleep timer | Partial | Actual JavaFX rate/equalizer and coroutine pause timer; device checks pending |
-| Lyrics | Partial | Local line/enhanced-word LRC, embedded text, click-to-seek; source word-growth timing reused but full animation not ported |
-| Artwork / colors / icon | Partial | Embedded still art, original logo/icon, source light/dark palette; dynamic mesh/canvas pending |
-| Local formats | Partial | JavaFX MP3/WAV/AIFF/M4A (AAC) baseline; decoder/platform checks pending. FLAC/Opus not claimed |
-| Google login / YouTube streaming / downloads / sync | Blocked | Source private API/extraction route incompatible with prompt's policy gate |
-| Discord login/RPC, scrobbling, Listen Together, sources | Blocked | No supported desktop implementation yet |
-| Replay / statistics / translations / remote network libraries | Blocked | Not implemented |
-| Keyboard / native picker / standard window controls / tray | Partial | Implemented; interactive Windows checks pending |
-| Windows multimedia keys / SMTC / device changes / notifications | Blocked | Native Windows bridge and device tests pending |
-| DPI / accessibility / responsiveness | Partial | Logical dp layout, labels, keyboard shortcuts, minimum size, scrolling; 100/150/200% DPI checks pending |
-| Atomic save / corrupt-file recovery | Verified | State round-trip, corrupt-file preservation and filtered restore tests passed in run 37943444938 |
-| Windows installer / portable bundle | Verified | MSI, EXE and portable/source artifacts produced in run 37943444938; installer installation/uninstallation still pending |
+| Native Compose window/navigation | Verified | Packaged Windows render across 15 routes plus populated playlist/album detail; consumer client acceptance remains |
+| Home/Explore/Search | Partial | Real imported recents/favorites/albums/artists and local search; personalized provider feed/search unavailable |
+| Library/favorites/history | Partial | Atomic local state and actual-start history; coordinator/state tests pass; large-collection interaction remains |
+| Playlist CRUD/reorder/duplicates | Partial | Persisted local playlists with queue-compatible duplicates; remote sync unavailable |
+| M3U8/M3U interchange | Verified | Round-trip duplicate/unicode/local-path tests; blocked remote URLs reported; interactive picker acceptance remains |
+| Album/artist detail | Partial | Album + album-artist identity and disc/track ordering; tagged local content; remote pages unavailable |
+| Now Playing/mini player/controls | Partial | Packaged real play/pause/seek/resume; volume changed mid-crossfade; physical output/volume assessment remains |
+| Queue/repeat/shuffle | Verified | Duplicate-safe entry IDs, mutation/current selection, repeat and reversible upcoming shuffle tests; stale callbacks covered |
+| Crossfade | Partial | Real two-player equal-power 0–12s overlap at 1× verified across six format fixtures; no sample-accurate gaplessness or beat alignment |
+| Automix/beat/tempo transitions | Blocked | Android/JNI/model analysis and WSOLA pipeline not adapted; AGPL obligations require deliberate reuse work |
+| Speed/equalizer/sleep | Partial | Actual JavaFX rate/ten-band EQ and monotonic pause timer; listening/device acceptance remains |
+| TTML/LRC/embedded lyrics | Partial | Original TTML/alignment/focus/clock reused; words/duets/backing vocals, per-track offsets, click-to-seek, autoscroll and reduced motion; parser/clock/security tests pass |
+| Word motion/artwork background | Partial | Timed growth/lift/bloom and dominant embedded-art palette motion; faithful source pixel/motion parity remains |
+| Online lyrics/translation/canvas video | Blocked | No supported remote provider implementation or animated video integration |
+| Local formats | Verified | Packaged real controls/crossfade in WAV, FLAC, Opus, MP3, AAC/M4A and AIFF; documented mono/stereo/PCM/cache/container limits |
+| Replay/statistics | Partial | Real elapsed-time 7/30/365-day tracks/artists/minutes/starts; pause/seek/suspension tests; source annual share cards missing |
+| Google/YouTube streaming/downloads/sync | Blocked | Private source API/extraction pipeline not ported under locked supported-provider requirement; official service opens in browser with no sync claim |
+| Last.fm/ListenBrainz/Discord/Listen Together | Blocked | Credentials/protocol adaptation and actual desktop implementation missing |
+| Network library sources | Partial | Existing accessible mapped/UNC folders can be imported; WebDAV/SMB account clients/addons not implemented |
+| Native SMTC | Verified | C++ real Windows session metadata/status/pause/seek self-test and packaged helper test; Kotlin command coordinator tests; physical media keys remain |
+| Keyboard/picker/tray/notifications/startup | Partial | Actual implementation and opt-in preferences; Robot Ctrl+F/play/pause passed; physical interactive acceptance remains |
+| DPI/resizing/accessibility | Partial | Compact icon navigation, bounded/maximized initial window, labels/shortcuts/scrolling; 100/150/200% startup screenshots inspected; physical/mixed-monitor DPI remains |
+| State persistence/recovery | Verified | Atomic saves, corrupt original preservation, restore filtering, duplicate normalization/offset clamps tests |
+| CPU/memory/shutdown/device routing | Partial | Cancellable jobs and disposed player/helper lifecycle; paused sample 0.86% of one core, peak 226.03 MB including direct helper; physical hotplug/long-run leak checks remain |
+| Windows installer/portable/source | Verified | MSI/EXE/portable and corresponding source produced; MSI install/run/uninstall verified on Windows Server 2025; unsigned/client acceptance remains |
 
-The source inventory lists additional Android surfaces (Sources, Listen
-Together, Discord, Replay, Equalizer, Local Music, Account/Scrobbling, canvas
-auth). Desktop availability is disclosed instead of inventing working controls.
+Screens visibly disclose missing account/Automix functionality. No playback,
+streaming, auth, downloads or statistics are simulated to imply parity. Source
+branding, icons and dark/light colors are retained; restricted SF Pro fonts are
+replaced with platform typography. Physical Windows 10/11 device listening,
+keyboard/tray/picker/startup, hotplug and full source animation parity require
+acceptance beyond the cloud runner.
