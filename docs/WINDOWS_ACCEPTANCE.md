@@ -10,7 +10,7 @@ build; it has no signing certificate or public release approval.
 | Install and upgrade | Install MSI to a chosen folder; update from the previous preview | Correct launcher/icon; library preserved; only the new app version installed |
 | Picker/import | Ctrl+O for unicode paths and Ctrl+Shift+O for nested music; cancel a large import | Native chooser, responsive UI, correct artwork/tags and no partial library commit after cancel |
 | Collection behavior | Favorite tracks; create/rename/delete playlist; add a duplicate; reorder/export/reimport | State/order/duplicates persist after reopening; audio originals remain untouched |
-| Queue/transitions | Reorder/remove upcoming/current tracks; repeat one/all; shuffle then undo; natural end and crossfade | Correct current selection; no stale callback skipping; no stuck playback or unexpected simultaneous players |
+| Queue/transitions | Reorder/remove upcoming/current tracks during overlap; repeat one/all; restart a completed/rewound entry; shuffle then undo | Correct current selection; no stale callback skipping; no stuck playback or unexpected simultaneous players |
 | Listening quality | Play real WAV/MP3/AIFF/FLAC/Opus/AAC with volume, seek, rate, EQ and crossfade | No clipping/crackling/unexpected silence; documented PCM and format limits respected |
 | Device routing | Switch default endpoint; unplug headphones/USB output; reconnect during playback/overlap | State/error is understandable; playback can recover; record whether JavaFX follows default endpoint |
 | Media session | Physical multimedia keys and Windows media flyout; play/pause/next/previous/seek | Correct track/artwork/state/timeline and command behavior, including after stop/reopen |

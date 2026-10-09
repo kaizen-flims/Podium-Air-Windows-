@@ -12,7 +12,7 @@ ten-band equalizer, sleep timer, TTML/LRC lyrics, lyric timing/word motion,
 artwork color motion and Replay listening statistics are implemented. Windows shell file/folder dialogs,
 system media controls, tray, optional notifications and optional startup are included.
 
-The expanded Windows build passed unit tests, all 15 navigation routes, real
+The verified Windows build passed 40 tests, all 15 navigation routes, real
 playback/crossfade in WAV, FLAC, Opus, MP3, AAC/M4A and AIFF, native media-session
 checks and MSI install/run/uninstall. See [BUILD_REPORT.md](BUILD_REPORT.md) for
 exact build evidence and the current interaction/performance verification.
@@ -44,8 +44,8 @@ No public release or automatic update is configured.
 
 ## Get a test build
 
-[Download the verified expanded build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37957264531/artifacts/11629850358) ·
-[Successful Windows checks](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37957264531) ·
+[Download the verified Windows build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355/artifacts/11632847114) ·
+[Successful Windows checks](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355) ·
 [Draft PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
 
 The [Windows workflow](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/workflows/windows.yml)
@@ -98,7 +98,7 @@ controls publish current metadata/timeline and accept transport commands.
 Ctrl+F searches, Ctrl+Space plays/pauses, Ctrl+Left/Right changes tracks,
 Alt+Left/Right seeks ten seconds and Esc leaves a collection. The navigation
 collapses to icons at narrower widths and scrolls at small heights. Settings
-controls dark/light theme, rate, equalizer, crossfade, sleep and Windows options.
+controls dark/light theme, volume, rate, equalizer, crossfade, sleep and Windows options.
 Crossfade works at 1× and is cancelled by seeking. Replay counts real elapsed
 playing time; paused time and seek distance do not inflate listening minutes.
 
