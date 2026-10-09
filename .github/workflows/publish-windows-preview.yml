@@ -58,20 +58,6 @@ jobs:
       - name: Validate tests, provenance and package checksums
         if: steps.release.outputs.publish == 'true'
         run: python release/prepare_assets.py --packages downloaded-packages --verification downloaded-verification --source-sha "$SOURCE_SHA" --run-id "$BUILD_RUN"
-      - name: Upload assets and publish the preview
+      - name: Upload verified assets and publish the preview
         if: steps.release.outputs.publish == 'true'
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: |
-          set -euo pipefail
-          title=$(python -c 'import json; print(json.load(open("release/preview.json"))["title"])')
-          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --target "$SOURCE_SHA" --title "$title" --notes-file release/preview-notes.md --draft --prerelease --latest=false
-          fi
-          tag_sha=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')
-          test "$tag_sha" = "$SOURCE_SHA"
-          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = true
-          gh release upload "$RELEASE_TAG" release-assets/* --clobber
-          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
-          gh release view "$RELEASE_TAG" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
+        run: python release/publish_preview.py
