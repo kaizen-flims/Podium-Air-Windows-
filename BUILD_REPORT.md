@@ -128,7 +128,10 @@ is made. Audio originals remain unchanged.
 mixed-monitor DPI, output changes/hotplug, long-session resources and listening
 quality. Signing credentials were not supplied; SmartScreen warnings may appear.
 
-No main merge, public release, Android modification or auto-update occurred.
-Work remains on `feat/native-windows-port` in draft PR #1. Target-platform
+At the original handoff, no main merge or public release had occurred. Prem
+subsequently explicitly requested publishing the Windows code and release assets.
+Release preparation adds exact Skiko/Skia renderer notices and aligns application
+JAR metadata to 0.2.0. The main-branch build must pass again before the approved
+public preview is published. Android source/releases and auto-update remain unchanged. Target-platform
 compilation and checks ran in Windows Actions; the Linux workspace could not
 fetch required build dependencies.

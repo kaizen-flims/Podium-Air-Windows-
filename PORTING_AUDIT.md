@@ -2,8 +2,10 @@
 
 Source: `kaizen-flims/Podium-Air`, default branch `main`, commit
 `48902e6b20fdcfeb1723e02d4744849e82d5067a` (Podium Air v1.0.1 revision 1).
-Destination: `kaizen-flims/Podium-Air-Windows-`, initially empty. Main contains
-only an initialization README; implementation lives on `feat/native-windows-port`.
+Destination: `kaizen-flims/Podium-Air-Windows-`, initially empty. The original
+audit initialized main with a README and implemented the app on
+`feat/native-windows-port`. Prem has since authorized publishing the Windows
+source and public preview assets; publication requires a successful Windows build.
 The Android repository has not been modified.
 
 The complete source-path/blob inventory is in `docs/android-source-inventory.json`.

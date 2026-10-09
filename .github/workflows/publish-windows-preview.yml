@@ -1,0 +1,77 @@
+name: Publish approved Windows preview
+on:
+  workflow_run:
+    workflows: [Windows native build]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: approved-windows-preview-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
+      BUILD_RUN: ${{ github.event.workflow_run.id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Confirm current source and release authorization
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag=$(python -c 'import json; print(json.load(open("release/preview.json"))["tag"])')
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" --json isDraft --jq '.isDraft' > existing-release.txt 2>/dev/null; then
+            if [ "$(cat existing-release.txt)" = false ]; then
+              echo 'The approved preview is already published; no release assets will be changed.'
+              echo 'publish=false' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          main_sha=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')
+          test "$main_sha" = "$SOURCE_SHA"
+          echo 'publish=true' >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        if: steps.release.outputs.publish == 'true'
+        with:
+          name: Podium-Air-Windows-x64
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: downloaded-packages
+      - uses: actions/download-artifact@v4
+        if: steps.release.outputs.publish == 'true'
+        with:
+          name: Windows-verification
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: downloaded-verification
+      - name: Validate tests, provenance and package checksums
+        if: steps.release.outputs.publish == 'true'
+        run: python release/prepare_assets.py --packages downloaded-packages --verification downloaded-verification --source-sha "$SOURCE_SHA" --run-id "$BUILD_RUN"
+      - name: Upload assets and publish the preview
+        if: steps.release.outputs.publish == 'true'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          title=$(python -c 'import json; print(json.load(open("release/preview.json"))["title"])')
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --target "$SOURCE_SHA" --title "$title" --notes-file release/preview-notes.md --draft --prerelease --latest=false
+          fi
+          tag_sha=$(gh api "repos/$GH_REPO/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')
+          test "$tag_sha" = "$SOURCE_SHA"
+          test "$(gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft')" = true
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          gh release view "$RELEASE_TAG" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"

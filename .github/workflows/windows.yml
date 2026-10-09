@@ -59,6 +59,21 @@ jobs:
         run: |
           & ./build/windows-helper/PodiumMediaBridge.exe --picker-self-test | Tee-Object -FilePath windows-dialog-smoke.txt
           if ($LASTEXITCODE -ne 0) { throw 'Native Windows shell dialogs failed' }
+      - name: Collect native renderer legal files
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'skia-native.zip'
+          $expanded = Join-Path $env:RUNNER_TEMP 'skia-native'
+          Invoke-WebRequest 'https://github.com/JetBrains/skia-pack/releases/download/m132-a00c390e98-1/Skia-m132-a00c390e98-1-windows-Release-x64.zip' -OutFile $archive
+          Expand-Archive $archive $expanded
+          $legal = @(Get-ChildItem $expanded -Recurse -File | Where-Object { $_.Name -match '(?i)license|notice|copying|copyright' })
+          foreach ($file in $legal) {
+            $relative = [IO.Path]::GetRelativePath($expanded, $file.FullName)
+            $target = Join-Path 'build/renderer-notices/licenses/skia-native' $relative
+            New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+            Copy-Item $file.FullName $target
+          }
+          "Upstream native renderer legal files collected: $($legal.Count). Exact Skia/Skiko LICENSE and NOTICE files are also committed resources."
       - name: Tests and native packages
         run: .\gradlew.bat --no-daemon :shared-domain:check :app-desktop:check :app-desktop:createDistributable :app-desktop:packageMsi :app-desktop:packageExe
       - name: Launch packaged app and verify rendered window

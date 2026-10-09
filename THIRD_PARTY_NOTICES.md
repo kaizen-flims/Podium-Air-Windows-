@@ -35,7 +35,7 @@ licenses and notices; the root GPL license does not erase the AGPL headers.
 | Compose Multiplatform / Material | 1.9.3 | Apache-2.0, https://github.com/JetBrains/compose-multiplatform |
 | Kotlin coroutines | 1.10.2 | Apache-2.0, https://github.com/Kotlin/kotlinx.coroutines |
 | Kotlin serialization | 1.9.0 | Apache-2.0, https://github.com/Kotlin/kotlinx.serialization |
-| Skiko / Skia (transitive Compose renderer) | resolved by Compose; see packaged inventory | Apache-2.0 / BSD and bundled notices, https://github.com/JetBrains/skiko, https://skia.googlesource.com/skia/ |
+| Skiko / Skia (transitive Compose renderer) | Skiko 0.9.22.2; Skia m132-a00c390e98-1 | Apache-2.0 / BSD and bundled notices, https://github.com/JetBrains/skiko, https://skia.googlesource.com/skia/ |
 | OpenJFX base / graphics / media | 21.0.9 | GPL-2.0 with Classpath Exception; additional native-library licenses. https://github.com/openjdk/jfx21u |
 | jaudiotagger | 3.0.1 | LGPL-2.1-or-later (source headers), LGPL in published POM. https://bitbucket.org/ijabz/jaudiotagger/ |
 | Eclipse Temurin runtime | 21.0.12.1+1 | GPL-2.0 with Classpath Exception and runtime legal notices. https://adoptium.net/ |
@@ -51,8 +51,7 @@ library notices in the actual Windows artifact. Preserve corresponding source
 access for LGPL/GPL runtime components and ensure license texts match the
 specific versions resolved. jaudiotagger LGPL-2.1 is additionally bundled. CI
 archives jaudiotagger/OpenJFX source JARs and full OpenJFX 21.0.9+1 native
-source beside the packages. Public release remains blocked until this review
-and audio/device testing are complete. The CI artifact includes this app's
+source beside the packages. Stable release requires this review and consumer audio/device testing. An explicitly authorized public preview may retain the documented physical-device acceptance gaps. The CI artifact includes this app's
 matching source ZIP and dependency notices for review; it is a test build.
 
 ## Corresponding source
@@ -90,3 +89,7 @@ archive (verified against the vendor SHA256), upstream source commit
 `e6ba7dec3d07654074559310376a3ae89da5f4ac` are included in the dependency source
 bundle, with the JDK release metadata and source locations. The runtime keeps
 its original legal notices. This supplements the OpenJFX and codec/tag sources.
+
+## Renderer notice supplement
+
+Skiko 0.9.22.2 is Apache-2.0. Its exact release LICENSE and NOTICE (including the Android Open Source Project acknowledgment) are bundled under `licenses/skiko/`. Skia m132-a00c390e98-1 uses the BSD copyright/license at commit a00c390e98, bundled under `licenses/skia/`. Corresponding upstream locations: https://github.com/JetBrains/skiko/tree/v0.9.22.2 and https://github.com/google/skia/tree/a00c390e98. The native renderer distribution is additionally scanned for supplied legal files during Windows packaging.

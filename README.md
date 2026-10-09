@@ -40,7 +40,9 @@ Temurin JDK build and hashes all runtime JARs. End users do not install Java,
 VLC, FFmpeg or .NET. FFmpeg is used only in CI to generate test fixtures.
 
 Installers are **unsigned test builds** and may show SmartScreen warnings.
-No public release or automatic update is configured.
+Prem has authorized a public Windows preview. The release workflow publishes
+only after the main-branch Windows build and package verification succeed.
+Android releases and automatic updates remain unchanged.
 
 ## Get a test build
 
@@ -114,3 +116,7 @@ CI package. SF Pro fonts and the separately licensed AGPL Automix code/model
 are not included. No Android releases, updates or files are modified.
 
 Made with ❤️ by Prem.
+
+## Preview release publishing
+
+`release/preview.json` records the explicitly approved Windows preview. After a successful main-branch Windows build, the release workflow validates all test results, integration reports, exact-source provenance and five package checksums; it uploads installers, portable app, corresponding sources, notices and checksums to a draft and then publishes it as a prerelease. An already published preview is never overwritten. Stable releases still require consumer-device acceptance.

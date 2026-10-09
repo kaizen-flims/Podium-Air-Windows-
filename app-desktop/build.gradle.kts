@@ -54,8 +54,10 @@ compose.desktop {
 // Include dependency-provided notices without dropping their original paths or text.
 val dependencyNotices by tasks.registering {
     val output = layout.buildDirectory.dir("generated/notices")
+    val nativeNotices = rootProject.layout.buildDirectory.dir("renderer-notices")
     inputs.files(configurations.runtimeClasspath)
     inputs.dir(project.file("src/main/resources/licenses"))
+    inputs.dir(nativeNotices).optional()
     outputs.dir(output)
     doLast {
         val dest = output.get().asFile
@@ -77,6 +79,7 @@ val dependencyNotices by tasks.registering {
                 }
             }
         }
+        nativeNotices.get().asFile.takeIf { it.isDirectory }?.copyRecursively(dest, overwrite = true)
         val manual = project.file("src/main/resources/licenses").walkTopDown().filter { it.isFile }.map { "licenses/" + it.relativeTo(project.file("src/main/resources/licenses")).invariantSeparatorsPath }.toList()
         val generated = dest.walkTopDown().filter { it.isFile }.map { it.relativeTo(dest).invariantSeparatorsPath }.toList()
         dest.resolve("licenses/INDEX.txt").writeText((listOf("licenses/LICENSE", "licenses/THIRD_PARTY_NOTICES.md") + manual + generated).distinct().sorted().joinToString("\n"))
