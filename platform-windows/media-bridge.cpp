@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Native Windows 10 SMTC adapter. Original implementation; no third-party source copied.
 #define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
 #include <windows.h>
 #include <shellapi.h>
+#include <shobjidl.h>
 #include <systemmediatransportcontrolsinterop.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Media.h>
 #include <winrt/Windows.Media.Control.h>
 #include <winrt/Windows.Storage.Streams.h>
