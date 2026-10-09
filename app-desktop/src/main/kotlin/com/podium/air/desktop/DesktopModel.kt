@@ -21,6 +21,8 @@ class DesktopModel(
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val saveMutex = Mutex()
+    private val saveLock = Any()
+    private val closed = java.util.concurrent.atomic.AtomicBoolean(false)
     private val mutable = MutableStateFlow(persistence.load())
     val state: StateFlow<SavedState> = mutable
     private val queueMutable = MutableStateFlow(mutable.value.playbackQueue())
@@ -43,8 +45,9 @@ class DesktopModel(
         scope.launch {
             engine.state.collect { audio ->
                 val now = System.nanoTime() / 1_000_000
-                if (audio.playing && audio.entry != null && historyKey != audio.entry.key) { historyKey = audio.entry.key; record(audio.entry.song) }
-                recorder.sample(audio.entry?.song?.videoId, audio.entry?.key, audio.playing, now, java.time.LocalDate.now().toString())
+                val playbackKey = audio.entry?.let { "${it.key}:${audio.session}" }
+                if (audio.playing && audio.entry != null && historyKey != playbackKey) { historyKey = playbackKey; record(audio.entry.song) }
+                recorder.sample(audio.entry?.song?.videoId, playbackKey, audio.playing, now, java.time.LocalDate.now().toString())
                 if (!audio.playing || now - lastStatsFlush >= 5000) { flushListening(); lastStatsFlush = now }
             }
         }
@@ -176,16 +179,18 @@ class DesktopModel(
         saveJob?.cancel()
         saveJob = scope.launch {
             delay(250)
-            try { saveMutex.withLock { withContext(Dispatchers.IO) { persistence.save(mutable.value) } } }
+            try { saveMutex.withLock { withContext(Dispatchers.IO) { synchronized(saveLock) { if (!closed.get()) persistence.save(mutable.value) } } } }
+            catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) { message.value = "Could not save your library: ${error.message}" }
         }
     }
     override fun close() {
+        if (!closed.compareAndSet(false, true)) return
         val audio = engine.state.value
-        recorder.sample(audio.entry?.song?.videoId, audio.entry?.key, false, System.nanoTime() / 1_000_000, java.time.LocalDate.now().toString())
+        recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, java.time.LocalDate.now().toString())
         flushListening()
         scope.cancel(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.
-        runCatching { persistence.save(mutable.value) }.onFailure { System.err.println("Library save failed: ${it.message}") }
+        runCatching { synchronized(saveLock) { persistence.save(mutable.value) } }.onFailure { System.err.println("Library save failed: ${it.message}") }
     }
 }

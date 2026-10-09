@@ -19,7 +19,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 data class AudioState(val entry: QueueEntry? = null, val playing: Boolean = false, val loading: Boolean = false,
-    val positionMs: Long = 0, val durationMs: Long = 0, val error: String? = null, val fading: Boolean = false)
+    val positionMs: Long = 0, val durationMs: Long = 0, val error: String? = null, val fading: Boolean = false, val session: Long = 0)
 interface AudioEngine : AutoCloseable {
     val state: StateFlow<AudioState>
     var onEnd: (String) -> Unit
@@ -73,7 +73,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
     override fun open(entry: QueueEntry, play: Boolean) = command {
         openJob?.cancel(); standbyJob?.cancel(); generation++
         disposePlayers(); active = entry
-        mutable.value = AudioState(entry = entry, loading = true)
+        mutable.value = AudioState(entry = entry, loading = true, session = generation)
         val request = generation
         openJob = decoding.launch {
             try {
@@ -148,7 +148,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
             incoming.totalDuration.toMillis() / 2).coerceAtLeast(1.0)
         fadeElapsed = 0.0
         outgoing = current; player = incoming; active = next; standby = null; standbyKey = null
-        mutable.value = AudioState(entry = next, playing = true, durationMs = finiteMs(incoming.totalDuration), fading = true)
+        mutable.value = AudioState(entry = next, playing = true, durationMs = finiteMs(incoming.totalDuration), fading = true, session = generation)
         incoming.volume = 0.0; incoming.play()
         onAdvance(next)
     }

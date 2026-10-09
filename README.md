@@ -44,8 +44,8 @@ No public release or automatic update is configured.
 
 ## Get a test build
 
-[Download the verified expanded build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863/artifacts/11627980078) ·
-[Successful Windows checks](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863) ·
+[Download the verified expanded build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37957264531/artifacts/11629850358) ·
+[Successful Windows checks](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37957264531) ·
 [Draft PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
 
 The [Windows workflow](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/workflows/windows.yml)

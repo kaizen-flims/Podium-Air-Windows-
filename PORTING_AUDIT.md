@@ -112,4 +112,5 @@ visible window found within the exact parent process, supports filesystem-only
 multiselect/folder selection and overwrite confirmation, and returns UTF-8
 paths as bounded hex lines. Cancellation/parent shutdown kills the helper and
 removes the temporary response. Swing choosers remain only for non-Windows
-development. Native shell selection/cancellation tests are pending the final CI run.
+development. Native Unicode file/folder/save selection, cancellation, packaged JVM protocol
+and cancelling an open picker without leaving a helper passed run 37957264531.

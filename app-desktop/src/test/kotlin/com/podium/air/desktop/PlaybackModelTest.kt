@@ -16,8 +16,9 @@ private class FakeAudio : AudioEngine {
     override var onEnd: (String) -> Unit = {}
     override var onAdvance: (QueueEntry) -> Unit = {}
     var next: QueueEntry? = null
-    var closed = false
-    override fun open(entry: QueueEntry, play: Boolean) { state.value = AudioState(entry, playing = play, durationMs = 10000) }
+    @Volatile var closed = false
+    private var session = 0L
+    override fun open(entry: QueueEntry, play: Boolean) { state.value = AudioState(entry, playing = play, durationMs = 10000, session = ++session) }
     override fun setUpcoming(entry: QueueEntry?) { next = entry }
     override fun toggle() { state.value = state.value.copy(playing = !state.value.playing) }
     override fun pause() { state.value = state.value.copy(playing = false) }
@@ -70,6 +71,51 @@ class PlaybackModelTest {
             handleMediaCommand(model, "PLAY"); assertEquals("b", audio.state.value.entry!!.song.videoId)
             assertEquals("506f6469756d20e29da4", mediaText("Podium ❤"))
         } finally { model.close() }
+    }
+    @Test fun repeatOneCountsASecondStartButPauseResumeDoesNot() {
+        val audio = FakeAudio(); val store = MemoryState(); val model = DesktopModel(audio, store, dispatcher = Dispatchers.Unconfined)
+        try {
+            model.play(listOf(store.value.library.first().song()))
+            val key = model.queue.value.current!!.key
+            audio.pause(); model.toggle(); audio.pause()
+            assertEquals(1, model.state.value.listening.sumOf { it.plays })
+            while (model.queue.value.repeat != com.podium.air.domain.RepeatMode.ONE) model.repeat()
+            audio.onEnd(key); audio.pause()
+            assertEquals(key, model.queue.value.current!!.key)
+            assertEquals(2, model.state.value.listening.sumOf { it.plays })
+        } finally { model.close() }
+    }
+    @Test fun shutdownFinalSnapshotWinsOverAnInFlightCancelledSave() {
+        val initial = MemoryState().value
+        val started = java.util.concurrent.CountDownLatch(1)
+        val release = java.util.concurrent.CountDownLatch(1)
+        val calls = java.util.concurrent.atomic.AtomicInteger(0)
+        val writes = java.util.Collections.synchronizedList(mutableListOf<SavedState>())
+        val persistence = object : StatePersistence {
+            override fun load() = initial
+            override fun save(state: SavedState) {
+                if (calls.incrementAndGet() == 1) {
+                    started.countDown()
+                    check(release.await(5, java.util.concurrent.TimeUnit.SECONDS))
+                }
+                writes += state
+            }
+        }
+        val audio = FakeAudio(); val model = DesktopModel(audio, persistence, dispatcher = Dispatchers.Unconfined)
+        var closer: Thread? = null
+        try {
+            model.createPlaylist("Before shutdown")
+            assertTrue(started.await(3, java.util.concurrent.TimeUnit.SECONDS), "The background save must have started")
+            model.favorite("a")
+            closer = Thread { model.close() }.apply { start() }
+            val deadline = System.nanoTime() + 2_000_000_000
+            while (!audio.closed && System.nanoTime() < deadline) Thread.sleep(10)
+            assertTrue(audio.closed)
+            release.countDown(); closer.join(3000)
+            assertFalse(closer.isAlive, "Shutdown must finish after the pending disk write")
+            assertTrue("a" in writes.last().favorites, "An older snapshot must not overwrite the shutdown snapshot")
+            assertFalse(model.message.value.orEmpty().contains("Could not save"), "Normal save cancellation is not an error")
+        } finally { release.countDown(); closer?.join(3000); model.close() }
     }
     @Test fun crossfadeAdvanceDoesNotReopenIncomingPlayer() {
         val audio = FakeAudio(); val store = MemoryState(); val model = DesktopModel(audio, store, dispatcher = Dispatchers.Unconfined)

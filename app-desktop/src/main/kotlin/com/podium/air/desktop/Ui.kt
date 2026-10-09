@@ -513,7 +513,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 @Composable private fun ReplayView(model: DesktopModel, state: SavedState) {
     var period by remember { mutableStateOf(30L) }
-    val since = java.time.LocalDate.now().minusDays(period).toString()
+    val since = java.time.LocalDate.now().minusDays(period - 1).toString()
     val data = state.listening.filter { it.day >= since }
     val milliseconds = data.sumOf { it.milliseconds }
     val ranked = data.groupBy { it.trackId }.entries.sortedByDescending { it.value.sumOf { stat -> stat.milliseconds } }

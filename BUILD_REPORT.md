@@ -14,19 +14,25 @@ pause/seek/resume/crossfade, and silent MSI install/run/uninstall. Its
 and [verification reports](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37950405605/artifacts/11625972342)
 are available.
 
-Follow-up commit `792ea3db86e3a5b3b2ecf0c4287603322d7fa8cc` runs at
-[37953260863](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863).
-Its test/package, all-route rendering, Robot Ctrl+F/Ctrl+Space, 150/200% startup,
-all codec, paused CPU/memory/helper-shutdown and MSI checks passed. [Packages and source](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863/artifacts/11627980078)
-and [verification](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37953260863/artifacts/11627242158)
-uploaded successfully; final job conclusion is success, 32 tests passed. Paused
-resource observation: **0.86% of one logical core, 226.03 MB peak sampled working
-set** including direct helper processes. Fresh route/150/200% screenshots were
-inspected; content and mini player fit the visible window and short layouts
-scroll. DPI is simulated with Java2D scaling, not a physical mixed-monitor test. Subsequent
-changes add bounded MP4 reference/descriptor validation, four security fixtures
-and natural end/missing-file recovery integration; those changes need a final
-passing Windows run before being advertised as verified.
+Native integration commit `8cb187791faa6013c55be33c98a79a595e833ba7` passed
+[run 37957264531](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37957264531),
+including **36 tests, zero failures/errors**, all routes/details and Robot
+Ctrl+F/Ctrl+Space, simulated 150/200% startup, all six codecs through natural end,
+missing-file error/recovery, actual Windows Unicode file/folder/save/cancellation,
+packaged JVM/native picker protocol and cancelling an open dialog without
+leaving a helper process. The pinned runtime matched its source metadata;
+checksum-verified Temurin and exact build-script sources were bundled.
+
+[Download packages and matching sources](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37957264531/artifacts/11629850358) ·
+[Verification reports](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37957264531/artifacts/11631290052)
+
+Paused resource observation: **0.69% of one logical core, 258.16 MB peak sampled
+working set** including direct helper processes; SMTC helper shut down with the
+app. Route and simulated 150/200% screenshots were visually inspected in the
+preceding layout build: mini player and content fit the visible window and
+short layouts scroll. DPI remains simulated, not a physical mixed-monitor test.
+Follow-up changes add repeat-one playback session accounting, final-save ordering
+and native helper icon/DPI resources; their 38-test run is pending.
 
 Runner: Windows Server 2025 x64, Temurin 21.0.12.1+1, Kotlin 2.2.21, Compose
 1.9.3, Gradle 8.14.3, OpenJFX 21.0.9. CI builds the C++20 native helper with the
@@ -37,7 +43,7 @@ end users need no Java/VLC/FFmpeg/.NET installation. All installers are unsigned
 
 - Native Compose/AWT window, source brand/icon/palette, dark/light themes,
   compact navigation, scrollable narrow layouts, mini player and keyboard controls and Windows Common Item Dialog file/folder/import/export pickers
-  in a cancellable STA helper (new picker validation pending).
+  in a cancellable STA helper with Unicode/protocol/cancellation checks passed.
 - Real filesystem import with metadata, embedded artwork, progress/cancellation,
   accessible mapped/UNC paths, album-artist identity and disc/track ordering.
 - Persisted local playlists/favorites/history/duplicate-safe queue, repeat,
@@ -60,7 +66,7 @@ end users need no Java/VLC/FFmpeg/.NET installation. All installers are unsigned
 Source commit `48902e6b20fdcfeb1723e02d4744849e82d5067a` remains untouched.
 The GPL source provenance and required library/native notices are bundled and
 visible from About. Matching application source, exact separately licensed
-codec/tag/OpenJFX source JARs, full OpenJFX native source, dependency hashes and
+codec/tag/OpenJFX source JARs, full OpenJFX native source, exact Temurin source/build scripts, dependency hashes and
 package SHA256 inventory accompany each successful build. LGPL libraries remain
 replaceable separate JARs. C++/WinRT MIT text is included. SF Pro fonts, AGPL
 Automix code/models, provider secrets and Android binaries are not redistributed.
@@ -78,10 +84,10 @@ references, truncated tables, deep descriptors and fragmented tracks.
 |---|---|
 | A — audit/reuse | Exact source inventory, structural audit, module/license/provider assessment and codec/native notices/source recorded |
 | B — native startup | Packaged route/detail render passed; compact/DPI screenshots inspected; consumer client acceptance remains |
-| C — real audio | Six codec controls/crossfade passed; final natural-end/error-recovery check pending; physical output/hotplug pending |
+| C — real audio | Six codec controls/crossfade passed; natural-end/error-recovery passed; physical output/hotplug pending |
 | D — honest parity | FEATURE_PARITY.md distinguishes tested local scope from missing source features |
 | E — installable artifact | Verified MSI/EXE/portable build, installed launch/uninstall and artifacts; unsigned |
-| F — documentation/handoff | README/audit/parity/notices/source/test instructions/progress and draft PR #1 provided; final evidence update pending |
+| F — documentation/handoff | README/audit/parity/notices/source/test instructions/progress and draft PR #1 provided; final 38-test evidence update pending |
 
 ## Remaining capabilities and limits
 

@@ -29,3 +29,11 @@
 - Added packaged JVM-to-native dialog protocol checks for real Unicode selections and save path, explicit cancellation, and cancelling an open dialog without leaving a helper process. Added parser cancellation checkpoints and logarithmic media-data lookup to avoid pathological MP4 sample-table work. Validation pending.
 
 - Native picker self-test found an 8.3/full-path alias comparison mismatch; fixture paths now expand to their long form and JVM tests compare filesystem identities. Pinned the actual runtime to Temurin 21.0.12.1+1 and added its checksum-verified vendor source archive and exact build-script sources to the package source bundle. Validation pending.
+
+- Added playback session identities so Replay counts repeat-one/restarting the same queue entry while pause/resume does not add a start. Added a coordinator regression test and corrected inclusive 7/30/365-day date boundaries. Final suite now expects 37 tests; validation pending.
+
+- Added source-branded icon/version resources and per-monitor DPI metadata to the native Windows integration helper, so its shell surfaces retain Podium Air identity. Final validation pending.
+
+- Hardened shutdown persistence: a cancelled older IO save cannot overwrite the final snapshot, close is idempotent, and normal cancellation does not display a save error. Added a concurrent regression test with a deliberately blocked disk write. Final suite now expects 38 tests; validation pending.
+
+- Commit 8cb1877 passed the full Windows workflow 37957264531: 36 tests, native Unicode shell selections/cancellation, packaged JVM/native protocol and open-dialog cancellation cleanup, all routes/keyboard/DPI smokes, six codec natural-end checks, bad-file recovery, MSI install/run/uninstall and all uploads. Pinned runtime/source checksum/build-source collection passed. Paused sample: 0.69% of one core, 258.16 MB peak sampled app/direct-helper working set.
