@@ -34,6 +34,10 @@ license and device acceptance gates in [BUILD_REPORT.md](BUILD_REPORT.md) pass.
 
 ## Get a test build
 
+[Download the verified Windows test build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37943444938/artifacts/11622212580) ·
+[Successful build and checks](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37943444938) ·
+[Draft PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
+
 [Windows native build workflows](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/workflows/windows.yml)
 produce `Podium-Air-Windows-x64`: MSI, EXE installer, portable ZIP, matching
 source ZIP, dependency source bundle and SHA256SUMS. A successful run is required; workflow configuration

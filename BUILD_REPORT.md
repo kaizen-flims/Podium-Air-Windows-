@@ -5,15 +5,15 @@ Full Android feature parity is not complete.**
 
 ## Verified Windows build
 
-Implementation commit: `4c631f89875fefa067f3ae248cc8b04f8bca6923`.
+Implementation commit: `ab5b172321f85fca8b9e4d6c4ce4da0fe9327e7f`.
 Successful workflow:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37942605916
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37943444938
 
 Download installer/portable/source artifact:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37942605916/artifacts/11622806566
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37943444938/artifacts/11622212580
 
 Verification reports, screenshot, dependency inventory and runtime version:
-https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37942605916/artifacts/11622636786
+https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37943444938/artifacts/11621922792
 
 - `:shared-domain:check` and `:app-desktop:check`: **18 tests, zero failures/errors**.
 - Native `createDistributable`, `packageMsi`, `packageExe`: passed.
@@ -30,10 +30,12 @@ Compose 1.9.3, Gradle 8.14.3, OpenJFX 21.0.9. These are automated runtime/state
 checks, not a listening-quality or physical device hotplug assessment.
 
 The populated UI smoke passed every navigation route and playlist/album detail
-using actual generated WAV files. Long titles/renaming display and CI caching
-are also included. A final fix preserves both crossfade volume envelopes when
-preferences change during a transition, tracks manual license files as Gradle
-inputs, and improves the file chooser label; the next workflow checks that fix.
+using actual generated WAV files. The final audio smoke also changed volume
+mid-transition and completed the fade. Both gain envelopes are preserved when
+preferences change. Manual license files are explicit Gradle inputs. All final
+implementation changes passed the workflow linked above. This later reporting
+commit changes documentation only; the downloaded app/source artifact matches
+the verified implementation commit exactly.
 
 ## Implementation
 
