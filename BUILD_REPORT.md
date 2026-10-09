@@ -28,7 +28,7 @@ changes add bounded MP4 reference/descriptor validation, four security fixtures
 and natural end/missing-file recovery integration; those changes need a final
 passing Windows run before being advertised as verified.
 
-Runner: Windows Server 2025 x64, Temurin 21.0.12+101.0, Kotlin 2.2.21, Compose
+Runner: Windows Server 2025 x64, Temurin 21.0.12.1+1, Kotlin 2.2.21, Compose
 1.9.3, Gradle 8.14.3, OpenJFX 21.0.9. CI builds the C++20 native helper with the
 Visual Studio x64 compiler and Windows SDK. The app bundles its runtime;
 end users need no Java/VLC/FFmpeg/.NET installation. All installers are unsigned.

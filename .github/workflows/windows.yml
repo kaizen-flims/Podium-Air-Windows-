@@ -23,7 +23,12 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '21.0.12+101.0'
+      - name: Verify pinned runtime build
+        shell: pwsh
+        run: |
+          $release = Get-Content "$env:JAVA_HOME/release" -Raw
+          if ($release -notmatch '(?m)^JAVA_RUNTIME_VERSION="21\.0\.12\.1\+1-LTS"\r?$') { throw 'The selected runtime differs from the matching source bundle' }
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
@@ -199,6 +204,16 @@ jobs:
           .\gradlew.bat --no-daemon :app-desktop:collectDependencySources
           if ($LASTEXITCODE -ne 0) { throw 'Dependency source collection failed' }
           Invoke-WebRequest 'https://github.com/openjdk/jfx21u/archive/refs/tags/21.0.9%2B1.zip' -OutFile 'build/dependency-sources/OpenJFX-21.0.9-native-source.zip'
+          $runtimeSource = 'https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk-sources_21.0.12.1_1.tar.gz'
+          $runtimeArchive = 'build/dependency-sources/Temurin-21.0.12.1+1-source.tar.gz'
+          Invoke-WebRequest $runtimeSource -OutFile $runtimeArchive
+          Invoke-WebRequest "$runtimeSource.sha256.txt" -OutFile "build/dependency-sources/Temurin-source.sha256.txt"
+          $checksum = [regex]::Match((Get-Content "build/dependency-sources/Temurin-source.sha256.txt" -Raw), '^[0-9a-fA-F]{64}').Value
+          if ($checksum.Length -ne 64) { throw 'Invalid vendor source checksum' }
+          if ((Get-FileHash $runtimeArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $checksum.ToLowerInvariant()) { throw 'Temurin source checksum mismatch' }
+          Invoke-WebRequest 'https://github.com/adoptium/temurin-build/archive/e6ba7dec3d07654074559310376a3ae89da5f4ac.zip' -OutFile 'build/dependency-sources/Temurin-build-e6ba7dec-source.zip'
+          Copy-Item runtime-build.txt build/dependency-sources/runtime-build.txt
+          @("Temurin source: $runtimeSource", "Upstream source commit: https://github.com/adoptium/jdk21u/commit/1c417fbfc2f70ab03a565b0af0a5a3c6f5e15ad6", 'Build scripts: https://github.com/adoptium/temurin-build/commit/e6ba7dec3d07654074559310376a3ae89da5f4ac') | Set-Content build/dependency-sources/TEMURIN-SOURCE.txt
           Compress-Archive -Path 'build/dependency-sources/*' -DestinationPath dependency-sources.zip
       - name: Archive corresponding source and portable app
         shell: pwsh

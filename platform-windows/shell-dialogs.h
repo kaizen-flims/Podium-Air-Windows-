@@ -75,17 +75,23 @@ void selfTest() {
     if (!GetTempPathW(MAX_PATH, temp) || !GetTempFileNameW(temp, L"pod", 0, seed)) throw std::runtime_error("Could not make shell dialog fixture");
     DeleteFileW(seed); std::wstring folder = std::wstring(seed) + L"-\u97f3\u4e50";
     if (!CreateDirectoryW(folder.c_str(), nullptr)) throw std::runtime_error("Could not make shell dialog directory");
+    DWORD required = GetLongPathNameW(folder.c_str(), nullptr, 0);
+    if (!required) throw std::runtime_error("Could not normalize shell dialog fixture path");
+    std::wstring expanded(required, L'\0');
+    DWORD written = GetLongPathNameW(folder.c_str(), expanded.data(), required);
+    if (!written || written >= required) throw std::runtime_error("Could not expand shell dialog fixture path");
+    expanded.resize(written); folder = expanded;
     std::wstring file = folder + L"\\\u00e9\u97f3.wav";
     HANDLE fixture = CreateFileW(file.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (fixture == INVALID_HANDLE_VALUE) throw std::runtime_error("Could not make unicode shell dialog file");
     CloseHandle(fixture);
     try {
         auto files = choose("--pick-files", nullptr, L"\u00e9\u97f3.wav", folder, IDOK);
-        if (files.size() != 1 || files[0] != file) throw std::runtime_error("Native file dialog selected the wrong path");
+        if (files.size() != 1 || _wcsicmp(files[0].c_str(), file.c_str()) != 0) throw std::runtime_error("Native file dialog selected the wrong path: expected " + to_string(hstring(file)) + "; actual " + (files.empty() ? "none" : to_string(hstring(files[0]))));
         auto directories = choose("--pick-folder", nullptr, L"", folder, IDOK);
-        if (directories.size() != 1 || directories[0] != folder) throw std::runtime_error("Native folder dialog selected the wrong directory");
+        if (directories.size() != 1 || _wcsicmp(directories[0].c_str(), folder.c_str()) != 0) throw std::runtime_error("Native folder dialog selected the wrong directory");
         auto saved = choose("--save-playlist", nullptr, L"\u00e9\u97f3.m3u8", folder, IDOK);
-        if (saved.size() != 1 || saved[0] != folder + L"\\\u00e9\u97f3.m3u8") throw std::runtime_error("Native save dialog selected the wrong path");
+        if (saved.size() != 1 || _wcsicmp(saved[0].c_str(), (folder + L"\\\u00e9\u97f3.m3u8").c_str()) != 0) throw std::runtime_error("Native save dialog selected the wrong path");
         if (!choose("--pick-files", nullptr, L"", folder, IDCANCEL).empty()) throw std::runtime_error("Native dialog cancellation returned a path");
         emit("PASS: Windows shell dialogs selected a Unicode music file and folder, selected an M3U8 save path, and cancelled without importing.");
     } catch (...) { DeleteFileW(file.c_str()); RemoveDirectoryW(folder.c_str()); throw; }
@@ -95,13 +101,15 @@ int run(int argc, char** argv) {
     init_apartment(apartment_type::single_threaded);
     std::string mode(argv[1]);
     if (mode == "--picker-self-test") { selfTest(); return 0; }
-    DWORD ownerPid = 0; std::wstring name;
+    DWORD ownerPid = 0; std::wstring name, fixtureFolder; int automatic = 0;
     for (int i = 2; i < argc; ++i) {
         std::string argument(argv[i]);
         if (argument.starts_with("--owner-pid=")) ownerPid = static_cast<DWORD>(std::stoul(argument.substr(12)));
         if (argument.starts_with("--name=")) name = unhex(argument.substr(7));
+        if (argument.starts_with("--fixture-folder=")) fixtureFolder = unhex(argument.substr(17));
+        if (argument.starts_with("--automatic=")) { automatic = std::stoi(argument.substr(12)); if (automatic != 0 && automatic != IDOK && automatic != IDCANCEL) throw std::invalid_argument("Invalid dialog test command"); }
     }
-    auto paths = choose(mode, ownerPid ? windowFor(ownerPid) : nullptr, name);
+    auto paths = choose(mode, ownerPid ? windowFor(ownerPid) : nullptr, name, fixtureFolder, fixtureFolder.empty() ? 0 : automatic);
     if (paths.empty()) { emit("CANCEL"); return 0; }
     size_t total = 0;
     for (auto const& path : paths) {

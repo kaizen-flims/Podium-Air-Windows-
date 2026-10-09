@@ -25,3 +25,7 @@
 - Added four independent ISO-BMFF security fixtures and stricter inline reference/table/descriptor bounds. Expanded audio integration to natural end and missing-file error/recovery; final verification pending.
 
 - Final audit corrected the earlier native-picker claim: Swing JFileChooser was the previous implementation. Replaced it on Windows with owned COM Common Item Dialogs for multiselect files, folders and playlist import/export. Added actual Unicode file/folder/save selection and cancellation self-tests, including the packaged helper. Validation pending.
+
+- Added packaged JVM-to-native dialog protocol checks for real Unicode selections and save path, explicit cancellation, and cancelling an open dialog without leaving a helper process. Added parser cancellation checkpoints and logarithmic media-data lookup to avoid pathological MP4 sample-table work. Validation pending.
+
+- Native picker self-test found an 8.3/full-path alias comparison mismatch; fixture paths now expand to their long form and JVM tests compare filesystem identities. Pinned the actual runtime to Temurin 21.0.12.1+1 and added its checksum-verified vendor source archive and exact build-script sources to the package source bundle. Validation pending.

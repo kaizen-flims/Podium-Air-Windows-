@@ -9,7 +9,7 @@ Local file/folder imports, metadata/artwork, albums/artists, search, favorites,
 history, editable playlists, M3U8 interchange, duplicate-safe queues, repeat/
 shuffle, play/pause/seek/volume, 0–12 second equal-power crossfade, speed,
 ten-band equalizer, sleep timer, TTML/LRC lyrics, lyric timing/word motion,
-artwork color motion and Replay listening statistics are implemented. Windows
+artwork color motion and Replay listening statistics are implemented. Windows shell file/folder dialogs,
 system media controls, tray, optional notifications and optional startup are included.
 
 The expanded Windows build passed unit tests, all 15 navigation routes, real
@@ -24,7 +24,7 @@ Listen Together remain incomplete. The app discloses unavailable capabilities.
 
 ## Build on Windows 10/11 x64
 
-Install JDK 21, WiX Toolset 3.14.1 and Visual Studio Build Tools with Desktop
+Install Temurin JDK 21.0.12.1+1, WiX Toolset 3.14.1 and Visual Studio Build Tools with Desktop
 development with C++ and a Windows SDK. In a Visual Studio x64 developer shell:
 
 ```powershell

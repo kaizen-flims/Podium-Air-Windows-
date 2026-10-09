@@ -170,6 +170,19 @@ private fun platformSmoke(args: Array<String>) {
             result.appendText(text)
             check(process.exitValue() == 0 && text.contains("PASS:")) { text }
         }
+        runBlocking {
+            val fixture = File(directory, "é音.wav"); generateTestWave(fixture, 1)
+            check(WindowsFilePicker.chooseForSmoke("--pick-files", fixture.name, directory, 1).singleOrNull()?.let { java.nio.file.Files.isSameFile(it.toPath(), fixture.toPath()) } == true) { "JVM picker returned the wrong Unicode file." }
+            check(WindowsFilePicker.chooseForSmoke("--pick-folder", "", directory, 1).singleOrNull()?.let { java.nio.file.Files.isSameFile(it.toPath(), directory.toPath()) } == true) { "JVM picker returned the wrong folder." }
+            check(WindowsFilePicker.chooseForSmoke("--save-playlist", "é音.m3u8", directory, 1).singleOrNull()?.let { it.name == "é音.m3u8" && java.nio.file.Files.isSameFile(it.parentFile.toPath(), directory.toPath()) } == true) { "JVM save picker returned the wrong path." }
+            check(WindowsFilePicker.chooseForSmoke("--pick-files", "", directory, 2).isEmpty()) { "Cancelled picker returned a selection." }
+            val pending = launch { WindowsFilePicker.chooseForSmoke("--pick-files", "", directory, 0) }
+            delay(750); pending.cancelAndJoin()
+            withTimeout(5000) {
+                while (ProcessHandle.current().children().use { children -> children.anyMatch { it.isAlive && it.info().command().orElse("").contains("PodiumMediaBridge", ignoreCase = true) } }) delay(50)
+            }
+            result.appendText("PASS: Packaged JVM/native picker protocol round-tripped Unicode file/folder/save selections, cancellation returned no paths, and cancelling an open picker left no helper process.\n")
+        }
     } catch (error: Exception) { result.writeText("FAIL: ${error.message}\n"); directory.deleteRecursively(); exitProcess(1) }
     directory.deleteRecursively(); exitProcess(0)
 }

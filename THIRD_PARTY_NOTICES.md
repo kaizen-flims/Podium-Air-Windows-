@@ -38,7 +38,7 @@ licenses and notices; the root GPL license does not erase the AGPL headers.
 | Skiko / Skia (transitive Compose renderer) | resolved by Compose; see packaged inventory | Apache-2.0 / BSD and bundled notices, https://github.com/JetBrains/skiko, https://skia.googlesource.com/skia/ |
 | OpenJFX base / graphics / media | 21.0.9 | GPL-2.0 with Classpath Exception; additional native-library licenses. https://github.com/openjdk/jfx21u |
 | jaudiotagger | 3.0.1 | LGPL-2.1-or-later (source headers), LGPL in published POM. https://bitbucket.org/ijabz/jaudiotagger/ |
-| Eclipse Temurin runtime | JDK 21 build resolved by setup-java | GPL-2.0 with Classpath Exception and runtime legal notices. https://adoptium.net/ |
+| Eclipse Temurin runtime | 21.0.12.1+1 | GPL-2.0 with Classpath Exception and runtime legal notices. https://adoptium.net/ |
 | Gradle wrapper | 8.14.3 distribution | Apache-2.0, https://github.com/gradle/gradle |
 
 The Gradle dependencyNotices task retains LICENSE, NOTICE, COPYING and legal
@@ -82,3 +82,11 @@ For the LGPL codec/tag libraries, the portable distribution keeps their JARs
 separate in the application directory. You may replace them with compatible
 modified versions and rebuild this application using the supplied scripts and
 corresponding sources. They are not statically merged into application code.
+
+
+The bundled Temurin runtime is pinned to 21.0.12.1+1. Its exact published source
+archive (verified against the vendor SHA256), upstream source commit
+`1c417fbfc2f70ab03a565b0af0a5a3c6f5e15ad6` and Temurin build scripts at
+`e6ba7dec3d07654074559310376a3ae89da5f4ac` are included in the dependency source
+bundle, with the JDK release metadata and source locations. The runtime keeps
+its original legal notices. This supplements the OpenJFX and codec/tag sources.

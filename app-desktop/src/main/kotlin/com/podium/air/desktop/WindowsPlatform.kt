@@ -108,13 +108,16 @@ object WindowsStartup {
 
 /** Windows Common Item Dialogs in a cancellable STA helper process; no Swing picker on Windows. */
 object WindowsFilePicker {
-    suspend fun choose(mode: String, name: String = ""): List<File> = runInterruptible(Dispatchers.IO) {
+    suspend fun choose(mode: String, name: String = ""): List<File> = request(mode, name, null, 0)
+    internal suspend fun chooseForSmoke(mode: String, name: String, folder: File, automatic: Int): List<File> = request(mode, name, folder, automatic)
+    private suspend fun request(mode: String, name: String, folder: File?, automatic: Int): List<File> = runInterruptible(Dispatchers.IO) {
         require(mode in setOf("--pick-files", "--pick-folder", "--pick-playlist", "--save-playlist"))
         val output = Files.createTempFile("podium-dialog-", ".txt").toFile()
         try {
-            val child = ProcessBuilder(extractMediaBridge().absolutePath, mode,
+            val command = mutableListOf(extractMediaBridge().absolutePath, mode,
                 "--owner-pid=${ProcessHandle.current().pid()}", "--name=${mediaText(name)}")
-                .redirectErrorStream(true).redirectOutput(output).start()
+            if (folder != null) command += listOf("--fixture-folder=${mediaText(folder.absolutePath)}", "--automatic=$automatic")
+            val child = ProcessBuilder(command).redirectErrorStream(true).redirectOutput(output).start()
             try {
                 if (!child.waitFor(2, TimeUnit.HOURS)) error("The Windows file dialog timed out.")
                 require(output.length() <= 9_000_000) { "The Windows dialog returned too many paths." }
@@ -130,7 +133,7 @@ object WindowsFilePicker {
                     require(path.isNotEmpty() && '\u0000' !in path)
                     File(path).also { require(it.isAbsolute) }
                 }
-            } finally { if (child.isAlive) child.destroyForcibly() }
+            } finally { if (child.isAlive) { child.destroyForcibly(); runCatching { child.waitFor(2, TimeUnit.SECONDS) } } }
         } finally { output.delete() }
     }
 }
