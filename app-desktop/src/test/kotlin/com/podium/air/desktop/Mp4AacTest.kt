@@ -32,7 +32,13 @@ class Mp4AacTest {
     }
     private fun readFixture(bytes: ByteArray, inspect: (Mp4Aac) -> Unit) {
         val file = Files.createTempFile("podium-mp4-test", ".m4a").toFile()
-        try { file.writeBytes(bytes); RandomAccessFile(file, "r").use { inspect(Mp4Aac(it)) } }
+        try {
+            file.writeBytes(bytes)
+            RandomAccessFile(file, "r").use { input ->
+                assertFailsWith<InterruptedException> { Mp4Aac(input) { throw InterruptedException("cancelled") } }
+                input.seek(0); inspect(Mp4Aac(input))
+            }
+        }
         finally { file.delete() }
     }
 }

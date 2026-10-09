@@ -39,11 +39,27 @@ fun main(args: Array<String>) {
     var mediaControls: WindowsMediaControls? = null
     application {
         var visible by remember { mutableStateOf(!args.contains("--background") || !SystemTray.isSupported()) }
+        val pickerScope = rememberCoroutineScope()
+        var pickerActive by remember { mutableStateOf(false) }
+        val windows = System.getProperty("os.name").startsWith("Windows")
         val bounds = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
         val windowState = rememberWindowState(placement = if (args.contains("--small")) WindowPlacement.Floating else WindowPlacement.Maximized,
             position = WindowPosition(Alignment.Center), width = minOf(760, bounds.width - 24).coerceAtLeast(360).dp, height = minOf(560, bounds.height - 24).coerceAtLeast(280).dp)
-        fun shutdown() { tray?.let { SystemTray.getSystemTray().remove(it) }; mediaControls?.close(); model.close(); FxRuntime.exit(); exitApplication() }
+        fun shutdown() { pickerScope.cancel(); tray?.let { SystemTray.getSystemTray().remove(it) }; mediaControls?.close(); model.close(); FxRuntime.exit(); exitApplication() }
         fun pick(folder: Boolean) {
+            if (windows) {
+                if (pickerActive) return
+                pickerActive = true
+                pickerScope.launch {
+                    try {
+                        val selected = WindowsFilePicker.choose(if (folder) "--pick-folder" else "--pick-files")
+                        if (selected.isNotEmpty()) model.importFiles(selected, folder)
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) { model.message.value = "File selection failed: ${error.message}" }
+                    finally { pickerActive = false }
+                }
+                return
+            }
             val chooser = JFileChooser().apply {
                 dialogTitle = if (folder) "Import music folder" else "Import music"
                 fileSelectionMode = if (folder) JFileChooser.DIRECTORIES_ONLY else JFileChooser.FILES_ONLY
@@ -55,6 +71,20 @@ fun main(args: Array<String>) {
             }
         }
         fun pickPlaylist(playlist: Playlist?) {
+            if (windows) {
+                if (pickerActive) return
+                pickerActive = true
+                pickerScope.launch {
+                    try {
+                        val filename = playlist?.name?.replace(Regex("[<>:\"/\\\\|?*\\x00-\\x1f]"), "_")?.plus(".m3u8").orEmpty()
+                        val selected = WindowsFilePicker.choose(if (playlist == null) "--pick-playlist" else "--save-playlist", filename).firstOrNull()
+                        if (selected != null) { if (playlist == null) model.importPlaylist(selected) else model.exportPlaylist(playlist.id, selected) }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) { model.message.value = "Playlist selection failed: ${error.message}" }
+                    finally { pickerActive = false }
+                }
+                return
+            }
             val chooser = JFileChooser().apply {
                 dialogTitle = if (playlist == null) "Import local playlist" else "Export ${playlist.name}"
                 fileFilter = FileNameExtensionFilter("Local playlists (M3U8, M3U)", "m3u8", "m3u")
@@ -132,11 +162,14 @@ private fun platformSmoke(args: Array<String>) {
     val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "platform-smoke.txt")
     val directory = java.nio.file.Files.createTempDirectory("podium-platform-smoke").toFile()
     try {
-        val process = ProcessBuilder(extractMediaBridge(directory).absolutePath, "--self-test").redirectErrorStream(true).start()
-        if (!process.waitFor(15000, java.util.concurrent.TimeUnit.MILLISECONDS)) { process.destroyForcibly(); error("Packaged Windows media helper timed out") }
-        val text = process.inputStream.bufferedReader().readText()
-        result.writeText(text)
-        check(process.exitValue() == 0 && text.contains("PASS:")) { text }
+        result.writeText("")
+        for (mode in listOf("--self-test", "--picker-self-test")) {
+            val process = ProcessBuilder(extractMediaBridge(directory).absolutePath, mode).redirectErrorStream(true).start()
+            if (!process.waitFor(20000, java.util.concurrent.TimeUnit.MILLISECONDS)) { process.destroyForcibly(); error("Packaged Windows helper timed out: $mode") }
+            val text = process.inputStream.bufferedReader().readText()
+            result.appendText(text)
+            check(process.exitValue() == 0 && text.contains("PASS:")) { text }
+        }
     } catch (error: Exception) { result.writeText("FAIL: ${error.message}\n"); directory.deleteRecursively(); exitProcess(1) }
     directory.deleteRecursively(); exitProcess(0)
 }

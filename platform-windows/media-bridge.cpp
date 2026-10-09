@@ -50,6 +50,8 @@ std::wstring unhex(std::string const& hex) {
     if (size) MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, bytes.data(), static_cast<int>(bytes.size()), result.data(), size);
     return result;
 }
+#include "shell-dialogs.h"
+
 std::vector<std::string> split(std::string const& text) {
     std::vector<std::string> result;
     size_t start=0;
@@ -100,6 +102,10 @@ LRESULT CALLBACK procedure(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam
 }
 int main(int argc, char** argv) {
     try {
+        if (argc > 1) {
+            std::string mode(argv[1]);
+            if (mode == "--picker-self-test" || mode == "--pick-files" || mode == "--pick-folder" || mode == "--pick-playlist" || mode == "--save-playlist") return podium_shell::run(argc, argv);
+        }
         init_apartment(apartment_type::multi_threaded);
         SetCurrentProcessExplicitAppUserModelID(L"PodiumAir.Windows");
         WNDCLASSW type{}; type.lpfnWndProc=procedure; type.hInstance=GetModuleHandleW(nullptr); type.lpszClassName=L"PodiumAirMediaBridge";

@@ -49,6 +49,11 @@ jobs:
         run: |
           & ./build/windows-helper/PodiumMediaBridge.exe --self-test | Tee-Object -FilePath windows-media-smoke.txt
           if ($LASTEXITCODE -ne 0) { throw 'Native Windows media integration failed' }
+      - name: Verify native Windows file and folder dialogs
+        shell: pwsh
+        run: |
+          & ./build/windows-helper/PodiumMediaBridge.exe --picker-self-test | Tee-Object -FilePath windows-dialog-smoke.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Native Windows shell dialogs failed' }
       - name: Tests and native packages
         run: .\gradlew.bat --no-daemon :shared-domain:check :app-desktop:check :app-desktop:createDistributable :app-desktop:packageMsi :app-desktop:packageExe
       - name: Launch packaged app and verify rendered window
@@ -68,7 +73,7 @@ jobs:
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
           $result = Join-Path $PWD 'platform-smoke.txt'
           $p = Start-Process -FilePath $exe -ArgumentList @('--platform-smoke', "--result=`"$result`"") -PassThru
-          if (-not $p.WaitForExit(20000)) { $p.Kill(); throw 'Packaged Windows helper timed out' }
+          if (-not $p.WaitForExit(45000)) { $p.Kill(); throw 'Packaged Windows helper timed out' }
           Get-Content $result
           if ($p.ExitCode -ne 0) { throw 'Packaged Windows integration failed' }
       - name: Verify small window at 150 and 200 percent scaling
@@ -225,6 +230,7 @@ jobs:
             audio-smoke.txt
             codec-*-smoke.txt
             windows-media-smoke.txt
+            windows-dialog-smoke.txt
             platform-smoke.txt
             dpi-*-smoke.*
             screenshots/

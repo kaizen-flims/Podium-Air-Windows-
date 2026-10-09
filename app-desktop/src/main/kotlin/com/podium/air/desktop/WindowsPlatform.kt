@@ -105,3 +105,32 @@ object WindowsStartup {
     fun packagedExecutable(): File? = System.getProperty("jpackage.app-path")?.let(::File)
         ?: ProcessHandle.current().info().command().orElse(null)?.let(::File)?.takeIf { it.name == "Podium Air.exe" }
 }
+
+/** Windows Common Item Dialogs in a cancellable STA helper process; no Swing picker on Windows. */
+object WindowsFilePicker {
+    suspend fun choose(mode: String, name: String = ""): List<File> = runInterruptible(Dispatchers.IO) {
+        require(mode in setOf("--pick-files", "--pick-folder", "--pick-playlist", "--save-playlist"))
+        val output = Files.createTempFile("podium-dialog-", ".txt").toFile()
+        try {
+            val child = ProcessBuilder(extractMediaBridge().absolutePath, mode,
+                "--owner-pid=${ProcessHandle.current().pid()}", "--name=${mediaText(name)}")
+                .redirectErrorStream(true).redirectOutput(output).start()
+            try {
+                if (!child.waitFor(2, TimeUnit.HOURS)) error("The Windows file dialog timed out.")
+                require(output.length() <= 9_000_000) { "The Windows dialog returned too many paths." }
+                val lines = output.readLines(Charsets.UTF_8).filter { it.isNotBlank() }
+                check(child.exitValue() == 0) { lines.firstOrNull { it.startsWith("ERROR\t") }?.substringAfter('\t') ?: "The Windows file dialog failed." }
+                if (lines == listOf("CANCEL")) return@runInterruptible emptyList()
+                require(lines.lastOrNull() == "DONE" && lines.size in 2..10001) { "Incomplete Windows dialog result." }
+                lines.dropLast(1).map { line ->
+                    require(line.startsWith("PATH\t")) { "Unexpected Windows dialog result." }
+                    val encoded = line.substringAfter('\t')
+                    require(encoded.length <= 262144 && encoded.length % 2 == 0)
+                    val path = ByteArray(encoded.length / 2) { at -> encoded.substring(at * 2, at * 2 + 2).toInt(16).toByte() }.toString(Charsets.UTF_8)
+                    require(path.isNotEmpty() && '\u0000' !in path)
+                    File(path).also { require(it.isAbsolute) }
+                }
+            } finally { if (child.isAlive) child.destroyForcibly() }
+        } finally { output.delete() }
+    }
+}

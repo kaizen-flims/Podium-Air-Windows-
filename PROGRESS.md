@@ -23,3 +23,5 @@
 
 - Commit 792ea3d passed 32 tests, Robot Ctrl+F/Ctrl+Space play/pause, simulated 150/200% startup, all six codecs, native/packaged SMTC, MSI install/run/uninstall and all uploads in run 37953260863. Fresh screenshots visually confirmed visible mini player and bounded/scrollable layouts. Paused sample: 0.86% of one logical core and 226.03 MB peak app/direct-helper working set; helper exited with app.
 - Added four independent ISO-BMFF security fixtures and stricter inline reference/table/descriptor bounds. Expanded audio integration to natural end and missing-file error/recovery; final verification pending.
+
+- Final audit corrected the earlier native-picker claim: Swing JFileChooser was the previous implementation. Replaced it on Windows with owned COM Common Item Dialogs for multiselect files, folders and playlist import/export. Added actual Unicode file/folder/save selection and cancellation self-tests, including the packaged helper. Validation pending.

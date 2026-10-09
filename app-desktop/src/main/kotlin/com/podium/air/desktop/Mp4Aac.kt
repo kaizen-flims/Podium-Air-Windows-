@@ -4,12 +4,13 @@ package com.podium.air.desktop
 import java.io.RandomAccessFile
 
 /** Non-fragmented ISO BMFF AAC sample tables. Unknown boxes are skipped by their declared bounds. */
-internal class Mp4Aac(private val input: RandomAccessFile) {
+internal class Mp4Aac(private val input: RandomAccessFile, private val checkCancelled: () -> Unit = {}) {
     private data class Box(val type: String, val start: Long, val size: Long, val header: Long = 8) { val data get() = start + header; val end get() = start + size }
     private fun boxes(start: Long, end: Long): List<Box> {
         require(start >= 0 && end <= input.length() && end >= start)
         val result = mutableListOf<Box>(); var at = start
         while (at < end) {
+            checkCancelled()
             require(end - at >= 8) { "Truncated MP4 box header." }
             input.seek(at); val shortSize = input.readInt().toLong() and 0xffffffffL
             val type = ByteArray(4).also(input::readFully).toString(Charsets.ISO_8859_1)
@@ -38,6 +39,8 @@ internal class Mp4Aac(private val input: RandomAccessFile) {
     val movieTimescale: Long
     init {
         val roots = boxes(0, input.length())
+        val mediaData = roots.filter { it.type == "mdat" }
+        val mediaStarts = mediaData.map { it.data }.toLongArray()
         require(roots.none { it.type == "moof" }) { "Fragmented M4A is not supported." }
         val movie = children(roots.required("moov"))
         movieTimescale = timescale(movie.required("mvhd"))
@@ -79,7 +82,7 @@ internal class Mp4Aac(private val input: RandomAccessFile) {
         input.seek(sampleSize.data + 4); val uniform = input.readInt(); val count = input.readInt()
         require(count in 1..1_000_000 && uniform >= 0)
         require(uniform != 0 || sampleSize.end - input.filePointer >= count * 4L) { "Truncated MP4 sample sizes." }
-        sizes = IntArray(count) { if (uniform != 0) uniform else input.readInt() }
+        sizes = IntArray(count) { if (it % 1024 == 0) checkCancelled(); if (uniform != 0) uniform else input.readInt() }
         require(sizes.all { it in 1..2_000_000 }) { "Invalid AAC sample sizes." }
         val chunks = table.firstOrNull { it.type == "co64" } ?: table.required("stco")
         require(chunks.end - chunks.data >= 8) { "Truncated MP4 chunk table." }
@@ -94,11 +97,15 @@ internal class Mp4Aac(private val input: RandomAccessFile) {
         require(map.first().first == 1 && map.all { it.second in 1..count && it.third == 1 } && map.zipWithNext().all { (a, b) -> a.first < b.first })
         offsets = LongArray(count); var sample = 0; var mapIndex = 0
         chunkOffsets.forEachIndexed { index, base ->
+            checkCancelled()
             while (mapIndex + 1 < map.size && map[mapIndex + 1].first <= index + 1) mapIndex++
             var offset = base
             repeat(map[mapIndex].second) {
                 require(sample < count && offset >= 0 && sizes[sample] <= input.length() - offset) { "AAC sample points outside the file." }
-                require(roots.any { it.type == "mdat" && offset >= it.data && offset + sizes[sample] <= it.end }) { "AAC sample points outside media data." }
+                if (sample % 1024 == 0) checkCancelled()
+                val located = java.util.Arrays.binarySearch(mediaStarts, offset)
+                val mediaIndex = if (located >= 0) located else -located - 2
+                require(mediaIndex >= 0 && offset + sizes[sample] <= mediaData[mediaIndex].end) { "AAC sample points outside media data." }
                 offsets[sample] = offset; offset += sizes[sample]; sample++
             }
         }

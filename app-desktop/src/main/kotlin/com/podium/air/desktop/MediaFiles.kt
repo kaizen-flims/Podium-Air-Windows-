@@ -58,7 +58,7 @@ private fun decodeAac(source: File, destination: File, checkCancelled: () -> Uni
     var frames = 0
     try {
         RandomAccessFile(source, "r").use { input ->
-            val track = Mp4Aac(input)
+            val track = Mp4Aac(input, checkCancelled)
             val decoder = Decoder(track.configuration)
             val buffer = SampleBuffer().apply { isBigEndian = false }
             var decoded = 0L; var skip = 0L

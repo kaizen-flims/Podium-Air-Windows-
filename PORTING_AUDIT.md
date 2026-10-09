@@ -30,7 +30,7 @@ simply changing the Gradle target would not produce a desktop app.
 | Home / Explore / Search / Library / Detail / Player | Reusable after abstraction | Compose concepts retained, Android resource/activity/player bindings rewritten for desktop; local content only |
 | Brand images | Reusable | Original mono mark and Glow Flow app icon retained; Windows icon derived |
 | SF Pro Display OTF files | Blocked pending redistribution rights | Not bundled; desktop default system font used |
-| `LocalMediaRepository` | Android-only / reimplement | MediaStore, URI permissions and MediaMetadataRetriever replaced with filesystem picker/scanner and jaudiotagger |
+| `LocalMediaRepository` | Android-only / reimplement | MediaStore, URI permissions and MediaMetadataRetriever replaced with Windows Common Item Dialogs, cancellable filesystem scanning and jaudiotagger |
 | `AppSettings`, SearchHistory, LastPlayed, ListeningStats | Android-only persistence bindings | Atomic JSON store, preferences, favorites and recent history implemented. Elapsed-time recorder and 7/30/365-day Replay implemented; source annual share-card presentation is not ported |
 | PlaybackService / PlayerConnection / audio sink / output routing | Android-only / reimplement | JavaFX native audio backend on JVM, single-thread lifecycle, reactive StateFlow; Windows JavaFX native libraries packaged |
 | `CrossfadeController` | Android-only orchestration | Two-player equal-power overlap implemented for local tracks at 1×; not claiming sample-accurate gaplessness |
@@ -105,3 +105,11 @@ decoder source JARs accompany the package. The AGPL Automix planner/analyzer and
 beat model were inspected but not copied. AGPL is not treated as a blanket ban: a
 port requires retaining its license obligations and adapting the Android/JNI/
 model/time-stretch pipeline. JavaFX's overlap alone cannot deliver beat matching.
+
+The Windows file/folder/import/export picker now uses COM `IFileOpenDialog` and
+`IFileSaveDialog` in a separate STA helper mode. The dialog is owned by the
+visible window found within the exact parent process, supports filesystem-only
+multiselect/folder selection and overwrite confirmation, and returns UTF-8
+paths as bounded hex lines. Cancellation/parent shutdown kills the helper and
+removes the temporary response. Swing choosers remain only for non-Windows
+development. Native shell selection/cancellation tests are pending the final CI run.

@@ -36,7 +36,8 @@ end users need no Java/VLC/FFmpeg/.NET installation. All installers are unsigned
 ## Implemented scope
 
 - Native Compose/AWT window, source brand/icon/palette, dark/light themes,
-  compact navigation, scrollable narrow layouts, mini player and keyboard controls.
+  compact navigation, scrollable narrow layouts, mini player and keyboard controls and Windows Common Item Dialog file/folder/import/export pickers
+  in a cancellable STA helper (new picker validation pending).
 - Real filesystem import with metadata, embedded artwork, progress/cancellation,
   accessible mapped/UNC paths, album-artist identity and disc/track ordering.
 - Persisted local playlists/favorites/history/duplicate-safe queue, repeat,
