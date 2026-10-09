@@ -19,6 +19,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("net.jthink:jaudiotagger:3.0.1")
+    implementation("de.sfuhrm:jaad:0.8.7") { isTransitive = false }
     implementation("org.jflac:jflac-codec:1.5.2") { isTransitive = false }
     implementation("io.github.jaredmdobson:concentus:1.0.2") { isTransitive = false }
     for (module in listOf("base", "graphics", "media")) {
@@ -83,6 +84,7 @@ val dependencyNotices by tasks.registering {
 }
 tasks.processResources {
     dependsOn(dependencyNotices)
+    from(rootProject.layout.buildDirectory.dir("windows-helper")) { include("PodiumMediaBridge.exe"); into("windows") }
     from(layout.buildDirectory.dir("generated/notices"))
     from(rootProject.file("LICENSE")) { into("licenses") }
     from(rootProject.file("THIRD_PARTY_NOTICES.md")) { into("licenses") }
@@ -94,6 +96,7 @@ val dependencySources by configurations.creating {
 }
 dependencies {
     dependencySources("net.jthink:jaudiotagger:3.0.1:sources")
+    dependencySources("de.sfuhrm:jaad:0.8.7:sources")
     dependencySources("org.jflac:jflac-codec:1.5.2:sources")
     dependencySources("io.github.jaredmdobson:concentus:1.0.2:sources")
     for (module in listOf("base", "graphics", "media")) dependencySources("org.openjfx:javafx-$module:21.0.9:sources")

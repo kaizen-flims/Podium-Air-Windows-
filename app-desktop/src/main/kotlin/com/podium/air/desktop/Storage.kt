@@ -24,7 +24,7 @@ data class StoredTrack(val id: String, val path: String, val title: String, val 
 @Serializable
 data class Playlist(val id: String = UUID.randomUUID().toString(), val name: String, val tracks: List<String> = emptyList())
 @Serializable
-data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 })
+data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false)
 @Serializable
 data class SavedQueueEntry(val key: String, val trackId: String)
 @Serializable

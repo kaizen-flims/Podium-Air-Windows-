@@ -69,3 +69,7 @@ locations above are provided for unmodified separately licensed libraries.
 - The Ogg container reader and PCM cache in this port are new GPL-3.0 code implementing RFC 3533 and RFC 7845. No code was extracted from the RFCs.
 
 FLAC above 16-bit is converted to 16-bit PCM because this JavaFX pipeline accepts 8/16-bit WAV. Opus is decoded at 48 kHz with header gain, pre-skip and final-granule trimming. Multichannel, chained Ogg streams and Ogg Vorbis are explicitly rejected rather than advertised as supported.
+
+- JAAD 0.8.7 (`de.sfuhrm:jaad`) provides local AAC/M4A decoding independently of Windows optional codecs. The exact `jaad-0.8.7` tag is `23a55187689cd5d0a857c49f945dcf16cf49868a`; its public-domain dedication is bundled under `licenses/jaad/LICENSE`. The published source JAR accompanies the build. Encrypted/protected files, external MP4 references and non-AAC M4A tracks are rejected. AAC encoder delay/edit-list handling is not sample-accurate and gapless is not claimed.
+
+The native Windows media helper is new GPL-3.0-only C++ code compiled against the Windows SDK with C++/WinRT. It uses the operating system SMTC APIs and includes no third-party audio engine or .NET runtime. The Microsoft Visual C++ runtime is linked by the compiler; its distribution is subject to the Microsoft Visual Studio redistribution terms. Windows SDK/C++/WinRT source headers are under their applicable Microsoft SDK and MIT terms, and their notices must remain in any redistributed SDK source. The source archive includes this port's complete helper and build command.

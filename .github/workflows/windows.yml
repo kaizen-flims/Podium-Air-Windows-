@@ -38,6 +38,17 @@ jobs:
           }
           if (-not $wix) { throw 'WiX 3 not found' }
           "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Build native Windows media integration
+        shell: pwsh
+        run: ./platform-windows/build.ps1
+      - name: Verify Windows system media session
+        shell: pwsh
+        run: |
+          & ./build/windows-helper/PodiumMediaBridge.exe --self-test | Tee-Object -FilePath windows-media-smoke.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Native Windows media integration failed' }
       - name: Tests and native packages
         run: .\gradlew.bat --no-daemon :shared-domain:check :app-desktop:check :app-desktop:createDistributable :app-desktop:packageMsi :app-desktop:packageExe
       - name: Launch packaged app and verify rendered window
@@ -138,6 +149,7 @@ jobs:
             ui-smoke.png
             audio-smoke.txt
             codec-*-smoke.txt
+            windows-media-smoke.txt
             test-summary.txt
             runtime-build.txt
             dependency-inventory.txt

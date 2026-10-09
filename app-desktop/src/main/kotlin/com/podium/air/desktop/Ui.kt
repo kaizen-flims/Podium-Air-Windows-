@@ -420,7 +420,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
     }
 }
 @Composable private fun Settings(model: DesktopModel, state: SavedState) {
-    val prefs = state.preferences; val sleep by model.sleepRemaining.collectAsState()
+    val prefs = state.preferences; val sleep by model.sleepRemaining.collectAsState(); val platform by model.platformStatus.collectAsState()
     LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
         item { Text("Appearance", style = MaterialTheme.typography.headlineMedium); Row(verticalAlignment = Alignment.CenterVertically) { Text("Dark theme", Modifier.weight(1f)); Switch(prefs.dark, { model.preferences(prefs.copy(dark = it)) }) } }
         item { Text("Playback", style = MaterialTheme.typography.headlineMedium); Text("Crossfade • ${prefs.crossfadeSeconds}s"); Slider(prefs.crossfadeSeconds.toFloat(), { model.preferences(prefs.copy(crossfadeSeconds = it.toInt())) }, valueRange = 0f..12f, steps = 11); Text("Equal-power volume overlap. Crossfade pauses during seeking and is disabled at playback speeds other than 1×. Automix beat matching is not available.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -428,6 +428,13 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
         item { Text("Sleep timer", style = MaterialTheme.typography.titleLarge); if (sleep != null) Text("Pauses in ${formatTime(sleep!! * 1000)}"); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(15, 30, 60).forEach { minutes -> AssistChip({ model.sleepTimer(minutes) }, { Text("${minutes}m") }) }; AssistChip({ model.sleepTimer(null) }, { Text("Cancel") }) } }
         item { Text("Equalizer", style = MaterialTheme.typography.headlineMedium); TextButton({ model.preferences(prefs.copy(equalizer = List(10) { 0.0 })) }) { Text("Reset to flat") } }
         items(10) { band -> Row(verticalAlignment = Alignment.CenterVertically) { Text(listOf("32 Hz", "64 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz")[band], Modifier.width(64.dp), fontSize = 12.sp); Slider(prefs.equalizer.getOrElse(band) { 0.0 }.toFloat(), { gain -> model.preferences(prefs.copy(equalizer = prefs.equalizer.toMutableList().apply { this[band] = gain.toDouble() })) }, Modifier.weight(1f), valueRange = -12f..12f); Text("${prefs.equalizer.getOrElse(band) { 0.0 }.toInt()} dB", Modifier.width(46.dp), fontSize = 12.sp) } }
+        item {
+            Text("Windows", style = MaterialTheme.typography.headlineMedium)
+            Text(platform, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Close window to system tray", Modifier.weight(1f)); Switch(prefs.closeToTray, { model.preferences(prefs.copy(closeToTray = it)) }) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Launch at Windows sign-in", Modifier.weight(1f)); Switch(prefs.launchAtStartup, { model.preferences(prefs.copy(launchAtStartup = it)) }) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Track notifications", Modifier.weight(1f)); Switch(prefs.notifications, { model.preferences(prefs.copy(notifications = it)) }) }
+        }
         item { Text("Keyboard shortcuts", style = MaterialTheme.typography.headlineMedium); Text("Ctrl+O — import files\nCtrl+Shift+O — import folder\nCtrl+F — search\nCtrl+Space — play/pause\nCtrl+Left/Right — previous/next\nAlt+Left/Right — seek 10 seconds\nEsc — leave collection") }
         item { Text("Data", style = MaterialTheme.typography.headlineMedium); Text("Your library, playlists and preferences are stored on this computer. Music files are referenced in place; importing does not copy them. ${defaultDataDirectory().absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
@@ -449,7 +456,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, smoke: Boolean
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Podium Air — Windows Edition", style = MaterialTheme.typography.headlineMedium)
         Text("0.1.0 • Native desktop preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
-        Text("This preview supports local music. Streaming, full Android feature parity, Automix and Windows system media sessions are pending.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("This preview supports local music. Streaming, full Android feature parity, and Automix are pending. Windows system media controls are included.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton({ Desktop.getDesktop().browse(URI("https://github.com/kaizen-flims/Podium-Air-Windows-")) }) { Text("Corresponding source & build instructions") }
         TextButton({ licenses = readResource("/licenses/THIRD_PARTY_NOTICES.md") + "\n\n" + readResource("/licenses/LICENSE") }) { Text("Third-party licenses & legal notices") }
         Text("Free software under GNU GPL version 3. No warranty. You may redistribute it under the license terms.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

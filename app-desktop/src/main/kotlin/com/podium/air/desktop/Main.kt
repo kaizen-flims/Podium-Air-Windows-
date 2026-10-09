@@ -7,7 +7,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.*
 import java.awt.*
 import java.io.File
 import javax.imageio.ImageIO
@@ -30,10 +30,11 @@ fun main(args: Array<String>) {
     }
     val model = DesktopModel(JavaFxAudioEngine(), store)
     var tray: TrayIcon? = null
+    var mediaControls: WindowsMediaControls? = null
     application {
-        var visible by remember { mutableStateOf(true) }
+        var visible by remember { mutableStateOf(!args.contains("--background") || !SystemTray.isSupported()) }
         val windowState = rememberWindowState(width = 1160.dp, height = 800.dp)
-        fun shutdown() { tray?.let { SystemTray.getSystemTray().remove(it) }; model.close(); FxRuntime.exit(); exitApplication() }
+        fun shutdown() { tray?.let { SystemTray.getSystemTray().remove(it) }; mediaControls?.close(); model.close(); FxRuntime.exit(); exitApplication() }
         fun pick(folder: Boolean) {
             val chooser = JFileChooser().apply {
                 dialogTitle = if (folder) "Import music folder" else "Import music"
@@ -45,9 +46,13 @@ fun main(args: Array<String>) {
                 model.importFiles(if (folder) listOf(chooser.selectedFile) else chooser.selectedFiles.toList(), folder)
             }
         }
-        Window(onCloseRequest = { shutdown() }, title = "Podium Air — Windows Edition", state = windowState, visible = visible) {
+        Window(onCloseRequest = { if (model.state.value.preferences.closeToTray && tray != null) visible = false else shutdown() }, title = "Podium Air — Windows Edition", state = windowState, visible = visible) {
             LaunchedEffect(Unit) {
                 window.minimumSize = Dimension(720, 540)
+                if (!smoke && System.getProperty("os.name").startsWith("Windows")) {
+                    mediaControls = WindowsMediaControls(model)
+                    launch { mediaControls!!.status.collect { model.platformStatus.value = it } }
+                }
                 window.iconImage = ImageIO.read(object {}.javaClass.getResource("/brand/icon.jpg"))
                 if (!smoke && SystemTray.isSupported()) {
                     runCatching {
@@ -60,6 +65,12 @@ fun main(args: Array<String>) {
                             isImageAutoSize = true; addActionListener { SwingUtilities.invokeLater { visible = true; window.toFront() } }
                         }
                         SystemTray.getSystemTray().add(tray)
+                        launch {
+                            model.engine.state.map { it.entry?.song }.distinctUntilChangedBy { it?.videoId }.collect { song ->
+                                tray?.toolTip = song?.let { "${it.title} — ${it.artist}" } ?: "Podium Air"
+                                if (song != null && model.state.value.preferences.notifications) tray?.displayMessage(song.title, song.artist, TrayIcon.MessageType.NONE)
+                            }
+                        }
                     }.onFailure { model.message.value = "System tray is unavailable: ${it.message}" }
                 }
             }

@@ -29,6 +29,7 @@ class DesktopModel(
     val importing = MutableStateFlow(false)
     val lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val sleepRemaining = MutableStateFlow<Long?>(null)
+    val platformStatus = MutableStateFlow("Windows media controls initialize when the window opens.")
     private var saveJob: Job? = null
     private var lyricsJob: Job? = null
     private var sleepJob: Job? = null
@@ -111,7 +112,13 @@ class DesktopModel(
         change { copy(library = library.filterNot { it.id == id }, favorites = favorites - id, history = history - id,
             playlists = playlists.map { it.copy(tracks = it.tracks.filterNot { track -> track == id }) }) }
     }
-    fun preferences(value: Preferences) { change { copy(preferences = value) }; engine.configure(value) }
+    fun preferences(value: Preferences) {
+        if (value.launchAtStartup != state.value.preferences.launchAtStartup) {
+            try { WindowsStartup.set(value.launchAtStartup) }
+            catch (error: Exception) { message.value = error.message; return }
+        }
+        change { copy(preferences = value) }; engine.configure(value)
+    }
     fun sleepTimer(minutes: Int?) {
         sleepJob?.cancel(); sleepRemaining.value = minutes?.times(60L)
         if (minutes != null) sleepJob = scope.launch {

@@ -55,6 +55,22 @@ class PlaybackModelTest {
             assertTrue(model.state.value.playlists.single().tracks.isEmpty()); assertTrue(model.state.value.favorites.isEmpty())
         } finally { model.close() }
     }
+    @Test fun systemMediaCommandsControlTheSelectedQueueWithoutReopeningPlayingTracks() {
+        val audio = FakeAudio(); val store = MemoryState(); val model = DesktopModel(audio, store, dispatcher = Dispatchers.Unconfined)
+        try {
+            model.play(store.value.library.map { it.song() })
+            val original = audio.state.value.entry!!.key
+            handleMediaCommand(model, "PLAY"); assertEquals(original, audio.state.value.entry!!.key)
+            handleMediaCommand(model, "PAUSE"); assertFalse(audio.state.value.playing)
+            handleMediaCommand(model, "PLAY"); assertTrue(audio.state.value.playing)
+            handleMediaCommand(model, "SEEK\t2000"); assertEquals(2000, audio.state.value.positionMs)
+            handleMediaCommand(model, "SEEK\tinvalid"); assertEquals(2000, audio.state.value.positionMs)
+            handleMediaCommand(model, "NEXT"); assertEquals("b", audio.state.value.entry!!.song.videoId)
+            handleMediaCommand(model, "STOP"); assertNull(audio.state.value.entry)
+            handleMediaCommand(model, "PLAY"); assertEquals("b", audio.state.value.entry!!.song.videoId)
+            assertEquals("506f6469756d20e29da4", mediaText("Podium ❤"))
+        } finally { model.close() }
+    }
     @Test fun crossfadeAdvanceDoesNotReopenIncomingPlayer() {
         val audio = FakeAudio(); val store = MemoryState(); val model = DesktopModel(audio, store, dispatcher = Dispatchers.Unconfined)
         try {
