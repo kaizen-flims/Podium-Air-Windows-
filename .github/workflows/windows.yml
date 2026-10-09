@@ -1,0 +1,88 @@
+name: Windows native build
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      audio_smoke:
+        description: 'Run real audio/crossfade smoke test (requires a working audio output on runner)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Ensure WiX 3 packaging tools
+        shell: pwsh
+        run: |
+          $wix = Get-ChildItem 'C:\Program Files (x86)' -Filter 'WiX Toolset v3*' -Directory | Select-Object -First 1
+          if (-not $wix) {
+            choco install wixtoolset --version=3.14.1 --allow-downgrade -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
+            $wix = Get-ChildItem 'C:\Program Files (x86)' -Filter 'WiX Toolset v3*' -Directory | Select-Object -First 1
+          }
+          if (-not $wix) { throw 'WiX 3 not found' }
+          "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - name: Tests and native packages
+        run: .\gradlew.bat --no-daemon :shared-domain:check :app-desktop:check :app-desktop:createDistributable :app-desktop:packageMsi :app-desktop:packageExe
+      - name: Launch packaged app and verify rendered window
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'ui-smoke.txt'
+          $png = Join-Path $PWD 'ui-smoke.png'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--ui-smoke', "--result=`"$result`"", "--screenshot=`"$png`"") -PassThru
+          if (-not $p.WaitForExit(30000)) { $p.Kill(); throw 'UI startup smoke timed out' }
+          if (-not (Test-Path $result)) { throw 'App exited without rendering the Compose window' }
+          Get-Content $result
+          if ($p.ExitCode -ne 0) { throw "UI process failed with $($p.ExitCode)" }
+      - name: Real audio integration smoke
+        if: github.event_name == 'workflow_dispatch' && inputs.audio_smoke
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'audio-smoke.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--audio-smoke', "--result=`"$result`"") -PassThru
+          if (-not $p.WaitForExit(45000)) { $p.Kill(); throw 'Audio integration smoke timed out' }
+          if (Test-Path $result) { Get-Content $result }
+          if ($p.ExitCode -ne 0 -or -not (Test-Path $result)) { throw 'Real audio integration failed; inspect audio-smoke.txt' }
+      - name: Archive corresponding source and portable app
+        shell: pwsh
+        run: |
+          git archive --format=zip -o podium-air-windows-source.zip HEAD
+          Compress-Archive -Path 'app-desktop/build/compose/binaries/main/app/Podium Air' -DestinationPath podium-air-windows-portable.zip
+          Get-FileHash app-desktop/build/compose/binaries/main/msi/*.msi, app-desktop/build/compose/binaries/main/exe/*.exe, podium-air-windows-portable.zip, podium-air-windows-source.zip -Algorithm SHA256 | Format-List | Out-File SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Podium-Air-Windows-x64
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            app-desktop/build/compose/binaries/main/msi/*.msi
+            app-desktop/build/compose/binaries/main/exe/*.exe
+            podium-air-windows-portable.zip
+            podium-air-windows-source.zip
+            SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Windows-verification
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/test/
+            ui-smoke.txt
+            ui-smoke.png
+            audio-smoke.txt
