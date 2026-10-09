@@ -1,0 +1,274 @@
+name: Windows native build
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      audio_smoke:
+        description: 'Run real audio/crossfade smoke test (requires a working audio output on runner)'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21.0.12+101.0'
+      - name: Verify pinned runtime build
+        shell: pwsh
+        run: |
+          $release = Get-Content "$env:JAVA_HOME/release" -Raw
+          if ($release -notmatch '(?m)^JAVA_RUNTIME_VERSION="21\.0\.12\.1\+1-LTS"\r?$') { throw 'The selected runtime differs from the matching source bundle' }
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
+      - name: Ensure WiX 3 packaging tools
+        shell: pwsh
+        run: |
+          $wix = Get-ChildItem 'C:\Program Files (x86)' -Filter 'WiX Toolset v3*' -Directory | Select-Object -First 1
+          if (-not $wix) {
+            choco install wixtoolset --version=3.14.1 --allow-downgrade -y --no-progress
+            if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
+            $wix = Get-ChildItem 'C:\Program Files (x86)' -Filter 'WiX Toolset v3*' -Directory | Select-Object -First 1
+          }
+          if (-not $wix) { throw 'WiX 3 not found' }
+          "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+      - name: Build native Windows media integration
+        shell: pwsh
+        run: ./platform-windows/build.ps1
+      - name: Verify Windows system media session
+        shell: pwsh
+        run: |
+          & ./build/windows-helper/PodiumMediaBridge.exe --self-test | Tee-Object -FilePath windows-media-smoke.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Native Windows media integration failed' }
+      - name: Verify native Windows file and folder dialogs
+        shell: pwsh
+        run: |
+          & ./build/windows-helper/PodiumMediaBridge.exe --picker-self-test | Tee-Object -FilePath windows-dialog-smoke.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Native Windows shell dialogs failed' }
+      - name: Collect native renderer legal files
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'skia-native.zip'
+          $expanded = Join-Path $env:RUNNER_TEMP 'skia-native'
+          Invoke-WebRequest 'https://github.com/JetBrains/skia-pack/releases/download/m132-a00c390e98-1/Skia-m132-a00c390e98-1-windows-Release-x64.zip' -OutFile $archive
+          Expand-Archive $archive $expanded
+          $legal = @(Get-ChildItem $expanded -Recurse -File | Where-Object { $_.Name -match '(?i)license|notice|copying|copyright' })
+          foreach ($file in $legal) {
+            $relative = [IO.Path]::GetRelativePath($expanded, $file.FullName)
+            $target = Join-Path 'build/renderer-notices/licenses/skia-native' $relative
+            New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+            Copy-Item $file.FullName $target
+          }
+          "Upstream native renderer legal files collected: $($legal.Count). Exact Skia/Skiko LICENSE and NOTICE files are also committed resources."
+      - name: Tests and native packages
+        run: .\gradlew.bat --no-daemon :shared-domain:check :app-desktop:check :app-desktop:createDistributable :app-desktop:packageMsi :app-desktop:packageExe
+      - name: Launch packaged app and verify rendered window
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'ui-smoke.txt'
+          $png = Join-Path $PWD 'ui-smoke.png'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--ui-smoke', "--result=`"$result`"", "--screenshot=`"$png`"", "--screenshots=`"$(Join-Path $PWD 'screenshots')`"") -PassThru
+          if (-not $p.WaitForExit(30000)) { $p.Kill(); throw 'UI startup smoke timed out' }
+          if (-not (Test-Path $result)) { throw 'App exited without rendering the Compose window' }
+          Get-Content $result
+          if ($p.ExitCode -ne 0) { throw "UI process failed with $($p.ExitCode)" }
+      - name: Verify packaged Windows helper
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'platform-smoke.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--platform-smoke', "--result=`"$result`"") -PassThru
+          if (-not $p.WaitForExit(45000)) { $p.Kill(); throw 'Packaged Windows helper timed out' }
+          Get-Content $result
+          if ($p.ExitCode -ne 0) { throw 'Packaged Windows integration failed' }
+      - name: Verify small window at 150 and 200 percent scaling
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          foreach ($scale in @('1.5', '2.0')) {
+            $env:JAVA_TOOL_OPTIONS = "-Dsun.java2d.uiScale=$scale"
+            $result = Join-Path $PWD "dpi-$scale-smoke.txt"
+            $png = Join-Path $PWD "dpi-$scale-smoke.png"
+            $p = Start-Process -FilePath $exe -ArgumentList @('--ui-smoke', '--small', "--result=`"$result`"", "--screenshot=`"$png`"") -PassThru
+            if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "UI scaling smoke timed out at $scale" }
+            Get-Content $result
+            if ($p.ExitCode -ne 0) { throw "UI scaling smoke failed at $scale" }
+          }
+          Remove-Item Env:JAVA_TOOL_OPTIONS
+      - name: Attempt real audio integration smoke
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'audio-smoke.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--audio-smoke', "--result=`"$result`"") -PassThru
+          if (-not $p.WaitForExit(45000)) { $p.Kill(); throw 'Audio integration smoke timed out' }
+          if (Test-Path $result) { Get-Content $result }
+          if (-not (Test-Path $result)) { throw 'Audio process exited without a result (runtime/packaging failure)' }
+          if ($p.ExitCode -ne 0) {
+            $devices = @(Get-CimInstance Win32_SoundDevice)
+            $failure = Get-Content $result -Raw
+            $force = '${{ inputs.audio_smoke }}' -eq 'true'
+            if ($devices.Count -eq 0 -and -not $force -and $failure -match 'Could not create player|MEDIA_UNAVAILABLE|Timed out waiting for') {
+              "BLOCKED: This cloud runner has no audio output device. Native audio smoke was attempted: $failure" | Set-Content $result
+              Get-Content $result
+            } else { throw "Real audio integration failed: $failure" }
+          }
+      - name: Verify packaged playback for each supported codec
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw 'Could not install the test-only media encoder' }
+          }
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $codecs = @{flac='flac'; opus='libopus'; mp3='libmp3lame'; m4a='aac'; aiff='pcm_s16be'}
+          foreach ($extension in @('flac', 'opus', 'mp3', 'm4a', 'aiff')) {
+            $media = Join-Path $PWD "fixture.$extension"
+            & ffmpeg -hide_banner -loglevel error -f lavfi -i 'sine=frequency=440:duration=6' -ac 1 -c:a $codecs[$extension] -y $media
+            if ($LASTEXITCODE -ne 0) { throw "Could not encode $extension fixture" }
+            $result = Join-Path $PWD "codec-$extension-smoke.txt"
+            $p = Start-Process -FilePath $exe -ArgumentList @('--audio-smoke', "--media=`"$media`"", "--result=`"$result`"") -PassThru
+            if (-not $p.WaitForExit(45000)) { $p.Kill(); throw "$extension smoke timed out" }
+            if (-not (Test-Path $result)) { throw "$extension process exited without a result" }
+            Get-Content $result
+            if ($p.ExitCode -ne 0) { throw "$extension integration failed" }
+          }
+      - name: Measure paused desktop CPU, memory and shutdown
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'performance-smoke.txt'
+          $p = Start-Process $exe -ArgumentList @('--performance-smoke', "--result=`"$result`"") -PassThru
+          Start-Sleep -Seconds 5
+          $children = @(Get-CimInstance Win32_Process | Where-Object ParentProcessId -eq $p.Id | Select-Object -ExpandProperty ProcessId)
+          $ids = @($p.Id) + $children
+          $samples = @()
+          $timer = [Diagnostics.Stopwatch]::StartNew()
+          for ($i = 0; $i -lt 10; $i++) {
+            $cpu = 0; $memory = 0
+            foreach ($processId in $ids) {
+              $current = Get-Process -Id $processId -ErrorAction SilentlyContinue
+              if ($current) { $cpu += $current.TotalProcessorTime.TotalSeconds; $memory += $current.WorkingSet64 }
+            }
+            $samples += [pscustomobject]@{Seconds=$timer.Elapsed.TotalSeconds; CpuSeconds=$cpu; WorkingSetMB=[Math]::Round($memory / 1MB, 2)}
+            Start-Sleep -Seconds 1
+          }
+          $samples | Export-Csv performance-samples.csv -NoTypeInformation
+          $used = ($samples[-1].CpuSeconds - $samples[0].CpuSeconds) / ($samples[-1].Seconds - $samples[0].Seconds)
+          $peak = ($samples | Measure-Object WorkingSetMB -Maximum).Maximum
+          if (-not $p.WaitForExit(20000)) { $p.Kill(); throw 'Performance app failed to shut down' }
+          Get-Content $result
+          if ($p.ExitCode -ne 0) { throw 'Performance app failed' }
+          "Observed paused CPU: $([Math]::Round($used * 100, 2))% of one logical core; peak sampled working set: $peak MB (app plus direct helper processes)." | Tee-Object -FilePath performance-metrics.txt
+          if ($used -gt 0.50 -or $peak -gt 1500) { throw 'Paused app exceeds the conservative CPU/memory smoke budget' }
+          if ($children | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }) { throw 'Native media helper remained alive after app shutdown' }
+      - name: Install MSI, launch installed app and uninstall
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem 'app-desktop/build/compose/binaries/main/msi/*.msi' | Select-Object -First 1).FullName
+          $installed = Join-Path $env:RUNNER_TEMP 'podium-installed'
+          $installLog = Join-Path $PWD 'installer-install.log'
+          $uninstallLog = Join-Path $PWD 'installer-uninstall.log'
+          try {
+            $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart', "INSTALLDIR=`"$installed`"", '/L*v', "`"$installLog`"") -Wait -PassThru
+            if ($p.ExitCode -notin @(0, 3010)) { throw "MSI installation failed: $($p.ExitCode)" }
+            $exe = Join-Path $installed 'Podium Air.exe'
+            if (-not (Test-Path $exe)) { throw 'MSI did not install the application at the selected directory' }
+            $result = Join-Path $PWD 'installed-ui-smoke.txt'
+            $p = Start-Process $exe -ArgumentList @('--ui-smoke', "--result=`"$result`"") -PassThru
+            if (-not $p.WaitForExit(30000)) { $p.Kill(); throw 'Installed app timed out' }
+            Get-Content $result
+            if ($p.ExitCode -ne 0) { throw 'Installed app failed' }
+          } finally {
+            $p = Start-Process msiexec.exe -ArgumentList @('/x', "`"$msi`"", '/qn', '/norestart', '/L*v', "`"$uninstallLog`"") -Wait -PassThru
+            if ($p.ExitCode -notin @(0, 3010)) { throw "MSI uninstall failed: $($p.ExitCode)" }
+          }
+          if (Test-Path (Join-Path $installed 'Podium Air.exe')) { throw 'MSI uninstall left the application installed' }
+          'PASS: MSI installed at the selected directory, installed app rendered all routes, and MSI uninstalled successfully.' | Set-Content installer-smoke.txt
+      - name: Summarize test and runtime evidence
+        shell: pwsh
+        run: |
+          $tests = 0; $failures = 0
+          Get-ChildItem -Recurse -Path . -Filter 'TEST-*.xml' | Where-Object FullName -Match 'test-results' | ForEach-Object {
+            [xml]$report = Get-Content $_.FullName
+            $tests += [int]$report.testsuite.tests
+            $failures += [int]$report.testsuite.failures + [int]$report.testsuite.errors
+          }
+          "Tests: $tests; failures/errors: $failures" | Tee-Object -FilePath test-summary.txt
+          Get-Content "$env:JAVA_HOME/release" | Out-File runtime-build.txt
+          Get-Content app-desktop/build/generated/notices/licenses/DEPENDENCIES.txt | Out-File dependency-inventory.txt
+          if ($tests -lt 40 -or $failures -ne 0) { throw 'Expected test suites did not all run successfully' }
+      - name: Collect separately licensed dependency sources
+        shell: pwsh
+        run: |
+          .\gradlew.bat --no-daemon :app-desktop:collectDependencySources
+          if ($LASTEXITCODE -ne 0) { throw 'Dependency source collection failed' }
+          Invoke-WebRequest 'https://github.com/openjdk/jfx21u/archive/refs/tags/21.0.9%2B1.zip' -OutFile 'build/dependency-sources/OpenJFX-21.0.9-native-source.zip'
+          $runtimeSource = 'https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12.1%2B1/OpenJDK21U-jdk-sources_21.0.12.1_1.tar.gz'
+          $runtimeArchive = 'build/dependency-sources/Temurin-21.0.12.1+1-source.tar.gz'
+          Invoke-WebRequest $runtimeSource -OutFile $runtimeArchive
+          Invoke-WebRequest "$runtimeSource.sha256.txt" -OutFile "build/dependency-sources/Temurin-source.sha256.txt"
+          $checksum = [regex]::Match((Get-Content "build/dependency-sources/Temurin-source.sha256.txt" -Raw), '^[0-9a-fA-F]{64}').Value
+          if ($checksum.Length -ne 64) { throw 'Invalid vendor source checksum' }
+          if ((Get-FileHash $runtimeArchive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $checksum.ToLowerInvariant()) { throw 'Temurin source checksum mismatch' }
+          Invoke-WebRequest 'https://github.com/adoptium/temurin-build/archive/e6ba7dec3d07654074559310376a3ae89da5f4ac.zip' -OutFile 'build/dependency-sources/Temurin-build-e6ba7dec-source.zip'
+          Copy-Item runtime-build.txt build/dependency-sources/runtime-build.txt
+          @("Temurin source: $runtimeSource", "Upstream source commit: https://github.com/adoptium/jdk21u/commit/1c417fbfc2f70ab03a565b0af0a5a3c6f5e15ad6", 'Build scripts: https://github.com/adoptium/temurin-build/commit/e6ba7dec3d07654074559310376a3ae89da5f4ac') | Set-Content build/dependency-sources/TEMURIN-SOURCE.txt
+          Compress-Archive -Path 'build/dependency-sources/*' -DestinationPath dependency-sources.zip
+      - name: Archive corresponding source and portable app
+        shell: pwsh
+        run: |
+          git archive --format=zip -o podium-air-windows-source.zip HEAD
+          Compress-Archive -Path 'app-desktop/build/compose/binaries/main/app/Podium Air' -DestinationPath podium-air-windows-portable.zip
+          Get-FileHash app-desktop/build/compose/binaries/main/msi/*.msi, app-desktop/build/compose/binaries/main/exe/*.exe, podium-air-windows-portable.zip, podium-air-windows-source.zip, dependency-sources.zip -Algorithm SHA256 | Format-List | Out-File SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Podium-Air-Windows-x64
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            app-desktop/build/compose/binaries/main/msi/*.msi
+            app-desktop/build/compose/binaries/main/exe/*.exe
+            podium-air-windows-portable.zip
+            podium-air-windows-source.zip
+            dependency-sources.zip
+            SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Windows-verification
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/test/
+            ui-smoke.txt
+            ui-smoke.png
+            audio-smoke.txt
+            codec-*-smoke.txt
+            windows-media-smoke.txt
+            windows-dialog-smoke.txt
+            platform-smoke.txt
+            dpi-*-smoke.*
+            screenshots/
+            installed-ui-smoke.txt
+            installer-smoke.txt
+            installer-*.log
+            performance-*.txt
+            performance-samples.csv
+            test-summary.txt
+            runtime-build.txt
+            dependency-inventory.txt
