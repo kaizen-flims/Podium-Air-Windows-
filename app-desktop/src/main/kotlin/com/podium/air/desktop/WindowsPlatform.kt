@@ -16,6 +16,8 @@ class WindowsMediaControls(private val model: DesktopModel) : MediaControls {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mutable = MutableStateFlow("Starting Windows media controls…")
     override val status: StateFlow<String> = mutable
+    private val lifecycle = Any()
+    private var closed = false
     private var process: Process? = null
     private var writer: java.io.BufferedWriter? = null
     init {
@@ -23,7 +25,10 @@ class WindowsMediaControls(private val model: DesktopModel) : MediaControls {
             try {
                 val native = extractMediaBridge()
                 val child = ProcessBuilder(native.absolutePath).redirectErrorStream(true).start()
-                process = child; writer = child.outputStream.bufferedWriter(Charsets.UTF_8)
+                synchronized(lifecycle) {
+                    if (closed) { child.destroyForcibly(); return@launch }
+                    process = child; writer = child.outputStream.bufferedWriter(Charsets.UTF_8)
+                }
                 launch {
                     child.inputStream.bufferedReader().useLines { lines -> lines.forEach { line ->
                         when {
@@ -47,9 +52,14 @@ class WindowsMediaControls(private val model: DesktopModel) : MediaControls {
         }
     }
     override fun close() {
+        val resources = synchronized(lifecycle) {
+            if (closed) return
+            closed = true
+            (writer to process).also { writer = null; process = null }
+        }
         scope.cancel()
-        writer?.let { runCatching { synchronized(it) { it.write("QUIT\n"); it.flush(); it.close() } } }
-        process?.let { if (!it.waitFor(1500, TimeUnit.MILLISECONDS)) it.destroyForcibly() }
+        resources.first?.let { runCatching { synchronized(it) { it.write("QUIT\n"); it.flush(); it.close() } } }
+        resources.second?.let { if (!it.waitFor(1500, TimeUnit.MILLISECONDS)) it.destroyForcibly() }
     }
 }
 internal fun mediaText(text: String): String = text.take(16000).toByteArray(Charsets.UTF_8).joinToString("") { "%02x".format(it) }
@@ -90,7 +100,7 @@ object WindowsStartup {
         require(!executable.absolutePath.contains('\n') && !executable.absolutePath.contains('\r'))
         folder.mkdirs()
         val escaped = executable.absolutePath.replace("%", "%%")
-        script.writeText("@echo off\r\nstart \"\" \"$escaped\" --background\r\n", Charsets.UTF_8)
+        script.writeText("@echo off\r\nchcp 65001 >nul\r\nstart \"\" \"$escaped\" --background\r\n", Charsets.UTF_8)
     }
     fun packagedExecutable(): File? = System.getProperty("jpackage.app-path")?.let(::File)
         ?: ProcessHandle.current().info().command().orElse(null)?.let(::File)?.takeIf { it.name == "Podium Air.exe" }

@@ -15,3 +15,8 @@
 - Final correction preserves crossfade gain envelopes during volume changes; audio smoke now changes volume mid-transition. Manual license files are explicit Gradle task inputs.
 - Final implementation ab5b172 passed 18 tests (zero failures/errors), all 14 routes plus populated playlist/album detail, real WAV controls/crossfade with mid-transition volume change, MSI/EXE packaging and all artifact/source uploads in run 37943444938.
 - Draft PR #1 holds the implementation; reporting commit records the final verified build. No main merge, release publication, Android modification or auto-update.
+
+- Expanded the native port with bounded background FLAC/Opus/AAC decoding, native Windows SMTC, optional startup/tray notifications, original TTML/duet/lyric clock/focus reuse, word animation/timing controls, artwork color motion, Replay and M3U8 import/export.
+- Added decoder corruption/cancellation, TTML/security/clock, elapsed-time statistics, playlist interchange and native command coordinator tests; 31-test expanded build 6360d4a passed all six codec smokes, native SMTC self-tests, packaged UI routes, MSI install/run/uninstall and source/notice uploads in run 37950405605.
+- Tightened state recovery/normalization, album identity/ordering, monotonic sleep timing and actual-start history recording. Added a 32nd state-normalization test, real Robot keyboard checks and paused CPU/memory/helper-shutdown measurements.
+- Visual review found a window extending beyond the runner desktop. Corrected initial maximized sizing, small-window bounds, compact navigation, import controls and mini player. Robot checks also exposed missing root focus; corrected focus handling and made smoke failures produce explicit reports instead of timing out. Follow-up CI pending.

@@ -206,7 +206,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 
 @Composable private fun Navigation(route: Route, dark: Boolean, compact: Boolean, navigate: (Page) -> Unit) {
-    Column(Modifier.width(if (compact) 64.dp else 190.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(12.dp)) {
+    Column(Modifier.width(if (compact) 64.dp else 190.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(if (compact) 8.dp else 12.dp)) {
         val logo = remember { SkiaImage.makeFromEncoded(requireNotNull(object {}.javaClass.getResourceAsStream("/brand/mono.png")).readBytes()).asImageBitmap() }
         Row(Modifier.padding(8.dp, 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Image(logo, "Podium Air", Modifier.size(32.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (dark) Color.White else Color.Black))
@@ -365,6 +365,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 @Composable private fun MiniPlayer(model: DesktopModel, state: SavedState, open: () -> Unit) {
     val audio by model.engine.state.collectAsState()
     BoxWithConstraints {
+    val showVolume = maxWidth > 680.dp
     Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).clickable(onClick = open), verticalAlignment = Alignment.CenterVertically) {
             Art(audio.entry?.song, 46); Spacer(Modifier.width(12.dp)); Column {
@@ -375,7 +376,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         Control(Icons.Rounded.SkipPrevious, "Previous track", audio.entry != null) { model.previous() }
         Control(if (audio.playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (audio.playing) "Pause" else "Play", model.queue.value.current != null) { model.toggle() }
         Control(Icons.Rounded.SkipNext, "Next track", model.queue.value.nextIndex() != null) { model.next() }
-        if (maxWidth > 680.dp) { Spacer(Modifier.width(18.dp)); Icon(Icons.Rounded.VolumeUp, "Volume", Modifier.size(18.dp))
+        if (showVolume) { Spacer(Modifier.width(18.dp)); Icon(Icons.Rounded.VolumeUp, "Volume", Modifier.size(18.dp))
         Slider(state.preferences.volume, { model.preferences(state.preferences.copy(volume = it)) }, Modifier.width(96.dp), valueRange = 0f..1f) }
     }
     }
