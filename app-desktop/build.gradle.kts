@@ -22,6 +22,7 @@ dependencies {
     implementation("de.sfuhrm:jaad:0.8.7") { isTransitive = false }
     implementation("org.jflac:jflac-codec:1.5.2") { isTransitive = false }
     implementation("io.github.jaredmdobson:concentus:1.0.2") { isTransitive = false }
+    implementation("javazoom:jlayer:1.0.1") { isTransitive = false }
     for (module in listOf("base", "graphics", "media")) {
         implementation("org.openjfx:javafx-$module:21.0.9:$fxPlatform")
     }
@@ -88,6 +89,7 @@ val dependencyNotices by tasks.registering {
 tasks.processResources {
     dependsOn(dependencyNotices)
     from(rootProject.layout.buildDirectory.dir("windows-helper")) { include("PodiumMediaBridge.exe"); into("windows") }
+    from(rootProject.layout.buildDirectory.dir("windows-analysis")) { include("PodiumAnalysis.dll"); into("windows") }
     from(layout.buildDirectory.dir("generated/notices"))
     from(rootProject.file("LICENSE")) { into("licenses") }
     from(rootProject.file("THIRD_PARTY_NOTICES.md")) { into("licenses") }
@@ -102,6 +104,7 @@ dependencies {
     dependencySources("de.sfuhrm:jaad:0.8.7:sources")
     dependencySources("org.jflac:jflac-codec:1.5.2:sources")
     dependencySources("io.github.jaredmdobson:concentus:1.0.2:sources")
+    dependencySources("javazoom:jlayer:1.0.1:sources")
     for (module in listOf("base", "graphics", "media")) dependencySources("org.openjfx:javafx-$module:21.0.9:sources")
 }
 tasks.register<Copy>("collectDependencySources") {

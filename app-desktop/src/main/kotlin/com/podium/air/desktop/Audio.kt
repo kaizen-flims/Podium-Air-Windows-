@@ -2,6 +2,7 @@
 package com.podium.air.desktop
 
 import com.podium.air.domain.QueueEntry
+import com.music.bitchord.playback.smart.*
 import javafx.animation.KeyFrame
 import javafx.animation.Timeline
 import javafx.application.Platform
@@ -19,7 +20,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 data class AudioState(val entry: QueueEntry? = null, val playing: Boolean = false, val loading: Boolean = false,
-    val positionMs: Long = 0, val durationMs: Long = 0, val error: String? = null, val fading: Boolean = false, val session: Long = 0, val completed: Boolean = false)
+    val positionMs: Long = 0, val durationMs: Long = 0, val error: String? = null, val fading: Boolean = false, val session: Long = 0, val completed: Boolean = false, val automixStatus: String? = null)
 interface AudioEngine : AutoCloseable {
     val state: StateFlow<AudioState>
     var onEnd: (String) -> Unit
@@ -55,6 +56,16 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
     private var active: QueueEntry? = null
     private var upcoming: QueueEntry? = null
     private var standbyKey: String? = null
+    private val smartAudio = SmartAudio()
+    private var nextPlan: TransitionPlan? = null
+    private var standbyTiming: SourceTiming? = null
+    private var currentTiming: SourceTiming? = null
+    private var activeBaseFile: File? = null
+    private var standbyBaseFile: File? = null
+    private var currentTemp: File? = null
+    private var standbyTemp: File? = null
+    private var outgoingTemp: File? = null
+    private var renderingPlan: TransitionPlan? = null
     private var preferences = Preferences()
     private var fadeElapsed = 0.0
     private var fadeLength = 0.0
@@ -81,6 +92,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
                 command {
                     if (request == generation && active?.key == entry.key) {
                         val newPlayer = makePlayer(entry, file)
+                        activeBaseFile = file
                         player = newPlayer
                         newPlayer.setOnReady {
                             if (player === newPlayer && !closed.get()) {
@@ -105,7 +117,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
             setOnEndOfMedia {
                 if (player === this && !closed.get()) {
                     finishFade()
-                    mutable.value = mutable.value.copy(playing = false, positionMs = finiteMs(totalDuration), completed = true)
+                    mutable.value = mutable.value.copy(playing = false, positionMs = currentTiming?.originalDurationMs ?: finiteMs(totalDuration), completed = true)
                     onEnd(entry.key)
                 }
             }
@@ -115,40 +127,78 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
         if (upcoming?.key != entry?.key) {
             standbyJob?.cancel(); standbyJob = null
             standby?.dispose(); standby = null; standbyKey = null
+            standbyTemp?.delete(); standbyTemp = null; standbyTiming = null; nextPlan = null; standbyBaseFile = null
         }
         upcoming = entry
-        if (preferences.crossfadeSeconds > 0) prepareNext()
+        if (preferences.crossfadeSeconds > 0 || preferences.automix) prepareNext()
     }
     private fun prepareNext() {
         val next = upcoming ?: return
         if (standby != null || standbyJob?.isActive == true || next.key == active?.key || outgoing != null) return
         val request = generation
+        val currentEntry = active
+        val settings = preferences
         standbyJob = decoding.launch {
             try {
-                val file = mediaFiles.prepare(File(requireNotNull(next.song.localPath))) { ensureActive() }
-                command {
-                    if (request == generation && upcoming?.key == next.key && standby == null) {
-                        runCatching { makePlayer(next, file) }.onSuccess { prepared ->
-                            standby = prepared.apply { volume = 0.0; setOnReady { applyPreferences(this); volume = 0.0 } }
+                var file = mediaFiles.prepare(File(requireNotNull(next.song.localPath))) { ensureActive() }
+                var prepared: SmartPrepared? = null
+                var status: String? = null
+                var plan: TransitionPlan? = null
+                var base = file
+                if (settings.automix && settings.speed == 1f && currentEntry != null) {
+                    command { if (request == generation) mutable.value = mutable.value.copy(automixStatus = "Analyzing the current and next track…") }
+                    try {
+                        val currentPcm = mediaFiles.preparePcm(File(requireNotNull(currentEntry.song.localPath))) { ensureActive() }
+                        val nextPcm = mediaFiles.preparePcm(File(requireNotNull(next.song.localPath))) { ensureActive() }
+                        val first = smartAudio.analyze(currentPcm, currentEntry.song.videoId) { ensureActive() }
+                        val second = smartAudio.analyze(nextPcm, next.song.videoId) { ensureActive() }
+                        fun info(entry: QueueEntry, analysis: TrackAnalysis) = TransitionTrackInfo(entry.song.videoId, (analysis.duration * 1000).toLong(), entry.song.title, entry.song.artist, entry.song.albumName.orEmpty())
+                        var computed = planTransition(first, second, info(currentEntry, first), info(next, second), duration = first.duration,
+                            fadeSeconds = settings.crossfadeSeconds.takeIf { it > 0 }?.toDouble() ?: 6.0, mode = CrossfadeMode.SMART)
+                        // The source policy permits tempo correction only with measured confidence on both grids.
+                        if (assessTransitionTier(first, second).tier != TransitionTier.BEATMATCHED) computed = computed.copy(incomingPlaybackRate = 1.0)
+                        plan = computed
+                        if (!computed.blocked) { prepared = prepareSmartTransition(nextPcm, computed) { ensureActive() }; file = prepared.file }
+                        base = nextPcm
+                        status = if (computed.blocked) "Automix: " + computed.reason else "Automix ready • " + first.bpm.toInt() + " → " + second.bpm.toInt() + " BPM • " + computed.transitionStyle.name.lowercase().replace('_', ' ')
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) { base = file; plan = null; status = "Automix uses standard fade: " + error.message }
+                }
+                val owned = prepared
+                var accepted = false
+                try {
+                FxRuntime.dispatch {
+                    if (!closed.get() && request == generation && upcoming?.key == next.key && standby == null && preferences.automix == settings.automix && preferences.speed == settings.speed && preferences.crossfadeSeconds == settings.crossfadeSeconds) {
+                        runCatching { makePlayer(next, file) }.onSuccess { candidate ->
+                            standby = candidate.apply { volume = 0.0; setOnReady { applyPreferences(this); volume = 0.0 } }
                             standbyKey = next.key
+                            standbyTemp = owned?.file; standbyTiming = owned?.timing; standbyBaseFile = base; nextPlan = plan
+                            accepted = true
+                            if (status != null) mutable.value = mutable.value.copy(automixStatus = status)
                         }
                     }
+                    if (!accepted) owned?.file?.delete()
                 }
+                } catch (error: Throwable) { owned?.file?.delete(); throw error }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { /* The active track keeps playing; opening this track reports its error. */ }
         }
     }
-    private fun beginFade() {
+    private fun beginFade(plan: TransitionPlan? = null) {
         val next = upcoming ?: return
         val incoming = standby ?: return
         val current = player ?: return
         if (incoming.status != MediaPlayer.Status.READY || standbyKey != next.key) return
-        fadeLength = minOf(preferences.crossfadeSeconds * 1000.0,
-            (current.totalDuration.toMillis() - current.currentTime.toMillis()).coerceAtLeast(1.0),
+        fadeLength = minOf((plan?.fadeSeconds ?: preferences.crossfadeSeconds.takeIf { it > 0 }?.toDouble() ?: 6.0) * 1000.0,
+            ((plan?.transitionEnd?.times(1000) ?: current.totalDuration.toMillis()) - (currentTiming?.position(finiteMs(current.currentTime)) ?: finiteMs(current.currentTime))).coerceAtLeast(1.0),
             incoming.totalDuration.toMillis() / 2).coerceAtLeast(1.0)
         fadeElapsed = 0.0
         outgoing = current; player = incoming; active = next; standby = null; standbyKey = null
-        mutable.value = AudioState(entry = next, playing = true, durationMs = finiteMs(incoming.totalDuration), fading = true, session = generation)
+        outgoingTemp = currentTemp; currentTemp = standbyTemp; standbyTemp = null
+        currentTiming = standbyTiming; standbyTiming = null; activeBaseFile = standbyBaseFile; standbyBaseFile = null
+        renderingPlan = plan; nextPlan = null
+        mutable.value = AudioState(entry = next, playing = true, durationMs = currentTiming?.originalDurationMs ?: finiteMs(incoming.totalDuration), fading = true, session = generation,
+            positionMs = currentTiming?.position(0) ?: 0, automixStatus = mutable.value.automixStatus)
         incoming.volume = 0.0; incoming.play()
         onAdvance(next)
     }
@@ -164,27 +214,61 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
             val progress = (fadeElapsed / fadeLength).coerceIn(0.0, 1.0)
             current.volume = preferences.volume.toDouble() * sin(progress * Math.PI / 2)
             outgoing?.volume = preferences.volume.toDouble() * cos(progress * Math.PI / 2)
+            applyTransitionEqualizer(progress)
             if (progress >= 1) finishFade()
-        } else if (playing && preferences.crossfadeSeconds > 0 && preferences.speed == 1f) {
-            val remaining = finiteMs(current.totalDuration) - finiteMs(current.currentTime)
-            if (remaining in 1..15000) prepareNext()
-            if (remaining in 1..(preferences.crossfadeSeconds * 1000L)) beginFade()
+        } else if (playing && (preferences.crossfadeSeconds > 0 || preferences.automix) && preferences.speed == 1f) {
+            val position = currentTiming?.position(finiteMs(current.currentTime)) ?: finiteMs(current.currentTime)
+            val remaining = (currentTiming?.originalDurationMs ?: finiteMs(current.totalDuration)) - position
+            if (preferences.automix || remaining in 1..15000) prepareNext()
+            val plan = nextPlan
+            if (preferences.automix && plan != null) {
+                if (!plan.blocked && position >= plan.transitionStart * 1000 && position < plan.transitionEnd * 1000) beginFade(plan)
+            } else if (remaining in 1..((preferences.crossfadeSeconds.takeIf { it > 0 } ?: 6) * 1000L)) beginFade()
         }
         val actual = player ?: return
-        mutable.value = mutable.value.copy(positionMs = finiteMs(actual.currentTime), durationMs = finiteMs(actual.totalDuration),
+        mutable.value = mutable.value.copy(positionMs = currentTiming?.position(finiteMs(actual.currentTime)) ?: finiteMs(actual.currentTime), durationMs = currentTiming?.originalDurationMs ?: finiteMs(actual.totalDuration),
             playing = actual.status == MediaPlayer.Status.PLAYING, fading = outgoing != null)
     }
-    private fun finishFade() { outgoing?.dispose(); outgoing = null; player?.volume = preferences.volume.toDouble(); mutable.value = mutable.value.copy(fading = false) }
+    private fun applyTransitionEqualizer(progress: Double) {
+        val plan = renderingPlan ?: return
+        fun apply(target: MediaPlayer?, incoming: Boolean) {
+            target ?: return
+            target.audioEqualizer.isEnabled = true
+            target.audioEqualizer.bands.forEachIndexed { index, band ->
+                val attenuation = when {
+                    plan.bassSwap && index < 4 -> if (incoming) -12.0 * (1 - (progress / plan.bassSwapFraction.coerceIn(0.2, 0.8)).coerceIn(0.0, 1.0)) else -12.0 * ((progress - plan.bassSwapFraction.coerceIn(0.2, 0.8)) / (1 - plan.bassSwapFraction.coerceIn(0.2, 0.8))).coerceIn(0.0, 1.0)
+                    plan.filterSweep > 0 && !incoming && index >= 4 -> -12.0 * progress * (index - 3) / 6
+                    else -> 0.0
+                }
+                band.gain = (preferences.equalizer.getOrElse(index) { 0.0 } + attenuation).coerceIn(-24.0, 12.0)
+            }
+        }
+        apply(player, true); apply(outgoing, false)
+    }
+    private fun finishFade() { outgoing?.dispose(); outgoing = null; outgoingTemp?.delete(); outgoingTemp = null; renderingPlan = null; player?.let(::applyPreferences); mutable.value = mutable.value.copy(fading = false) }
     override fun toggle() = command { player?.let { if (it.status == MediaPlayer.Status.PLAYING) { it.pause(); outgoing?.pause() } else { it.play(); outgoing?.play() } } }
     override fun pause() = command { player?.pause(); outgoing?.pause() }
     override fun seek(ms: Long) = command {
         finishFade(); standbyJob?.cancel(); standbyJob = null; standby?.dispose(); standby = null; standbyKey = null
-        player?.let { it.seek(Duration.millis(ms.coerceIn(0, finiteMs(it.totalDuration)).toDouble())) }
+        standbyTemp?.delete(); standbyTemp = null; standbyTiming = null; standbyBaseFile = null; nextPlan = null
+        if (currentTiming != null) {
+            val entry = active ?: return@command
+            val base = activeBaseFile ?: return@command
+            val old = player; val playing = old?.status == MediaPlayer.Status.PLAYING
+            old?.dispose(); currentTemp?.delete(); currentTemp = null; currentTiming = null
+            mutable.value = mutable.value.copy(loading = true, playing = false)
+            val replacement = makePlayer(entry, base); player = replacement
+            replacement.setOnReady { if (player === replacement && !closed.get()) { applyPreferences(replacement); replacement.seek(Duration.millis(ms.coerceIn(0, finiteMs(replacement.totalDuration)).toDouble())); mutable.value = mutable.value.copy(loading = false, durationMs = finiteMs(replacement.totalDuration)); if (playing) replacement.play() } }
+        } else player?.let { it.seek(Duration.millis(ms.coerceIn(0, finiteMs(it.totalDuration)).toDouble())) }
     }
     override fun configure(preferences: Preferences) = command {
+        val replan = this.preferences.automix != preferences.automix || this.preferences.crossfadeSeconds != preferences.crossfadeSeconds || this.preferences.speed != preferences.speed
         this.preferences = preferences
+        if (replan) { standbyJob?.cancel(); standbyJob = null; standby?.dispose(); standby = null; standbyKey = null; standbyTemp?.delete(); standbyTemp = null; nextPlan = null; standbyTiming = null }
         if (preferences.crossfadeSeconds == 0 || preferences.speed != 1f) finishFade()
         listOfNotNull(player, outgoing).forEach(::applyPreferences)
+        if (replan && preferences.automix) prepareNext()
+        if (!preferences.automix) { mutable.value = mutable.value.copy(automixStatus = null); if (currentTiming != null) seek(mutable.value.positionMs) }
     }
     private fun applyPreferences(target: MediaPlayer) {
         val progress = (fadeElapsed / fadeLength.coerceAtLeast(1.0)).coerceIn(0.0, 1.0)
@@ -200,7 +284,9 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
         equalizer.bands.forEachIndexed { index, band -> band.gain = preferences.equalizer.getOrElse(index) { 0.0 }.coerceIn(-12.0, 12.0) }
     }
     override fun stop() = command { generation++; openJob?.cancel(); standbyJob?.cancel(); disposePlayers(); active = null; upcoming = null; mutable.value = AudioState() }
-    private fun disposePlayers() { player?.dispose(); standby?.dispose(); outgoing?.dispose(); player = null; standby = null; outgoing = null; standbyKey = null }
+    private fun disposePlayers() { player?.dispose(); standby?.dispose(); outgoing?.dispose(); player = null; standby = null; outgoing = null; standbyKey = null
+        listOfNotNull(currentTemp, standbyTemp, outgoingTemp).distinct().forEach { it.delete() }; currentTemp = null; standbyTemp = null; outgoingTemp = null
+        currentTiming = null; standbyTiming = null; nextPlan = null; renderingPlan = null; activeBaseFile = null; standbyBaseFile = null }
     override fun close() {
         if (closed.compareAndSet(false, true)) { decoding.cancel(); FxRuntime.dispatch { ticker?.stop(); disposePlayers(); mutable.value = AudioState() } }
     }

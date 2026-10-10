@@ -148,6 +148,16 @@ jobs:
             Get-Content $result
             if ($p.ExitCode -ne 0) { throw "$extension integration failed" }
           }
+      - name: Verify measured Automix and original-track seek
+        # Existing paused gate follows an additional real Automix check.
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'automix-smoke.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--automix-smoke', "--result=`"$result`"") -PassThru
+          if (-not $p.WaitForExit(120000)) { $p.Kill(); throw 'Packaged Automix integration timed out' }
+          if ($p.ExitCode -ne 0 -or -not (Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Packaged Automix integration failed' }
+          Get-Content $result
       - name: Measure paused desktop CPU, memory and shutdown
         shell: pwsh
         run: |
@@ -258,6 +268,7 @@ jobs:
             ui-smoke.txt
             ui-smoke.png
             audio-smoke.txt
+            automix-smoke.txt
             codec-*-smoke.txt
             windows-media-smoke.txt
             windows-dialog-smoke.txt

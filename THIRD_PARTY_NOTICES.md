@@ -93,3 +93,23 @@ its original legal notices. This supplements the OpenJFX and codec/tag sources.
 ## Renderer notice supplement
 
 Skiko 0.9.22.2 is Apache-2.0. Its exact release LICENSE and NOTICE (including the Android Open Source Project acknowledgment) are bundled under `licenses/skiko/`. Skia m132-a00c390e98-1 uses the BSD copyright/license at commit a00c390e98, bundled under `licenses/skia/`. Corresponding upstream locations: https://github.com/JetBrains/skiko/tree/v0.9.22.2 and https://github.com/google/skia/tree/a00c390e98. The native renderer distribution is additionally scanned for supplied legal files during Windows packaging.
+
+## Native Automix port (development branch)
+
+The original Orchard/BitChord TrackAnalysis, TransitionPolicy and TransitionPlanner,
+whole-track DSP analyzer, native resampler and JNI bridge are reused with their
+complete original copyright headers. Those files remain AGPLv3-or-later within
+the GPLv3 combination permitted by section 13 of both licenses. The AGPL text is
+bundled at `licenses/automix/AGPL-3.0.txt`; all matching modified/unmodified source
+is included in the application source archive. Original authors: SFG545 and
+Kushagra Singh. Upstreams: https://github.com/SFG5453/Orchard and
+https://github.com/kushagrasinghx/BitChord.
+
+The Windows adapter, PCM preparation and WSOLA renderer are new GPLv3 code.
+Neural ONNX models are not redistributed in this branch. DSP measurements do
+not claim neural vocal/beat-model parity.
+
+JLayer `javazoom:jlayer:1.0.1` provides MP3-to-PCM decoding for the analyzer/mixer;
+it is LGPL-2.1 software by JavaZOOM contributors. The unmodified JAR remains
+replaceable, its license is bundled at `licenses/jlayer/LGPL-2.1.txt`, and the
+corresponding source accompanies the dependency-source archive.

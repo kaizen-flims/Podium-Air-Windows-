@@ -22,6 +22,7 @@ import kotlin.system.exitProcess
 fun main(args: Array<String>) {
     if (args.contains("--platform-smoke")) { platformSmoke(args); return }
     if (args.contains("--audio-smoke")) { audioSmoke(args); return }
+    if (args.contains("--automix-smoke")) { automixSmoke(args); return }
     val performance = args.contains("--performance-smoke")
     val smoke = args.contains("--ui-smoke") || performance
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
@@ -239,4 +240,60 @@ internal fun generateTestWave(file: File, seconds: Int) {
     javax.sound.sampled.AudioInputStream(bytes.inputStream(), format, (rate * seconds).toLong()).use {
         javax.sound.sampled.AudioSystem.write(it, javax.sound.sampled.AudioFileFormat.Type.WAVE, file)
     }
+}
+
+/** Packaged native measurements feed a real two-player PCM transition, then pause/seek/end/cleanup. */
+private fun automixSmoke(args: Array<String>) {
+    val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "automix-smoke.txt")
+    val directory = java.nio.file.Files.createTempDirectory("podium-automix-smoke-").toFile()
+    val firstFile = File(directory, "Measured track one.wav")
+    val secondFile = File(directory, "Measured track two.wav")
+    fun beatWave(file: File, bpm: Double) {
+        val rate = 22050
+        PcmWaveWriter(file, rate, 1).use { wave ->
+            val bytes = ByteArray(rate * 60 * 2)
+            for (i in 0 until rate * 60) {
+                val t = i / rate.toDouble(); val beat = (t - 2).mod(60 / bpm)
+                val sound = if (t < 2 || t > 57) 0.0 else 0.05 * kotlin.math.sin(t * 2 * Math.PI * 220) + if (beat < 0.055) 0.65 * kotlin.math.exp(-beat * 70) * kotlin.math.sin(beat * 2 * Math.PI * 90) else 0.0
+                val value = (sound * 15000).toInt().coerceIn(-32768, 32767)
+                bytes[i * 2] = value.toByte(); bytes[i * 2 + 1] = (value shr 8).toByte()
+            }
+            wave.write(bytes)
+        }
+    }
+    val engine = JavaFxAudioEngine()
+    try {
+        beatWave(firstFile, 120.0); beatWave(secondFile, 122.0)
+        runBlocking {
+            val tracks = LocalLibrary(File(directory, "art")).import(listOf(firstFile, secondFile)).first
+            check(tracks.size == 2)
+            val first = com.podium.air.domain.QueueEntry(song = tracks[0].song())
+            val next = com.podium.air.domain.QueueEntry(song = tracks[1].song())
+            val advanced = CompletableDeferred<Unit>(); val ended = CompletableDeferred<Unit>()
+            engine.onAdvance = { if (it.key == next.key) advanced.complete(Unit) }
+            engine.onEnd = { if (it == next.key) ended.complete(Unit) }
+            engine.configure(Preferences(automix = true, crossfadeSeconds = 4, volume = 0.2f))
+            engine.open(first, play = false)
+            withTimeout(15000) { engine.state.first { it.error != null || !it.loading && it.durationMs > 50000 } }.let { check(it.error == null) { it.error.orEmpty() } }
+            engine.seek(40000)
+            withTimeout(3000) { engine.state.first { it.positionMs in 39800..40200 } }
+            engine.setUpcoming(next)
+            withTimeout(45000) { engine.state.first { it.automixStatus?.startsWith("Automix ready") == true || it.automixStatus?.startsWith("Automix uses standard") == true } }.let {
+                check(it.automixStatus?.startsWith("Automix ready") == true) { it.automixStatus.orEmpty() }
+            }
+            engine.toggle()
+            withTimeout(25000) { advanced.await() }
+            withTimeout(4000) { engine.state.first { it.entry?.key == next.key && it.playing && it.fading } }
+            engine.pause(); withTimeout(3000) { engine.state.first { !it.playing } }
+            engine.seek(10000)
+            withTimeout(15000) { engine.state.first { it.error != null || !it.loading && it.positionMs in 9800..10200 } }.let { check(it.error == null) { it.error.orEmpty() } }
+            check(!engine.state.value.playing) { "Seeking while paused started playback." }
+            engine.configure(Preferences(automix = false, volume = 0.2f)); engine.toggle()
+            withTimeout(5000) { engine.state.first { it.playing } }
+            engine.seek(59400); withTimeout(5000) { ended.await() }
+            check(!engine.state.value.playing)
+            result.writeText("PASS: Packaged native DSP and original planner prepared an actual PCM Automix transition; two real players overlapped, pause/seek restored the original track clock, disabling Automix worked and the incoming track reached natural end. Pitch-preserving WSOLA is verified separately by measured PCM tests.\n")
+        }
+    } catch (error: Throwable) { result.writeText("FAIL: " + error.message + "\n"); error.printStackTrace(); engine.close(); FxRuntime.exit(); directory.deleteRecursively(); exitProcess(1) }
+    engine.close(); FxRuntime.exit(); directory.deleteRecursively(); exitProcess(0)
 }
