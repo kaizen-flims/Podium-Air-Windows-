@@ -26,7 +26,7 @@ data class StoredTrack(val id: String, val path: String, val title: String, val 
 @Serializable
 data class Playlist(val id: String = UUID.randomUUID().toString(), val name: String, val tracks: List<String> = emptyList())
 @Serializable
-data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false, val reducedMotion: Boolean = false, val dynamicBackground: Boolean = true, val lyricsAutoScroll: Boolean = true)
+data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false, val reducedMotion: Boolean = false, val dynamicBackground: Boolean = true, val lyricsAutoScroll: Boolean = true, val automix: Boolean = false, val onlineLyrics: Boolean = false, val listenBrainzEnabled: Boolean = false, val listenBrainzUser: String = "")
 @Serializable
 data class SavedQueueEntry(val key: String, val trackId: String)
 @Serializable
@@ -65,7 +65,7 @@ class StateStore(val directory: File = defaultDataDirectory()) : StatePersistenc
             state.copy(library = state.library.distinctBy { it.id }, playlists = state.playlists.distinctBy { it.id }.map { it.copy(tracks = it.tracks.filter(known::contains)) },
                 favorites = state.favorites.filter(known::contains).toSet(), history = state.history.distinct().filter(known::contains).take(200),
                 queue = normalizedQueue, cursor = normalizedQueue.indexOfFirst { it.key == selected }.takeIf { it >= 0 } ?: if (normalizedQueue.isEmpty()) -1 else 0, lyricOffsets = state.lyricOffsets.filterKeys(known::contains).mapValues { it.value.coerceIn(-10000, 10000) },
-                listening = state.listening.filter { it.milliseconds >= 0 && it.plays >= 0 }.take(20000), preferences = state.preferences.copy(
+                listening = state.listening.filter { it.milliseconds >= 0 && it.plays >= 0 }.take(20000).map { row -> row.copy(hourMilliseconds = row.hourMilliseconds.filter { (hour, ms) -> hour in 0..23 && ms > 0 && ms <= row.milliseconds }) }, preferences = state.preferences.copy(
                 volume = state.preferences.volume.coerceIn(0f, 1f), crossfadeSeconds = state.preferences.crossfadeSeconds.coerceIn(0, 12),
                 speed = state.preferences.speed.coerceIn(0.5f, 2f), equalizer = List(10) { state.preferences.equalizer.getOrElse(it) { 0.0 }.coerceIn(-12.0, 12.0) }))
         } catch (error: Exception) {
@@ -134,6 +134,11 @@ class LocalLibrary(private val directory: File = defaultDataDirectory()) {
         val lrc = File(audio.parentFile, "${audio.nameWithoutExtension}.lrc")
         if (lrc.isFile) require(lrc.length() <= 2_000_000) { "LRC lyrics exceed the 2 MB limit." }
         val text = if (lrc.isFile) lrc.readText() else runCatching { AudioFileIO.read(audio).tag?.getFirst(FieldKey.LYRICS) }.getOrNull().orEmpty()
+        return parseLyricText(text)
+    }
+}
+
+internal fun parseLyricText(text: String): List<LyricLine> {
         if (text.isBlank()) return emptyList()
         val enhanced = EnhancedLrc.parse(text)
         if (enhanced.isNotEmpty()) return enhanced
@@ -146,5 +151,5 @@ class LocalLibrary(private val directory: File = defaultDataDirectory()) {
             }
         }.toList().sortedBy { it.timeMs }
         return synced.ifEmpty { text.lineSequence().filter { it.isNotBlank() && !it.startsWith("[") }.map { LyricLine(0, it.trim()) }.toList() }
-    }
 }
+

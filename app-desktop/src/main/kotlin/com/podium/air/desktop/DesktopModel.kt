@@ -18,6 +18,7 @@ class DesktopModel(
     private val persistence: StatePersistence = StateStore(),
     val localLibrary: LocalLibrary = LocalLibrary(),
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val onlineLyrics: LyricsProvider = LrcLibLyrics(),
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val saveMutex = Mutex()
@@ -35,11 +36,19 @@ class DesktopModel(
     private var lastStatsFlush = 0L
     private var historyKey: String? = null
     val lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
+    val lyricsStatus = MutableStateFlow("Select a track to view lyrics.")
     val sleepRemaining = MutableStateFlow<Long?>(null)
     val platformStatus = MutableStateFlow("Windows media controls initialize when the window opens.")
     private var saveJob: Job? = null
     private var lyricsJob: Job? = null
     private var sleepJob: Job? = null
+    private val scrobbling = ScrobblingIntegration(scope, ListenBrainzHttp(), WindowsSecretStore(), mutable.value.preferences) { enabled, username ->
+        change { copy(preferences = preferences.copy(listenBrainzEnabled = enabled, listenBrainzUser = username)) }
+    }
+    val scrobblingStatus = scrobbling.status
+    val scrobblingBusy = scrobbling.busy
+    fun connectListenBrainz(token: String) = scrobbling.connect(token)
+    fun disconnectListenBrainz() = scrobbling.disconnect()
     init {
         engine.configure(mutable.value.preferences)
         scope.launch {
@@ -47,7 +56,9 @@ class DesktopModel(
                 val now = System.nanoTime() / 1_000_000
                 val playbackKey = audio.entry?.let { "${it.key}:${audio.session}" }
                 if (audio.playing && audio.entry != null && historyKey != playbackKey) { historyKey = playbackKey; record(audio.entry.song) }
-                recorder.sample(audio.entry?.song?.videoId, playbackKey, audio.playing, now, java.time.LocalDate.now().toString())
+                val localTime = java.time.LocalDateTime.now()
+                recorder.sample(audio.entry?.song?.videoId, playbackKey, audio.playing, now, localTime.toLocalDate().toString(), localTime.hour)
+                scrobbling.sample(audio, now, System.currentTimeMillis() / 1000)
                 if (!audio.playing || now - lastStatsFlush >= 5000) { flushListening(); lastStatsFlush = now }
             }
         }
@@ -150,8 +161,21 @@ class DesktopModel(
     }
     private fun record(song: Song) { change { copy(history = (listOf(song.videoId) + history.filterNot { it == song.videoId }).take(200)) } }
     private fun loadLyrics(song: Song) {
-        lyricsJob?.cancel(); lyrics.value = emptyList()
-        lyricsJob = scope.launch { lyrics.value = withContext(Dispatchers.IO) { runCatching { localLibrary.lyrics(song) }.getOrElse { emptyList() } } }
+        lyricsJob?.cancel(); lyrics.value = emptyList(); lyricsStatus.value = "Loading lyrics…"
+        val online = state.value.preferences.onlineLyrics
+        val duration = state.value.library.find { it.id == song.videoId }?.duration ?: engine.state.value.durationMs
+        lyricsJob = scope.launch {
+            try {
+                val local = withContext(Dispatchers.IO) { localLibrary.lyrics(song) }
+                ensureActive()
+                if (local.isNotEmpty()) { lyrics.value = local; lyricsStatus.value = "Sidecar or embedded lyrics" }
+                else {
+                    val result = onlineLyrics.lookup(LyricsQuery(song.title, song.artist, song.albumName.orEmpty(), duration), online)
+                    ensureActive(); lyrics.value = result.lines; lyricsStatus.value = result.status
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { ensureActive(); lyricsStatus.value = "Could not load lyrics: ${error.message}" }
+        }
     }
     fun favorite(id: String) { change { copy(favorites = if (id in favorites) favorites - id else favorites + id) } }
     fun createPlaylist(name: String) { val trimmed = name.trim(); if (trimmed.isNotEmpty()) change { copy(playlists = playlists + Playlist(name = trimmed)) } }
@@ -168,11 +192,14 @@ class DesktopModel(
             playlists = playlists.map { it.copy(tracks = it.tracks.filterNot { track -> track == id }) }) }
     }
     fun preferences(value: Preferences) {
+        val reload = value.onlineLyrics != state.value.preferences.onlineLyrics
         if (value.launchAtStartup != state.value.preferences.launchAtStartup) {
             try { WindowsStartup.set(value.launchAtStartup) }
             catch (error: Exception) { message.value = error.message; return }
         }
         change { copy(preferences = value) }; engine.configure(value)
+        scrobbling.configure(value.listenBrainzEnabled)
+        if (reload) reloadLyrics()
     }
     fun sleepTimer(minutes: Int?) {
         sleepJob?.cancel(); sleepRemaining.value = minutes?.times(60L)
@@ -195,10 +222,12 @@ class DesktopModel(
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         val audio = engine.state.value
-        recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, java.time.LocalDate.now().toString())
+        val localTime = java.time.LocalDateTime.now()
+        recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, localTime.toLocalDate().toString(), localTime.hour)
         flushListening()
-        scope.cancel(); engine.close()
+        scope.cancel(); onlineLyrics.close(); scrobbling.close(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.
         runCatching { synchronized(saveLock) { persistence.save(mutable.value) } }.onFailure { System.err.println("Library save failed: ${it.message}") }
     }
 }
+

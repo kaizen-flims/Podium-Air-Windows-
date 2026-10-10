@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
     try {
         if (argc > 1) {
             std::string mode(argv[1]);
-            if (mode == "--picker-self-test" || mode == "--pick-files" || mode == "--pick-folder" || mode == "--pick-playlist" || mode == "--save-playlist") return podium_shell::run(argc, argv);
+            if (mode == "--picker-self-test" || mode == "--pick-files" || mode == "--pick-folder" || mode == "--pick-playlist" || mode == "--save-playlist" || mode == "--save-image") return podium_shell::run(argc, argv);
         }
         init_apartment(apartment_type::multi_threaded);
         SetCurrentProcessExplicitAppUserModelID(L"PodiumAir.Windows");

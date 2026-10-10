@@ -22,6 +22,9 @@ import kotlin.system.exitProcess
 fun main(args: Array<String>) {
     if (args.contains("--platform-smoke")) { platformSmoke(args); return }
     if (args.contains("--audio-smoke")) { audioSmoke(args); return }
+    if (args.contains("--replay-smoke")) { replaySmoke(args); return }
+    if (args.contains("--automix-smoke")) { automixSmoke(args); return }
+    if (args.contains("--credentials-smoke")) { credentialsSmoke(args); return }
     val performance = args.contains("--performance-smoke")
     val smoke = args.contains("--ui-smoke") || performance
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
@@ -175,6 +178,7 @@ private fun platformSmoke(args: Array<String>) {
             check(WindowsFilePicker.chooseForSmoke("--pick-files", fixture.name, directory, 1).singleOrNull()?.let { java.nio.file.Files.isSameFile(it.toPath(), fixture.toPath()) } == true) { "JVM picker returned the wrong Unicode file." }
             check(WindowsFilePicker.chooseForSmoke("--pick-folder", "", directory, 1).singleOrNull()?.let { java.nio.file.Files.isSameFile(it.toPath(), directory.toPath()) } == true) { "JVM picker returned the wrong folder." }
             check(WindowsFilePicker.chooseForSmoke("--save-playlist", "é音.m3u8", directory, 1).singleOrNull()?.let { it.name == "é音.m3u8" && java.nio.file.Files.isSameFile(it.parentFile.toPath(), directory.toPath()) } == true) { "JVM save picker returned the wrong path." }
+            check(WindowsFilePicker.chooseForSmoke("--save-image", "é音.png", directory, 1).singleOrNull()?.let { it.name == "é音.png" && java.nio.file.Files.isSameFile(it.parentFile.toPath(), directory.toPath()) } == true) { "JVM PNG picker returned the wrong path." }
             check(WindowsFilePicker.chooseForSmoke("--pick-files", "", directory, 2).isEmpty()) { "Cancelled picker returned a selection." }
             val pending = launch { WindowsFilePicker.chooseForSmoke("--pick-files", "", directory, 0) }
             delay(750); pending.cancelAndJoin()
@@ -198,6 +202,19 @@ private fun audioSmoke(args: Array<String>) {
         runBlocking {
             val tracks = LocalLibrary(File(wave.parentFile, "podium-smoke-art")).import(listOf(wave)).first
             check(tracks.size == 1)
+            // Automix's decoder must work for each actual codec fixture, not just WAV.
+            val pcm = engine.mediaFiles.preparePcm(wave) { ensureActive() }
+            javax.sound.sampled.AudioSystem.getAudioInputStream(pcm).use { input ->
+                check(input.format.sampleSizeInBits == 16 && !input.format.isBigEndian && input.format.channels in 1..2)
+                val pcmDuration = input.frameLength * 1000.0 / input.format.sampleRate
+                check(pcmDuration >= 5000 && (tracks[0].duration <= 0 || kotlin.math.abs(pcmDuration - tracks[0].duration) < 2000)) { "Decoded PCM duration differs from the recording." }
+                val bytes = ByteArray(8192); var energy = 0L
+                while (true) {
+                    ensureActive(); val count = input.read(bytes); if (count < 0) break
+                    for (i in 0 until count - 1 step 2) energy += kotlin.math.abs(((bytes[i].toInt() and 255) or (bytes[i + 1].toInt() shl 8)).toShort().toInt()).toLong()
+                }
+                check(energy > 0) { "Codec PCM conversion produced silence." }
+            }
             val first = com.podium.air.domain.QueueEntry(song = tracks[0].song())
             val next = com.podium.air.domain.QueueEntry(song = tracks[0].song())
             val advanced = CompletableDeferred<Unit>()
@@ -223,7 +240,7 @@ private fun audioSmoke(args: Array<String>) {
                 engine.open(first, play = false)
                 withTimeout(15000) { engine.state.first { !it.loading && it.entry?.key == first.key && it.error == null } }
             }
-            result.writeText("PASS: ${wave.extension.uppercase()} played, paused, sought to 2s, resumed, crossfaded to a second queue entry and reached natural end.${if (supplied == null) " Missing-file error and subsequent recovery also passed." else ""}\n")
+            result.writeText("PASS: ${wave.extension.uppercase()} played, paused, sought to 2s, resumed, crossfaded to a second queue entry and reached natural end. Automix PCM conversion passed duration, format and non-silence checks.${if (supplied == null) " Missing-file error and subsequent recovery also passed." else ""}\n")
         }
     } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); engine.close(); FxRuntime.exit(); if (supplied == null) wave.delete(); exitProcess(1) }
     engine.close(); FxRuntime.exit(); if (supplied == null) wave.delete(); exitProcess(0)
@@ -240,3 +257,117 @@ internal fun generateTestWave(file: File, seconds: Int) {
         javax.sound.sampled.AudioSystem.write(it, javax.sound.sampled.AudioFileFormat.Type.WAVE, file)
     }
 }
+
+/** Packaged native measurements feed a real two-player PCM transition, then pause/seek/end/cleanup. */
+private fun credentialsSmoke(args: Array<String>) {
+    val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "credentials-smoke.txt")
+    val secret = WindowsSecretStore("test-${java.util.UUID.randomUUID()}")
+    var code = 0
+    try {
+        check(secret.read() == null)
+        secret.write("packaged-fixture-日本🎵")
+        check(secret.read() == "packaged-fixture-日本🎵")
+        secret.write("replacement-fixture"); check(secret.read() == "replacement-fixture")
+        secret.delete(); check(secret.read() == null)
+        result.writeText("PASS: Packaged JNI Windows Credential Manager stored, read, overwrote and deleted an isolated Unicode fixture. No real account credentials were used.\n")
+    } catch (error: Exception) { result.writeText("FAIL: ${error.message}\n"); code = 1 }
+    finally { runCatching { secret.delete() } }
+    exitProcess(code)
+}
+
+private fun automixSmoke(args: Array<String>) {
+    val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "automix-smoke.txt")
+    val directory = java.nio.file.Files.createTempDirectory("podium-automix-smoke-").toFile()
+    val firstFile = File(directory, "Measured track one.wav")
+    val secondFile = File(directory, "Measured track two.wav")
+    fun beatWave(file: File, bpm: Double) {
+        val rate = 22050
+        PcmWaveWriter(file, rate, 1).use { wave ->
+            val bytes = ByteArray(rate * 60 * 2)
+            for (i in 0 until rate * 60) {
+                val t = i / rate.toDouble(); val beat = (t - 2).mod(60 / bpm)
+                val sound = if (t < 2 || t > 57) 0.0 else 0.05 * kotlin.math.sin(t * 2 * Math.PI * 220) + if (beat < 0.055) 0.65 * kotlin.math.exp(-beat * 70) * kotlin.math.sin(beat * 2 * Math.PI * 90) else 0.0
+                val value = (sound * 15000).toInt().coerceIn(-32768, 32767)
+                bytes[i * 2] = value.toByte(); bytes[i * 2 + 1] = (value shr 8).toByte()
+            }
+            wave.write(bytes)
+        }
+    }
+    val engine = JavaFxAudioEngine()
+    try {
+        beatWave(firstFile, 120.0); beatWave(secondFile, 122.0)
+        runBlocking {
+            val tracks = LocalLibrary(File(directory, "art")).import(listOf(firstFile, secondFile)).first
+            check(tracks.size == 2)
+            val first = com.podium.air.domain.QueueEntry(song = tracks[0].song())
+            val next = com.podium.air.domain.QueueEntry(song = tracks[1].song())
+            val advanced = CompletableDeferred<Unit>(); val ended = CompletableDeferred<Unit>()
+            engine.onAdvance = { if (it.key == next.key) advanced.complete(Unit) }
+            engine.onEnd = { if (it == next.key) ended.complete(Unit) }
+            engine.configure(Preferences(automix = true, crossfadeSeconds = 0, volume = 0.2f))
+            engine.open(first, play = false)
+            withTimeout(15000) { engine.state.first { it.error != null || !it.loading && it.durationMs > 50000 } }.let { check(it.error == null) { it.error.orEmpty() } }
+            engine.seek(40000)
+            withTimeout(3000) { engine.state.first { it.positionMs in 39800..40200 } }
+            engine.setUpcoming(next)
+            withTimeout(5000) { engine.state.first { it.automixStatus?.startsWith("Analyzing") == true } }
+            // Replace an in-flight preparation, then seek with the same upcoming key.
+            // Cancelled native/model work must not install a stale standby player.
+            engine.setUpcoming(null); engine.setUpcoming(next); engine.seek(40000); engine.setUpcoming(next)
+            withTimeout(90000) { engine.state.first { it.automixStatus?.startsWith("Automix ready") == true || it.automixStatus?.startsWith("Automix uses standard") == true } }.let {
+                check(it.automixStatus?.startsWith("Automix ready") == true) { it.automixStatus.orEmpty() }
+                check(it.automixStatus?.contains("open-unmix vocal mask") == true) { "The packaged vocal model did not contribute measured evidence: ${it.automixStatus}" }
+            }
+            engine.toggle()
+            withTimeout(25000) { advanced.await() }
+            withTimeout(4000) { engine.state.first { it.entry?.key == next.key && it.playing && it.fading } }
+            engine.configure(Preferences(automix = true, crossfadeSeconds = 0, volume = 0.1f))
+            val stillFading = CompletableDeferred<Boolean>()
+            FxRuntime.dispatch { stillFading.complete(engine.state.value.fading) }
+            check(stillFading.await()) { "Changing volume cancelled an enabled Automix with manual crossfade off." }
+            engine.pause(); withTimeout(3000) { engine.state.first { !it.playing } }
+            engine.seek(10000)
+            withTimeout(15000) { engine.state.first { it.error != null || !it.loading && it.positionMs in 9800..10200 } }.let { check(it.error == null) { it.error.orEmpty() } }
+            check(!engine.state.value.playing) { "Seeking while paused started playback." }
+            engine.configure(Preferences(automix = false, volume = 0.2f)); engine.toggle()
+            withTimeout(5000) { engine.state.first { it.playing } }
+            engine.seek(59400); withTimeout(5000) { ended.await() }
+            check(!engine.state.value.playing)
+            result.writeText("PASS: Packaged native DSP and original planner prepared an actual PCM Automix transition; two real players overlapped, pause/seek restored the original track clock, disabling Automix worked and the incoming track reached natural end. Pitch-preserving WSOLA is verified separately by measured PCM tests.\n")
+        }
+    } catch (error: Throwable) { result.writeText("FAIL: " + error.message + "\n"); error.printStackTrace(); engine.close(); FxRuntime.exit(); directory.deleteRecursively(); exitProcess(1) }
+    engine.close(); FxRuntime.exit(); directory.deleteRecursively(); exitProcess(0)
+}
+
+
+/** The packaged app renders and saves a real Replay PNG through its native save dialog. */
+private fun replaySmoke(args: Array<String>) {
+    val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "replay-smoke.txt")
+    val imagePath = File(args.firstOrNull { it.startsWith("--image=") }?.substringAfter("=") ?: "replay-smoke.png")
+    val directory = java.nio.file.Files.createTempDirectory("podium-replay-smoke-").toFile()
+    var image: java.awt.image.BufferedImage? = null
+    try {
+        val today = java.time.LocalDate.now()
+        val state = SavedState(library = listOf(StoredTrack("a", "a.wav", "Native Replay 音楽", "Podium Air", "Test album", genre = "Fixture genre")), listening = listOf(ListeningEntry("a", today.toString(), 1_800_000, 10, mapOf(20 to 1_800_000))))
+        val summary = ReplaySummary.from(state, 30, today)
+        image = renderReplayPoster(summary)
+        val target = runBlocking { WindowsFilePicker.chooseForSmoke("--save-image", "Replay 音楽.png", directory, 1).single() }
+        writeReplayPoster(image, target)
+        ImageIO.read(target).let { decoded -> check(decoded.width == 1080 && decoded.height == 1920); decoded.flush() }
+        target.copyTo(imagePath, overwrite = true)
+        val stories = File(imagePath.absoluteFile.parentFile, "replay-cards").apply { mkdirs() }
+        val hashes = mutableSetOf<String>()
+        ReplayStoryPage.entries.forEach { page ->
+            val poster = renderReplayPoster(summary, page)
+            try {
+                val saved = File(stories, "${page.name.lowercase()}.png"); writeReplayPoster(poster, saved)
+                ImageIO.read(saved).let { decoded -> check(decoded.width == 1080 && decoded.height == 1920); decoded.flush() }
+                hashes += java.security.MessageDigest.getInstance("SHA-256").digest(saved.readBytes()).joinToString("") { "%02x".format(it) }
+            } finally { poster.flush() }
+        }
+        check(hashes.size == 8) { "Individual Replay cards must render distinct pictures." }
+        result.writeText("PASS: Packaged app rendered the actual listening summary, saved a 1080x1920 PNG through the native Unicode save dialog, reopened it, and rendered/saved/reopened all eight distinct Replay story cards.\n")
+    } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); error.printStackTrace(); image?.flush(); directory.deleteRecursively(); exitProcess(1) }
+    image?.flush(); directory.deleteRecursively(); exitProcess(0)
+}
+

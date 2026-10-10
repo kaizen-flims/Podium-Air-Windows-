@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.music.bitchord.data.model.Song
 import com.podium.air.domain.RepeatMode
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -160,7 +162,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                                 Page.QUEUE -> QueueView(model)
                                 Page.LYRICS -> LyricsView(model, Modifier.padding(horizontal = 28.dp))
                                 Page.SETTINGS -> Settings(model, state)
-                                Page.ACCOUNT -> Account()
+                                Page.ACCOUNT -> Account(model)
                                 Page.ABOUT -> About()
                             }
                         }
@@ -444,6 +446,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 @Composable private fun LyricsView(model: DesktopModel, modifier: Modifier = Modifier) {
     val lyrics by model.lyrics.collectAsState(); val audio by model.engine.state.collectAsState(); val saved by model.state.collectAsState()
+    val lyricsStatus by model.lyricsStatus.collectAsState()
     val list = rememberLazyListState()
     val id = audio.entry?.song?.videoId
     val offset = saved.lyricOffsets[id] ?: 0
@@ -466,8 +469,9 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     Column(modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AssistChip({ model.preferences(saved.preferences.copy(lyricsAutoScroll = !saved.preferences.lyricsAutoScroll)) }, { Text(if (saved.preferences.lyricsAutoScroll) "Auto-scroll on" else "Auto-scroll off") })
-            Spacer(Modifier.weight(1f)); Control(Icons.Rounded.Refresh, "Reload sidecar lyrics") { model.reloadLyrics() }
+            Spacer(Modifier.weight(1f)); Control(Icons.Rounded.Refresh, "Reload lyrics") { model.reloadLyrics() }
         }
+        Text(lyricsStatus, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (id != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Control(Icons.Rounded.Remove, "Lyrics 100 milliseconds earlier") { model.lyricOffset(id, offset - 100) }
@@ -476,7 +480,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 TextButton({ model.lyricOffset(id, 0) }) { Text("Reset") }
             }
         }
-        if (lyrics.isEmpty()) { Empty("Place a .ttml or .lrc file beside the audio file with the same filename, or use embedded lyrics.", Modifier.weight(1f)); return@Column }
+        if (lyrics.isEmpty()) { Empty("Place a .ttml or .lrc file beside the audio file with the same filename, use embedded lyrics, or enable online lyrics in Settings.", Modifier.weight(1f)); return@Column }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = PaddingValues(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             itemsIndexed(lyrics) { index, line ->
                 val focused = index in active
@@ -512,13 +516,31 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     }
 }
 @Composable private fun ReplayView(model: DesktopModel, state: SavedState) {
-    var period by remember { mutableStateOf(30L) }
-    val since = java.time.LocalDate.now().minusDays(period - 1).toString()
-    val data = state.listening.filter { it.day >= since }
+    var period by remember { mutableStateOf(ReplayPeriod.THIS_MONTH) }
+    var story by remember { mutableStateOf<ReplayStoryPage?>(null) }
+    var preview by remember { mutableStateOf<ReplayPreview?>(null) }
+    var exporting by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val summary = ReplaySummary.from(state, period)
+    val data = summary.entries
     val milliseconds = data.sumOf { it.milliseconds }
     val ranked = data.groupBy { it.trackId }.entries.sortedByDescending { it.value.sumOf { stat -> stat.milliseconds } }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 28.dp)) {
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(7L, 30L, 365L).forEach { days -> FilterChip(period == days, { period = days }, { Text("${days} days") }) } } }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { ReplayPeriod.entries.forEach { choice -> FilterChip(period == choice, { period = choice; story = null }, { Text(choice.chip) }) } } }
+        item { LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            item { FilterChip(story == null, { story = null }, { Text("Whole Replay") }) }
+            items(summary.storyPages()) { page -> FilterChip(story == page, { story = page }, { Text(page.title) }) }
+        } }
+        item { OutlinedButton({
+            if (!exporting) scope.launch {
+                exporting = true
+                val selected = story
+                try { preview = withContext(Dispatchers.IO) { ReplayPreview(renderReplayPoster(summary, selected), summary, selected) } }
+                catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (error: Exception) { model.message.value = "Could not prepare your Replay: ${error.message}" }
+                finally { exporting = false }
+            }
+        }, enabled = !exporting) { Icon(Icons.Rounded.Share, null); Spacer(Modifier.width(8.dp)); Text(if (exporting) "Preparing…" else story?.let { "Preview and export ${it.title.lowercase()}" } ?: "Export your Replay") } }
         item { Text("${milliseconds / 60000} minutes listened", style = MaterialTheme.typography.displayLarge); Text("${data.sumOf { it.plays }} track starts • ${ranked.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { Text("Your top tracks", style = MaterialTheme.typography.headlineMedium) }
         itemsIndexed(ranked.take(50)) { rank, entry ->
@@ -530,15 +552,49 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         val artists = ranked.mapNotNull { entry -> state.library.find { it.id == entry.key }?.artist?.let { it to entry.value.sumOf { stat -> stat.milliseconds } } }.groupBy { it.first }.mapValues { it.value.sumOf { pair -> pair.second } }.entries.sortedByDescending { it.value }
         items(artists.take(10)) { Text("${it.key} • ${it.value / 60000} minutes") }
     }
+    preview?.let { captured ->
+        AlertDialog(onDismissRequest = { if (!exporting) { captured.image.flush(); preview = null } },
+            title = { Text("${captured.page?.title ?: "Your Replay"} • ${captured.summary.label}") },
+            text = { Image(remember(captured) { captured.image.toComposeImageBitmap() }, "Replay export preview", Modifier.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit) },
+            confirmButton = { TextButton({
+                if (!exporting) scope.launch {
+                    exporting = true
+                    try {
+                        val filename = "Podium-Air-Replay-${captured.summary.fileLabel}${captured.page?.let { "-${it.name.lowercase()}" } ?: ""}.png"
+                        val target = if (System.getProperty("os.name").startsWith("Windows")) WindowsFilePicker.choose("--save-image", filename).firstOrNull()
+                        else {
+                            val chooser = javax.swing.JFileChooser().apply { selectedFile = File(filename); fileFilter = javax.swing.filechooser.FileNameExtensionFilter("PNG image", "png") }
+                            if (chooser.showSaveDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION && (!chooser.selectedFile.exists() || javax.swing.JOptionPane.showConfirmDialog(null, "Replace ${chooser.selectedFile.name}?", "Save Replay", javax.swing.JOptionPane.YES_NO_OPTION) == javax.swing.JOptionPane.YES_OPTION)) chooser.selectedFile else null
+                        }
+                        if (target != null) { withContext(Dispatchers.IO) { writeReplayPoster(captured.image, target) }; model.message.value = "Saved your Replay to ${target.absolutePath}" }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (error: Exception) { model.message.value = "Replay export failed: ${error.message}" }
+                    finally { exporting = false }
+                }
+            }, enabled = !exporting) { Text(if (exporting) "Saving…" else "Save PNG") } },
+            dismissButton = { TextButton({ captured.image.flush(); preview = null }, enabled = !exporting) { Text("Close") } })
+    }
 }
 @Composable private fun Settings(model: DesktopModel, state: SavedState) {
-    val prefs = state.preferences; val sleep by model.sleepRemaining.collectAsState(); val platform by model.platformStatus.collectAsState()
+    val prefs = state.preferences; val sleep by model.sleepRemaining.collectAsState(); val platform by model.platformStatus.collectAsState(); val audio by model.engine.state.collectAsState()
     LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
         item { Text("Appearance", style = MaterialTheme.typography.headlineMedium); Row(verticalAlignment = Alignment.CenterVertically) { Text("Dark theme", Modifier.weight(1f)); Switch(prefs.dark, { model.preferences(prefs.copy(dark = it)) }) }
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Reduce motion", Modifier.weight(1f)); Switch(prefs.reducedMotion, { model.preferences(prefs.copy(reducedMotion = it)) }) }
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Artwork background", Modifier.weight(1f)); Switch(prefs.dynamicBackground, { model.preferences(prefs.copy(dynamicBackground = it)) }) } }
-        item { Text("Playback", style = MaterialTheme.typography.headlineMedium); Text("Volume • ${(prefs.volume * 100).toInt()}%"); Slider(prefs.volume, { model.preferences(prefs.copy(volume = it)) }, Modifier.fillMaxWidth().semantics { contentDescription = "Playback volume" }, valueRange = 0f..1f); Text("Crossfade • ${prefs.crossfadeSeconds}s"); Slider(prefs.crossfadeSeconds.toFloat(), { model.preferences(prefs.copy(crossfadeSeconds = it.toInt())) }, valueRange = 0f..12f, steps = 11); Text("Equal-power volume overlap. Crossfade is cancelled by seeking and is disabled at playback speeds other than 1×. Automix beat matching is not available.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Playback", style = MaterialTheme.typography.headlineMedium); Text("Volume • ${(prefs.volume * 100).toInt()}%"); Slider(prefs.volume, { model.preferences(prefs.copy(volume = it)) }, Modifier.fillMaxWidth().semantics { contentDescription = "Playback volume" }, valueRange = 0f..1f); Text("Crossfade • ${prefs.crossfadeSeconds}s"); Slider(prefs.crossfadeSeconds.toFloat(), { model.preferences(prefs.copy(crossfadeSeconds = it.toInt())) }, valueRange = 0f..12f, steps = 11); Text("Equal-power volume overlap. Crossfade is cancelled by seeking and is disabled at playback speeds other than 1×. Automix uses a separate measured transition plan when enabled.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) { Text("Automix", style = MaterialTheme.typography.titleLarge); Text("Native analysis • adaptive cues • pitch-preserving tempo correction", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Switch(prefs.automix, { model.preferences(prefs.copy(automix = it)) }, Modifier.semantics { contentDescription = "Automix" }, enabled = com.music.bitchord.playback.smart.TrackFeatures.available)
+            }
+            Text(audio.automixStatus ?: if (prefs.automix) "Prepares the next queued track. Automix runs at 1×; uncertain or failed analysis uses an ordinary fade." else "Automix is off. The crossfade setting controls ordinary transitions.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Uses the original planner, native DSP, Beat This! and open-unmix models. Missing or uncertain model evidence keeps the DSP fallback; EQ handoffs use desktop equalizer bands.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         item { Text("Playback speed • ${"%.2f".format(prefs.speed)}×"); Slider(prefs.speed, { model.preferences(prefs.copy(speed = it)) }, valueRange = 0.5f..2f, steps = 5) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Online lyrics • LRCLIB", Modifier.weight(1f)); Switch(prefs.onlineLyrics, { model.preferences(prefs.copy(onlineLyrics = it)) }, Modifier.semantics { contentDescription = "Online lyrics" }) }
+            Text("Sends the track title, artist, album and duration to lrclib.net. Local lyrics take priority. Matched results are cached for offline use; audio and account details are never sent.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         item { Text("Sleep timer", style = MaterialTheme.typography.titleLarge); if (sleep != null) Text("Pauses in ${formatTime(sleep!! * 1000)}"); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(15, 30, 60).forEach { minutes -> AssistChip({ model.sleepTimer(minutes) }, { Text("${minutes}m") }) }; AssistChip({ model.sleepTimer(null) }, { Text("Cancel") }) } }
         item { Text("Equalizer", style = MaterialTheme.typography.headlineMedium); TextButton({ model.preferences(prefs.copy(equalizer = List(10) { 0.0 })) }) { Text("Reset to flat") } }
         items(10) { band -> Row(verticalAlignment = Alignment.CenterVertically) { Text(listOf("32 Hz", "64 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz")[band], Modifier.width(64.dp), fontSize = 12.sp); Slider(prefs.equalizer.getOrElse(band) { 0.0 }.toFloat(), { gain -> model.preferences(prefs.copy(equalizer = prefs.equalizer.toMutableList().apply { this[band] = gain.toDouble() })) }, Modifier.weight(1f), valueRange = -12f..12f); Text("${prefs.equalizer.getOrElse(band) { 0.0 }.toInt()} dB", Modifier.width(46.dp), fontSize = 12.sp) } }
@@ -553,13 +609,35 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         item { Text("Data", style = MaterialTheme.typography.headlineMedium); Text("Your library, playlists and preferences are stored on this computer. Music files are referenced in place; importing does not copy them. ${defaultDataDirectory().absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
-@Composable private fun Account() {
+@Composable private fun Account(model: DesktopModel) {
+    val state by model.state.collectAsState()
+    val status by model.scrobblingStatus.collectAsState()
+    val busy by model.scrobblingBusy.collectAsState()
+    var token by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Local music", style = MaterialTheme.typography.headlineMedium); Text("No account is needed to use your local collection.")
         Text("YouTube Music • Unavailable", fontWeight = FontWeight.Bold)
-        Text("Google login, personalized streaming, remote playlists and bidirectional account sync have not been implemented. This preview does not collect passwords, cookies or tokens.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Google login, personalized streaming, remote playlists and bidirectional account sync need a supported provider integration. Google passwords and session cookies are not collected.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Button({ Desktop.getDesktop().browse(URI("https://music.youtube.com")) }) { Text("Open YouTube Music") }
         Text("The service opens in your default browser, with its own sign-in and playback rules. It does not connect or synchronize this app.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalDivider()
+        Text("ListenBrainz", style = MaterialTheme.typography.headlineMedium)
+        Text("Share track, artist and album names and listening timestamps with your ListenBrainz account. Listens count after half a track or four minutes of actual playback, whichever comes first; tracks of 30 seconds or less are excluded. Your token is saved in Windows Credential Manager.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(status, fontSize = 13.sp)
+        if (state.preferences.listenBrainzUser.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Sharing as ${state.preferences.listenBrainzUser}", Modifier.weight(1f))
+                Switch(state.preferences.listenBrainzEnabled, { model.preferences(state.preferences.copy(listenBrainzEnabled = it)) }, enabled = !busy)
+            }
+            TextButton(model::disconnectListenBrainz, enabled = !busy) { Text("Disconnect and delete saved token") }
+        }
+        OutlinedTextField(token, { token = it.take(100) }, label = { Text("ListenBrainz user token") }, singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), enabled = !busy, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button({ val selected = token; token = ""; model.connectListenBrainz(selected) }, enabled = !busy && token.isNotBlank()) { Text(if (busy) "Connecting…" else "Connect ListenBrainz") }
+            TextButton({ Desktop.getDesktop().browse(URI("https://listenbrainz.org/settings/")) }) { Text("Get my token") }
+        }
+        Text("Network failures are reported. Failed listens are not retained for offline retry.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
     }
 }
@@ -570,10 +648,10 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Podium Air — Windows Edition", style = MaterialTheme.typography.headlineMedium)
         Text("0.2.0 • Native local music preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
-        Text("This preview supports local music. Streaming, full Android feature parity, and Automix are pending. Windows system media controls are included.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Native Windows playback, measured Automix, optional LRCLIB lyrics, ListenBrainz and Windows media controls are included. Google streaming and full Android feature parity remain unfinished.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton({ Desktop.getDesktop().browse(URI("https://github.com/kaizen-flims/Podium-Air-Windows-")) }) { Text("Corresponding source & build instructions") }
         TextButton({ licenses = readResource("/licenses/THIRD_PARTY_NOTICES.md") + "\n\n" + readResource("/licenses/LICENSE") }) { Text("Third-party licenses & legal notices") }
-        Text("Free software under GNU GPL version 3. No warranty. You may redistribute it under the license terms.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("GPLv3 application with AGPLv3-or-later Automix components. No warranty. See the bundled licenses for redistribution terms.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (licenses != null) AlertDialog(onDismissRequest = { licenses = null }, title = { Text("Licenses & legal notices") }, text = {
         Column {
@@ -588,3 +666,4 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     }, confirmButton = { TextButton({ licenses = null }) { Text("Close") } })
 }
 private fun readResource(path: String): String = object {}.javaClass.getResourceAsStream(path)?.bufferedReader()?.use { it.readText() } ?: "See the corresponding source for $path."
+

@@ -2,8 +2,9 @@
 
 Podium Air — Windows Edition is a modified adaptation, dated 9 October 2026,
 by Prem Das aka Kaizen. Copyright © 2026 Prem Das and upstream contributors.
-It is free software under GNU GPL version 3; there is no warranty. You may
-redistribute it under that license. The complete license is included as LICENSE,
+The original application and Windows adaptation are GNU GPL version 3
+software, combined with AGPLv3-or-later Automix components under section 13.
+Their separate headers and obligations are preserved; there is no warranty. The complete license is included as LICENSE,
 shown in About → Third-party licenses, and bundled under licenses/LICENSE.
 
 ## Android source and acknowledgments
@@ -23,9 +24,10 @@ icon.ico and icon.png are derived from podium_air_icon.jpg. No SF Pro fonts,
 media files, provider credentials or Android native binaries are redistributed.
 Upstream credits binimum/am-lyrics for lyric animation inspiration.
 
-The Orchard-derived AGPL Automix planner, audio-analysis models and WSOLA
-implementation are NOT included. A future port must preserve their file-level
-licenses and notices; the root GPL license does not erase the AGPL headers.
+The development branch includes the Orchard-derived AGPL Automix planner,
+analysis and neural adapters, with the full retained notices described below.
+The desktop WSOLA adapter is new GPLv3 code. The published older local preview
+did not contain these components.
 
 ## Runtime dependencies
 
@@ -93,3 +95,99 @@ its original legal notices. This supplements the OpenJFX and codec/tag sources.
 ## Renderer notice supplement
 
 Skiko 0.9.22.2 is Apache-2.0. Its exact release LICENSE and NOTICE (including the Android Open Source Project acknowledgment) are bundled under `licenses/skiko/`. Skia m132-a00c390e98-1 uses the BSD copyright/license at commit a00c390e98, bundled under `licenses/skia/`. Corresponding upstream locations: https://github.com/JetBrains/skiko/tree/v0.9.22.2 and https://github.com/google/skia/tree/a00c390e98. The native renderer distribution is additionally scanned for supplied legal files during Windows packaging.
+
+## Native Automix port (development branch)
+
+The original Orchard/BitChord TrackAnalysis, TransitionPolicy and TransitionPlanner,
+whole-track DSP analyzer, native resampler and JNI bridge are reused with their
+complete original copyright headers. Those files remain AGPLv3-or-later within
+the GPLv3 combination permitted by section 13 of both licenses. The AGPL text is
+bundled at `licenses/automix/AGPL-3.0.txt`; all matching modified/unmodified source
+is included in the application source archive. Original authors: SFG545 and
+Kushagra Singh. Upstreams: https://github.com/SFG5453/Orchard and
+https://github.com/kushagrasinghx/BitChord.
+
+The Windows adapter, PCM preparation and WSOLA renderer are new GPLv3 code.
+Neural ONNX assets and their distinct notices are included as described below.
+Measured inference is not a guarantee of beat or vocal prediction accuracy.
+
+JLayer `javazoom:jlayer:1.0.1` provides MP3-to-PCM decoding for the analyzer/mixer;
+it is LGPL-2.1 software by JavaZOOM contributors. The unmodified JAR remains
+replaceable, its license is bundled at `licenses/jlayer/LGPL-2.1.txt`, and the
+corresponding source accompanies the dependency-source archive.
+
+## Neural Automix adapters and model assets
+
+Windows ports of `BeatTracker`, `VocalTracker`, `MelSpectrogram`, the original C++
+mel/STFT front ends and their JNI bridges retain their Orchard/BitChord
+copyright headers and AGPL-3.0-or-later terms. The adapters remove Android
+Context/Log/settings dependencies and use CPU ONNX Runtime with bounded
+head/tail PCM, cancellation checks, checked resource extraction and native
+session cleanup. The planner remains confidence-aware; inference is evidence,
+not a guarantee of correct beat or vocal predictions.
+
+The exact quantized assets from the Android source commit
+`48902e6b20fdcfeb1723e02d4744849e82d5067a` are pinned and verified by SHA-256:
+
+- `beat_this_int8.onnx`: `9dc29f1fcd713d18f48a2755109fce01429ba6d1639607af8ae5c7449b47070f`
+- `vocals_umxhq_int8.onnx`: `a2be987b55a29bc149d3a6ae99b08175d81f85ee292a8ea21f96c3a473bc94cb`
+
+Gradle downloads these committed bytes at build time; the installed application
+loads its bundled copies and does not contact a model server. No training data
+is included. Windows does not re-export or re-quantize the models.
+
+Beat This! code and published model weights are MIT, Copyright (c) 2024 Institute
+of Computational Perception, JKU Linz, Austria. Upstream license declaration:
+<https://github.com/CPJKU/beat_this#license>. The full notice is bundled at
+`licenses/beat-this/MIT.txt`.
+
+Open-unmix's UMX-HQ weights (the vocals target, not the separate UMX-L model)
+are attributed to Inria / Fabian-Robert Stöter / Antoine Liutkus. The original UMX-HQ
+Zenodo deposit identifies the weights as MIT; the Android adapter cites it:
+<https://zenodo.org/records/3370489>. The upstream full MIT notice is bundled at
+`licenses/open-unmix/MIT.txt`.
+
+ONNX Runtime CPU Java 1.28.0 is MIT, Copyright (c) Microsoft Corporation.
+Its full MIT notice and the exact release's complete ThirdPartyNotices.txt
+are bundled at `licenses/onnxruntime/`. The original dependency JAR remains
+separate and replaceable. Upstream:
+<https://github.com/microsoft/onnxruntime/tree/v1.28.0>.
+
+## Online lyrics
+
+Optional LRCLIB lookup uses the service's public metadata `/api/get` and
+`/api/search` endpoints. Networking and matching are a Windows implementation;
+no LRCLIB server code or database is redistributed. Local TTML/LRC/embedded
+lyrics take priority. Only title, artist, album and duration are sent after the
+user enables the feature; returned lyrics are cached locally and attributed
+in the lyrics view. No audio or account credentials are transmitted.
+
+## Replay export
+
+The Windows Replay image follows the Android ReplayPoster's 1080×1920 summary
+format, 72px margins and content ordering. Android Canvas/Bitmap, Coil and
+Palette are replaced with Java2D and already-imported local artwork. The summary plus all eight individual source story card types
+are adapted to native desktop PNG rendering. Original page ordering and hue
+rotations are retained; the desktop's card picker/frozen preview replaces the
+mobile story gestures. Calendar periods and actual hourly statistics are
+adapted without manufacturing unavailable older hourly records. Typography uses Java's logical Dialog font and installed script fallback fonts;
+no Apple SF Pro font files are redistributed. The image is previewed before
+export and saved through a native Windows PNG dialog with overwrite prompting.
+No messaging or external sharing service is invoked.
+
+
+## ListenBrainz and Windows credential storage
+
+The scrobbling adapter follows Podium Air's ListenBrainzManager metadata
+behavior with the documented API and measured audible-time eligibility. No
+ListenBrainz server/database implementation is redistributed. It sends track,
+artist, album and listening timestamps only after opt-in, using the listener's
+own token in an Authorization header. No audio is uploaded. Requests are
+bounded, cancellable and paced at one per second with rate-limit headers.
+
+New GPLv3 JNI code calls the operating system's Credential Manager API for
+PodiumAirWindows-prefixed generic credentials in the current user's credential
+set. Windows system libraries are linked through the platform SDK; no Microsoft
+credential database, credentials or SDK binaries are redistributed. Disconnect
+turns sharing off and requests deletion of the saved app credential. Failed
+submissions are reported and have no persistent offline retry queue.

@@ -2,6 +2,9 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.util.zip.ZipFile
 import java.io.File
 import java.security.MessageDigest
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 plugins {
     kotlin("jvm")
     kotlin("plugin.compose")
@@ -22,6 +25,8 @@ dependencies {
     implementation("de.sfuhrm:jaad:0.8.7") { isTransitive = false }
     implementation("org.jflac:jflac-codec:1.5.2") { isTransitive = false }
     implementation("io.github.jaredmdobson:concentus:1.0.2") { isTransitive = false }
+    implementation("javazoom:jlayer:1.0.1") { isTransitive = false }
+    implementation("com.microsoft.onnxruntime:onnxruntime:1.28.0") { isTransitive = false }
     for (module in listOf("base", "graphics", "media")) {
         implementation("org.openjfx:javafx-$module:21.0.9:$fxPlatform")
     }
@@ -85,9 +90,37 @@ val dependencyNotices by tasks.registering {
         dest.resolve("licenses/INDEX.txt").writeText((listOf("licenses/LICENSE", "licenses/THIRD_PARTY_NOTICES.md") + manual + generated).distinct().sorted().joinToString("\n"))
     }
 }
+val automixModels by tasks.registering {
+    val destination = layout.buildDirectory.dir("generated/automix-models")
+    outputs.dir(destination)
+    val hashes = mapOf(
+        "beat_this_int8.onnx" to "9dc29f1fcd713d18f48a2755109fce01429ba6d1639607af8ae5c7449b47070f",
+        "vocals_umxhq_int8.onnx" to "a2be987b55a29bc149d3a6ae99b08175d81f85ee292a8ea21f96c3a473bc94cb",
+    )
+    inputs.properties(hashes)
+    doLast {
+        val directory = destination.get().asFile.apply { mkdirs() }
+        for ((name, expected) in hashes) {
+            val target = directory.resolve(name)
+            fun hash(file: File) = MessageDigest.getInstance("SHA-256").digest(file.readBytes()).joinToString("") { "%02x".format(it) }
+            if (target.isFile && hash(target) == expected) continue
+            val temporary = directory.resolve("$name.part")
+            try {
+                val url = URI("https://raw.githubusercontent.com/kaizen-flims/Podium-Air/48902e6b20fdcfeb1723e02d4744849e82d5067a/app/src/main/assets/$name").toURL()
+                val connection = url.openConnection().apply { connectTimeout = 15000; readTimeout = 30000 }
+                connection.getInputStream().use { input -> temporary.outputStream().use { output -> input.copyTo(output) } }
+                check(hash(temporary) == expected) { "Pinned Android Automix model checksum mismatch: $name" }
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } finally { temporary.delete() }
+        }
+    }
+}
 tasks.processResources {
     dependsOn(dependencyNotices)
+    dependsOn(automixModels)
+    from(layout.buildDirectory.dir("generated/automix-models")) { include("*.onnx"); into("models") }
     from(rootProject.layout.buildDirectory.dir("windows-helper")) { include("PodiumMediaBridge.exe"); into("windows") }
+    from(rootProject.layout.buildDirectory.dir("windows-analysis")) { include("PodiumAnalysis.dll"); into("windows") }
     from(layout.buildDirectory.dir("generated/notices"))
     from(rootProject.file("LICENSE")) { into("licenses") }
     from(rootProject.file("THIRD_PARTY_NOTICES.md")) { into("licenses") }
@@ -102,6 +135,7 @@ dependencies {
     dependencySources("de.sfuhrm:jaad:0.8.7:sources")
     dependencySources("org.jflac:jflac-codec:1.5.2:sources")
     dependencySources("io.github.jaredmdobson:concentus:1.0.2:sources")
+    dependencySources("javazoom:jlayer:1.0.1:sources")
     for (module in listOf("base", "graphics", "media")) dependencySources("org.openjfx:javafx-$module:21.0.9:sources")
 }
 tasks.register<Copy>("collectDependencySources") {

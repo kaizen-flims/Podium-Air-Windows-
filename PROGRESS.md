@@ -51,3 +51,55 @@
 
 - Prem explicitly authorized publishing Windows release assets and website download buttons. Added exact Skiko 0.9.22.2 LICENSE/NOTICE and Skia copyright/license before public preview packaging; source/API release preparation and website updates are in progress.
 - Main commit 4948feb passed all 40 tests and Windows packaging/integration checks in run 37980037577. Release preparation validated exact-source provenance and all package hashes. Fixed draft publishing: upload through the release ID after validating its target; a draft Git tag exists only after publication. No partial release was published.
+
+- 2026-10-10: Resumed the complete native-port scope after the public local preview. Added the original AGPL Automix analysis/policy/planner and native DSP/JNI, bounded PCM preparation including MP3/AIFF, pitch-preserving overlap preparation, original-track clock mapping, confidence-based fallback and adaptive EQ handoffs. The Linux native analyzer test measured 120.005 BPM from generated PCM, measured content boundaries and rejected silence for beat matching. Kotlin tests and packaged Windows Automix control/seek/cleanup checks are pending CI. This development branch is not a complete release; online account/streaming/provider and neural-model parity remain unresolved.
+
+### Automix Windows validation and remaining app work — 10 October 2026
+
+Feature commit c2e63ec passed Windows run 38018280923: 48 tests, zero failures;
+actual packaged Automix PCM preparation and overlap; original-track seek while
+paused; all six codecs; 15 UI routes and keyboard shortcuts; native media
+controls/dialogs; installer lifecycle. Paused observation: 1.73% of one logical
+core and 254.07 MB sampled working set. This verifies the DSP/WSOLA change,
+not full Android parity.
+
+Opt-in LRCLIB networking, strict recording/duration matching, body limits,
+cancellation, provider status and bounded offline cache are now implemented.
+Neural Automix adapters, original mel/STFT front ends, the two exact pinned
+Android model assets and CPU ONNX Runtime are being verified on Windows.
+No public full release has been declared. Streaming/login/sync and remaining
+network/social features are still unresolved. The website still points to the
+previous explicitly labeled local preview.
+
+Replay summary PNG export now includes a frozen preview, selected-period
+filtering (excluding future records), original poster dimensions/margins,
+local artwork, Unicode native PNG save dialog and atomic output. Unit and
+packaged export checks are included. Native model front ends also passed the
+standalone C++ self-test locally. A Gradle Java-extension name collision found
+by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
+
+
+### Verified neural Automix / LRCLIB / Replay checkpoint
+
+- `1b12da5` fixed the Replay coroutine/image-converter compile errors and passed
+  complete Windows run 38064057032: 58 tests, zero failures/errors/skips; bundled
+  neural graphs, actual Automix/seek, six codec PCM/control/end checks, Replay
+  PNG, native media/dialogs, 15 UI routes/keyboard/DPI and MSI lifecycle.
+- Independently verified the report ZIP digest, counted XML results and viewed
+  actual Settings/Replay screenshots. Logical-font fallback and singular labels
+  were corrected after visual inspection of Replay.
+- `dba37cb` adds opt-in ListenBrainz scrobbling, measured audible-time eligibility,
+  documented/rate-limited API calls, masked token input, Windows Credential
+  Manager JNI and eight new tests plus packaged credential smoke. CI pending.
+- This branch remains an unfinished native streaming port. No new full release
+  or website-link replacement has been made. Supported provider/account setup,
+  remaining integrations/source UI and consumer-device acceptance remain open.
+
+- `db8ab51` corrects the scrobbling test's required thumbnail constructor
+  argument and cancels any pending connection before disconnecting. CI rerun
+  pending; no tests or acceptance gates were disabled.
+
+- Implemented source calendar Replay periods and all eight individual story
+  PNG cards, plus measured local listening-hour profiles with backward-
+  compatible older records. Added three calendar/rendering/statistics tests and
+  expanded packaged Replay evidence to all cards. New checks pending.

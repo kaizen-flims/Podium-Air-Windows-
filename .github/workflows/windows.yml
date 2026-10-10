@@ -148,6 +148,35 @@ jobs:
             Get-Content $result
             if ($p.ExitCode -ne 0) { throw "$extension integration failed" }
           }
+      - name: Verify packaged Replay PNG export
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'replay-smoke.txt'
+          $image = Join-Path $PWD 'replay-smoke.png'
+          $p = Start-Process $exe -ArgumentList @('--replay-smoke', "--result=$result", "--image=$image") -PassThru
+          if (!$p.WaitForExit(30000)) { $p.Kill(); throw 'Replay PNG export timed out' }
+          if ($p.ExitCode -ne 0 -or !(Test-Path $result) -or !(Test-Path $image)) { throw 'Replay PNG export failed' }
+          Get-Content $result
+      - name: Verify measured Automix and original-track seek
+        # Existing paused gate follows an additional real Automix check.
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'automix-smoke.txt'
+          $p = Start-Process -FilePath $exe -ArgumentList @('--automix-smoke', "--result=`"$result`"") -PassThru
+          if (-not $p.WaitForExit(150000)) { $p.Kill(); throw 'Packaged Automix integration timed out' }
+          if ($p.ExitCode -ne 0 -or -not (Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Packaged Automix integration failed' }
+          Get-Content $result
+      - name: Verify packaged Windows credential storage
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'credentials-smoke.txt'
+          $p = Start-Process $exe -ArgumentList @('--credentials-smoke', "--result=$result") -PassThru
+          if (!$p.WaitForExit(30000)) { $p.Kill(); throw 'Credential storage timed out' }
+          if ($p.ExitCode -ne 0 -or !(Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Credential storage failed' }
+          Get-Content $result
       - name: Measure paused desktop CPU, memory and shutdown
         shell: pwsh
         run: |
@@ -258,6 +287,11 @@ jobs:
             ui-smoke.txt
             ui-smoke.png
             audio-smoke.txt
+            automix-smoke.txt
+            credentials-smoke.txt
+            replay-smoke.txt
+            replay-smoke.png
+            replay-cards/*.png
             codec-*-smoke.txt
             windows-media-smoke.txt
             windows-dialog-smoke.txt
@@ -272,3 +306,4 @@ jobs:
             test-summary.txt
             runtime-build.txt
             dependency-inventory.txt
+

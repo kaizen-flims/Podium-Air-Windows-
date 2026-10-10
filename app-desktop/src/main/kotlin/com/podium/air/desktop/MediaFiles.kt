@@ -20,6 +20,36 @@ import kotlin.math.roundToInt
 /** Bounded, disk-backed PCM preparation. Originals and metadata are never modified. */
 class MediaFiles(private val directory: File = File(defaultDataDirectory(), "decoded")) {
     private val locks = Array(32) { Any() }
+    /** The analyzer/mixer reads real PCM, including MP3 and AIFF that JavaFX normally plays directly. */
+    fun preparePcm(source: File, checkCancelled: () -> Unit = {}): File {
+        val decoded = prepare(source, checkCancelled)
+        val identity = "pcm-v1|" + source.canonicalPath + "|" + source.length() + "|" + source.lastModified()
+        val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
+        synchronized(locks[(key.hashCode() and Int.MAX_VALUE) % locks.size]) {
+            checkCancelled()
+            val target = File(directory, "$key-pcm.wav")
+            if (target.isFile && target.length() > 44) { target.setLastModified(System.currentTimeMillis()); return target }
+            check(directory.isDirectory || directory.mkdirs())
+            val temp = Files.createTempFile(directory.toPath(), "pcm-", ".tmp").toFile()
+            try {
+                if (decoded.extension.equals("mp3", true)) decodeMp3(decoded, temp, checkCancelled)
+                else javax.sound.sampled.AudioSystem.getAudioInputStream(decoded).use { input ->
+                    val base = input.format
+                    require(base.channels in 1..2 && base.sampleRate in 8000f..192000f)
+                    val format = javax.sound.sampled.AudioFormat(base.sampleRate, 16, base.channels, true, false)
+                    javax.sound.sampled.AudioSystem.getAudioInputStream(format, input).use { pcm ->
+                        PcmWaveWriter(temp, format.sampleRate.toInt(), format.channels).use { wave ->
+                            val buffer = ByteArray(8192)
+                            while (true) { checkCancelled(); val count = pcm.read(buffer); if (count < 0) break; if (count > 0) wave.write(buffer.copyOf(count)) }
+                        }
+                    }
+                }
+                checkCancelled(); require(temp.length() > 44) { "No PCM audio was decoded." }
+                prune(); Files.move(temp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                return target
+            } finally { temp.delete() }
+        }
+    }
     fun prepare(source: File, checkCancelled: () -> Unit = {}): File {
         require(source.isFile) { "File is missing: ${source.name}. Reimport it or remove it from your library." }
         if (source.extension.lowercase() !in setOf("flac", "opus", "ogg", "m4a")) return source
@@ -51,6 +81,28 @@ class MediaFiles(private val directory: File = File(defaultDataDirectory(), "dec
     }
     fun sizeBytes(): Long = directory.listFiles()?.sumOf { it.length() } ?: 0
     fun clear(): Int = directory.listFiles()?.count { it.isFile && it.delete() } ?: 0
+}
+
+private fun decodeMp3(source: File, destination: File, checkCancelled: () -> Unit) {
+    source.inputStream().buffered().use { input ->
+        val bits = javazoom.jl.decoder.Bitstream(input)
+        val decoder = javazoom.jl.decoder.Decoder()
+        var wave: PcmWaveWriter? = null
+        var expectedRate = 0; var expectedChannels = 0; var frames = 0
+        try {
+            while (true) {
+                checkCancelled()
+                val header = bits.readFrame() ?: break
+                val samples = decoder.decodeFrame(header, bits) as javazoom.jl.decoder.SampleBuffer
+                if (wave == null) { expectedRate = samples.sampleFrequency; expectedChannels = samples.channelCount; wave = PcmWaveWriter(destination, expectedRate, expectedChannels) }
+                require(samples.sampleFrequency == expectedRate && samples.channelCount == expectedChannels) { "MP3 changes its audio format midstream." }
+                val output = ByteArray(samples.bufferLength * 2)
+                for (i in 0 until samples.bufferLength) { output[i * 2] = samples.buffer[i].toByte(); output[i * 2 + 1] = (samples.buffer[i].toInt() shr 8).toByte() }
+                wave!!.write(output); frames++; bits.closeFrame()
+            }
+            require(frames > 0) { "MP3 contains no decodable frames." }
+        } finally { wave?.close(); bits.close() }
+    }
 }
 
 private fun decodeAac(source: File, destination: File, checkCancelled: () -> Unit) {

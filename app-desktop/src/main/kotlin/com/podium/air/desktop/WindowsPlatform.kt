@@ -112,7 +112,7 @@ object WindowsFilePicker {
     suspend fun choose(mode: String, name: String = ""): List<File> = request(mode, name, null, 0)
     internal suspend fun chooseForSmoke(mode: String, name: String, folder: File, automatic: Int): List<File> = request(mode, name, folder, automatic)
     private suspend fun request(mode: String, name: String, folder: File?, automatic: Int): List<File> = runInterruptible(Dispatchers.IO) {
-        require(mode in setOf("--pick-files", "--pick-folder", "--pick-playlist", "--save-playlist"))
+        require(mode in setOf("--pick-files", "--pick-folder", "--pick-playlist", "--save-playlist", "--save-image"))
         val output = Files.createTempFile("podium-dialog-", ".txt").toFile()
         try {
             val command = mutableListOf(extractMediaBridge().absolutePath, mode,

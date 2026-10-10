@@ -21,26 +21,28 @@ std::wstring pathOf(IShellItem* item) {
 std::vector<std::wstring> choose(std::string const& mode, HWND owner, std::wstring const& name = L"", std::wstring const& folder = L"", int automatic = 0) {
     com_ptr<IFileDialog> dialog;
     com_ptr<IFileOpenDialog> open;
-    if (mode == "--save-playlist") {
+    if (mode == "--save-playlist" || mode == "--save-image") {
         com_ptr<IFileSaveDialog> save;
         check_hresult(CoCreateInstance(CLSID_FileSaveDialog, nullptr, CLSCTX_INPROC_SERVER, __uuidof(IFileSaveDialog), save.put_void()));
         dialog = save.as<IFileDialog>();
-        check_hresult(dialog->SetDefaultExtension(L"m3u8"));
+        check_hresult(dialog->SetDefaultExtension(mode == "--save-image" ? L"png" : L"m3u8"));
     } else {
         check_hresult(CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER, __uuidof(IFileOpenDialog), open.put_void()));
         dialog = open.as<IFileDialog>();
     }
     FILEOPENDIALOGOPTIONS options{}; check_hresult(dialog->GetOptions(&options));
     options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_FORCEFILESYSTEM | FOS_NOCHANGEDIR);
+    if (mode == "--save-image") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_OVERWRITEPROMPT | FOS_STRICTFILETYPES);
     if (mode == "--pick-folder") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_PICKFOLDERS);
     if (mode == "--pick-files") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST);
     check_hresult(dialog->SetOptions(options));
     if (mode != "--pick-folder") {
+        COMDLG_FILTERSPEC images[] = {{L"PNG image", L"*.png"}};
         COMDLG_FILTERSPEC music[] = {{L"Supported music", L"*.mp3;*.wav;*.aif;*.aiff;*.m4a;*.flac;*.opus;*.ogg"}, {L"All files", L"*.*"}};
         COMDLG_FILTERSPEC playlists[] = {{L"Local playlists", L"*.m3u8;*.m3u"}, {L"All files", L"*.*"}};
-        check_hresult(dialog->SetFileTypes(2, mode == "--pick-files" ? music : playlists));
+        check_hresult(dialog->SetFileTypes(mode == "--save-image" ? 1 : 2, mode == "--save-image" ? images : mode == "--pick-files" ? music : playlists));
     }
-    check_hresult(dialog->SetTitle(mode == "--pick-folder" ? L"Import music folder" : mode == "--pick-files" ? L"Import music" : mode == "--save-playlist" ? L"Export local playlist" : L"Import local playlist"));
+    check_hresult(dialog->SetTitle(mode == "--pick-folder" ? L"Import music folder" : mode == "--pick-files" ? L"Import music" : mode == "--save-image" ? L"Save your Replay" : mode == "--save-playlist" ? L"Export local playlist" : L"Import local playlist"));
     if (!name.empty()) check_hresult(dialog->SetFileName(name.c_str()));
     if (!folder.empty()) {
         com_ptr<IShellItem> location;
@@ -92,8 +94,10 @@ void selfTest() {
         if (directories.size() != 1 || _wcsicmp(directories[0].c_str(), folder.c_str()) != 0) throw std::runtime_error("Native folder dialog selected the wrong directory");
         auto saved = choose("--save-playlist", nullptr, L"\u00e9\u97f3.m3u8", folder, IDOK);
         if (saved.size() != 1 || _wcsicmp(saved[0].c_str(), (folder + L"\\\u00e9\u97f3.m3u8").c_str()) != 0) throw std::runtime_error("Native save dialog selected the wrong path");
+        auto image = choose("--save-image", nullptr, L"\u00e9\u97f3.png", folder, IDOK);
+        if (image.size() != 1 || _wcsicmp(image[0].c_str(), (folder + L"\\\u00e9\u97f3.png").c_str()) != 0) throw std::runtime_error("Native PNG save dialog selected the wrong path");
         if (!choose("--pick-files", nullptr, L"", folder, IDCANCEL).empty()) throw std::runtime_error("Native dialog cancellation returned a path");
-        emit("PASS: Windows shell dialogs selected a Unicode music file and folder, selected an M3U8 save path, and cancelled without importing.");
+        emit("PASS: Windows shell dialogs selected a Unicode music file and folder, selected M3U8 and PNG save paths, and cancelled without importing.");
     } catch (...) { DeleteFileW(file.c_str()); RemoveDirectoryW(folder.c_str()); throw; }
     DeleteFileW(file.c_str()); RemoveDirectoryW(folder.c_str());
 }
