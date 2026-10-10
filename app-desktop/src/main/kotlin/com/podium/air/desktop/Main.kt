@@ -201,6 +201,19 @@ private fun audioSmoke(args: Array<String>) {
         runBlocking {
             val tracks = LocalLibrary(File(wave.parentFile, "podium-smoke-art")).import(listOf(wave)).first
             check(tracks.size == 1)
+            // Automix's decoder must work for each actual codec fixture, not just WAV.
+            val pcm = engine.mediaFiles.preparePcm(wave) { ensureActive() }
+            javax.sound.sampled.AudioSystem.getAudioInputStream(pcm).use { input ->
+                check(input.format.sampleSizeInBits == 16 && !input.format.isBigEndian && input.format.channels in 1..2)
+                val pcmDuration = input.frameLength * 1000.0 / input.format.sampleRate
+                check(pcmDuration >= 5000 && (tracks[0].duration <= 0 || kotlin.math.abs(pcmDuration - tracks[0].duration) < 2000)) { "Decoded PCM duration differs from the recording." }
+                val bytes = ByteArray(8192); var energy = 0L
+                while (true) {
+                    ensureActive(); val count = input.read(bytes); if (count < 0) break
+                    for (i in 0 until count - 1 step 2) energy += kotlin.math.abs(((bytes[i].toInt() and 255) or (bytes[i + 1].toInt() shl 8)).toShort().toInt()).toLong()
+                }
+                check(energy > 0) { "Codec PCM conversion produced silence." }
+            }
             val first = com.podium.air.domain.QueueEntry(song = tracks[0].song())
             val next = com.podium.air.domain.QueueEntry(song = tracks[0].song())
             val advanced = CompletableDeferred<Unit>()
@@ -226,7 +239,7 @@ private fun audioSmoke(args: Array<String>) {
                 engine.open(first, play = false)
                 withTimeout(15000) { engine.state.first { !it.loading && it.entry?.key == first.key && it.error == null } }
             }
-            result.writeText("PASS: ${wave.extension.uppercase()} played, paused, sought to 2s, resumed, crossfaded to a second queue entry and reached natural end.${if (supplied == null) " Missing-file error and subsequent recovery also passed." else ""}\n")
+            result.writeText("PASS: ${wave.extension.uppercase()} played, paused, sought to 2s, resumed, crossfaded to a second queue entry and reached natural end. Automix PCM conversion passed duration, format and non-silence checks.${if (supplied == null) " Missing-file error and subsequent recovery also passed." else ""}\n")
         }
     } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); engine.close(); FxRuntime.exit(); if (supplied == null) wave.delete(); exitProcess(1) }
     engine.close(); FxRuntime.exit(); if (supplied == null) wave.delete(); exitProcess(0)
@@ -274,12 +287,16 @@ private fun automixSmoke(args: Array<String>) {
             val advanced = CompletableDeferred<Unit>(); val ended = CompletableDeferred<Unit>()
             engine.onAdvance = { if (it.key == next.key) advanced.complete(Unit) }
             engine.onEnd = { if (it == next.key) ended.complete(Unit) }
-            engine.configure(Preferences(automix = true, crossfadeSeconds = 4, volume = 0.2f))
+            engine.configure(Preferences(automix = true, crossfadeSeconds = 0, volume = 0.2f))
             engine.open(first, play = false)
             withTimeout(15000) { engine.state.first { it.error != null || !it.loading && it.durationMs > 50000 } }.let { check(it.error == null) { it.error.orEmpty() } }
             engine.seek(40000)
             withTimeout(3000) { engine.state.first { it.positionMs in 39800..40200 } }
             engine.setUpcoming(next)
+            withTimeout(5000) { engine.state.first { it.automixStatus?.startsWith("Analyzing") == true } }
+            // Replace an in-flight preparation, then seek with the same upcoming key.
+            // Cancelled native/model work must not install a stale standby player.
+            engine.setUpcoming(null); engine.setUpcoming(next); engine.seek(40000); engine.setUpcoming(next)
             withTimeout(90000) { engine.state.first { it.automixStatus?.startsWith("Automix ready") == true || it.automixStatus?.startsWith("Automix uses standard") == true } }.let {
                 check(it.automixStatus?.startsWith("Automix ready") == true) { it.automixStatus.orEmpty() }
                 check(it.automixStatus?.contains("open-unmix vocal mask") == true) { "The packaged vocal model did not contribute measured evidence: ${it.automixStatus}" }
@@ -287,6 +304,10 @@ private fun automixSmoke(args: Array<String>) {
             engine.toggle()
             withTimeout(25000) { advanced.await() }
             withTimeout(4000) { engine.state.first { it.entry?.key == next.key && it.playing && it.fading } }
+            engine.configure(Preferences(automix = true, crossfadeSeconds = 0, volume = 0.1f))
+            val stillFading = CompletableDeferred<Boolean>()
+            FxRuntime.dispatch { stillFading.complete(engine.state.value.fading) }
+            check(stillFading.await()) { "Changing volume cancelled an enabled Automix with manual crossfade off." }
             engine.pause(); withTimeout(3000) { engine.state.first { !it.playing } }
             engine.seek(10000)
             withTimeout(15000) { engine.state.first { it.error != null || !it.loading && it.positionMs in 9800..10200 } }.let { check(it.error == null) { it.error.orEmpty() } }

@@ -214,7 +214,7 @@ class DesktopModel(
         val audio = engine.state.value
         recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, java.time.LocalDate.now().toString())
         flushListening()
-        scope.cancel(); engine.close()
+        scope.cancel(); onlineLyrics.close(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.
         runCatching { synchronized(saveLock) { persistence.save(mutable.value) } }.onFailure { System.err.println("Library save failed: ${it.message}") }
     }

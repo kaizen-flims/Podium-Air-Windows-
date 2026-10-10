@@ -24,7 +24,10 @@ import kotlin.math.abs
 
 data class LyricsQuery(val title: String, val artist: String, val album: String, val durationMs: Long)
 data class LyricsResult(val lines: List<LyricLine>, val status: String)
-interface LyricsProvider { suspend fun lookup(query: LyricsQuery, online: Boolean): LyricsResult }
+interface LyricsProvider : AutoCloseable {
+    suspend fun lookup(query: LyricsQuery, online: Boolean): LyricsResult
+    override fun close() {}
+}
 
 /** The source app's keyless provider, through its documented public API. Never uploads audio. */
 internal class LrcLibLyrics(
@@ -34,6 +37,7 @@ internal class LrcLibLyrics(
     private val clock: () -> Long = System::currentTimeMillis,
 ) : LyricsProvider {
     private val misses = ConcurrentHashMap<String, Long>()
+    override fun close() { client.shutdownNow() }
     init {
         require(base.scheme == "https" || (base.scheme == "http" && base.host in listOf("127.0.0.1", "localhost", "::1")))
         require(base.userInfo == null && base.query == null && base.fragment == null && base.path.endsWith('/'))

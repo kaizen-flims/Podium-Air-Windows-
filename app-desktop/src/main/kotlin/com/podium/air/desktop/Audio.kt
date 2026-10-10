@@ -46,6 +46,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
     private var openJob: Job? = null
     private var standbyJob: Job? = null
     private var generation = 0L
+    private var standbyEpoch = 0L
     private val mutable = MutableStateFlow(AudioState())
     override val state: StateFlow<AudioState> = mutable
     override var onEnd: (String) -> Unit = {}
@@ -125,9 +126,11 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
     }
     override fun setUpcoming(entry: QueueEntry?) = command {
         if (upcoming?.key != entry?.key) {
+            standbyEpoch++
             standbyJob?.cancel(); standbyJob = null
             standby?.dispose(); standby = null; standbyKey = null
             standbyTemp?.delete(); standbyTemp = null; standbyTiming = null; nextPlan = null; standbyBaseFile = null
+            mutable.value = mutable.value.copy(automixStatus = null)
         }
         upcoming = entry
         if (preferences.crossfadeSeconds > 0 || preferences.automix) prepareNext()
@@ -136,6 +139,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
         val next = upcoming ?: return
         if (standby != null || standbyJob?.isActive == true || next.key == active?.key || outgoing != null) return
         val request = generation
+        val epoch = standbyEpoch
         val currentEntry = active
         val settings = preferences
         standbyJob = decoding.launch {
@@ -146,7 +150,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
                 var plan: TransitionPlan? = null
                 var base = file
                 if (settings.automix && settings.speed == 1f && currentEntry != null) {
-                    command { if (request == generation) mutable.value = mutable.value.copy(automixStatus = "Analyzing the current and next track…") }
+                    command { if (request == generation && epoch == standbyEpoch) mutable.value = mutable.value.copy(automixStatus = "Analyzing the current and next track…") }
                     try {
                         val currentPcm = mediaFiles.preparePcm(File(requireNotNull(currentEntry.song.localPath))) { ensureActive() }
                         val nextPcm = mediaFiles.preparePcm(File(requireNotNull(next.song.localPath))) { ensureActive() }
@@ -168,7 +172,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
                 var accepted = false
                 try {
                 FxRuntime.dispatch {
-                    if (!closed.get() && request == generation && upcoming?.key == next.key && standby == null && preferences.automix == settings.automix && preferences.speed == settings.speed && preferences.crossfadeSeconds == settings.crossfadeSeconds) {
+                    if (!closed.get() && request == generation && epoch == standbyEpoch && upcoming?.key == next.key && standby == null && preferences.automix == settings.automix && preferences.speed == settings.speed && preferences.crossfadeSeconds == settings.crossfadeSeconds) {
                         runCatching { makePlayer(next, file) }.onSuccess { candidate ->
                             standby = candidate.apply { volume = 0.0; setOnReady { applyPreferences(this); volume = 0.0 } }
                             standbyKey = next.key
@@ -249,7 +253,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
     override fun toggle() = command { player?.let { if (it.status == MediaPlayer.Status.PLAYING) { it.pause(); outgoing?.pause() } else { it.play(); outgoing?.play() } } }
     override fun pause() = command { player?.pause(); outgoing?.pause() }
     override fun seek(ms: Long) = command {
-        finishFade(); standbyJob?.cancel(); standbyJob = null; standby?.dispose(); standby = null; standbyKey = null
+        standbyEpoch++; finishFade(); standbyJob?.cancel(); standbyJob = null; standby?.dispose(); standby = null; standbyKey = null
         standbyTemp?.delete(); standbyTemp = null; standbyTiming = null; standbyBaseFile = null; nextPlan = null
         if (currentTiming != null) {
             val entry = active ?: return@command
@@ -264,8 +268,8 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
     override fun configure(preferences: Preferences) = command {
         val replan = this.preferences.automix != preferences.automix || this.preferences.crossfadeSeconds != preferences.crossfadeSeconds || this.preferences.speed != preferences.speed
         this.preferences = preferences
-        if (replan) { standbyJob?.cancel(); standbyJob = null; standby?.dispose(); standby = null; standbyKey = null; standbyTemp?.delete(); standbyTemp = null; nextPlan = null; standbyTiming = null }
-        if (preferences.crossfadeSeconds == 0 || preferences.speed != 1f) finishFade()
+        if (replan) { standbyEpoch++; standbyJob?.cancel(); standbyJob = null; standby?.dispose(); standby = null; standbyKey = null; standbyTemp?.delete(); standbyTemp = null; nextPlan = null; standbyTiming = null }
+        if ((!preferences.automix && preferences.crossfadeSeconds == 0) || preferences.speed != 1f) finishFade()
         listOfNotNull(player, outgoing).forEach(::applyPreferences)
         if (replan && preferences.automix) prepareNext()
         if (!preferences.automix) { mutable.value = mutable.value.copy(automixStatus = null); if (currentTiming != null) seek(mutable.value.positionMs) }
