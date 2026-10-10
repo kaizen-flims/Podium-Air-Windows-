@@ -2,6 +2,9 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.util.zip.ZipFile
 import java.io.File
 import java.security.MessageDigest
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 plugins {
     kotlin("jvm")
     kotlin("plugin.compose")
@@ -103,11 +106,11 @@ val automixModels by tasks.registering {
             if (target.isFile && hash(target) == expected) continue
             val temporary = directory.resolve("$name.part")
             try {
-                val url = java.net.URI("https://raw.githubusercontent.com/kaizen-flims/Podium-Air/48902e6b20fdcfeb1723e02d4744849e82d5067a/app/src/main/assets/$name").toURL()
+                val url = URI("https://raw.githubusercontent.com/kaizen-flims/Podium-Air/48902e6b20fdcfeb1723e02d4744849e82d5067a/app/src/main/assets/$name").toURL()
                 val connection = url.openConnection().apply { connectTimeout = 15000; readTimeout = 30000 }
                 connection.getInputStream().use { input -> temporary.outputStream().use { output -> input.copyTo(output) } }
                 check(hash(temporary) == expected) { "Pinned Android Automix model checksum mismatch: $name" }
-                java.nio.file.Files.move(temporary.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
             } finally { temporary.delete() }
         }
     }

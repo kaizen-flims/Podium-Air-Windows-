@@ -515,12 +515,24 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 @Composable private fun ReplayView(model: DesktopModel, state: SavedState) {
     var period by remember { mutableStateOf(30L) }
-    val since = java.time.LocalDate.now().minusDays(period - 1).toString()
-    val data = state.listening.filter { it.day >= since }
+    var preview by remember { mutableStateOf<ReplayPreview?>(null) }
+    var exporting by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val summary = ReplaySummary.from(state, period)
+    val data = summary.entries
     val milliseconds = data.sumOf { it.milliseconds }
     val ranked = data.groupBy { it.trackId }.entries.sortedByDescending { it.value.sumOf { stat -> stat.milliseconds } }
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 28.dp)) {
         item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(7L, 30L, 365L).forEach { days -> FilterChip(period == days, { period = days }, { Text("${days} days") }) } } }
+        item { OutlinedButton({
+            if (!exporting) scope.launch {
+                exporting = true
+                try { preview = withContext(Dispatchers.IO) { ReplayPreview(renderReplayPoster(summary), summary) } }
+                catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (error: Exception) { model.message.value = "Could not prepare your Replay: ${error.message}" }
+                finally { exporting = false }
+            }
+        }, enabled = !exporting) { Icon(Icons.Rounded.Share, null); Spacer(Modifier.width(8.dp)); Text(if (exporting) "Preparing…" else "Export your Replay") } }
         item { Text("${milliseconds / 60000} minutes listened", style = MaterialTheme.typography.displayLarge); Text("${data.sumOf { it.plays }} track starts • ${ranked.size} tracks", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { Text("Your top tracks", style = MaterialTheme.typography.headlineMedium) }
         itemsIndexed(ranked.take(50)) { rank, entry ->
@@ -531,6 +543,27 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         item { Text("Top artists", style = MaterialTheme.typography.headlineMedium) }
         val artists = ranked.mapNotNull { entry -> state.library.find { it.id == entry.key }?.artist?.let { it to entry.value.sumOf { stat -> stat.milliseconds } } }.groupBy { it.first }.mapValues { it.value.sumOf { pair -> pair.second } }.entries.sortedByDescending { it.value }
         items(artists.take(10)) { Text("${it.key} • ${it.value / 60000} minutes") }
+    }
+    preview?.let { captured ->
+        AlertDialog(onDismissRequest = { if (!exporting) { captured.image.flush(); preview = null } },
+            title = { Text("Your Replay • ${captured.summary.period} days") },
+            text = { Image(remember(captured) { captured.image.asImageBitmap() }, "Replay export preview", Modifier.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit) },
+            confirmButton = { TextButton({
+                if (!exporting) scope.launch {
+                    exporting = true
+                    try {
+                        val target = if (System.getProperty("os.name").startsWith("Windows")) WindowsFilePicker.choose("--save-image", "Podium-Air-Replay-${captured.summary.period}-days.png").firstOrNull()
+                        else {
+                            val chooser = javax.swing.JFileChooser().apply { selectedFile = File("Podium-Air-Replay-${captured.summary.period}-days.png"); fileFilter = javax.swing.filechooser.FileNameExtensionFilter("PNG image", "png") }
+                            if (chooser.showSaveDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION && (!chooser.selectedFile.exists() || javax.swing.JOptionPane.showConfirmDialog(null, "Replace ${chooser.selectedFile.name}?", "Save Replay", javax.swing.JOptionPane.YES_NO_OPTION) == javax.swing.JOptionPane.YES_OPTION)) chooser.selectedFile else null
+                        }
+                        if (target != null) { withContext(Dispatchers.IO) { writeReplayPoster(captured.image, target) }; model.message.value = "Saved your Replay to ${target.absolutePath}" }
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                    catch (error: Exception) { model.message.value = "Replay export failed: ${error.message}" }
+                    finally { exporting = false }
+                }
+            }, enabled = !exporting) { Text(if (exporting) "Saving…" else "Save PNG") } },
+            dismissButton = { TextButton({ captured.image.flush(); preview = null }, enabled = !exporting) { Text("Close") } })
     }
 }
 @Composable private fun Settings(model: DesktopModel, state: SavedState) {

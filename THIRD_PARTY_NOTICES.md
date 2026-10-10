@@ -159,3 +159,14 @@ no LRCLIB server code or database is redistributed. Local TTML/LRC/embedded
 lyrics take priority. Only title, artist, album and duration are sent after the
 user enables the feature; returned lyrics are cached locally and attributed
 in the lyrics view. No audio or account credentials are transmitted.
+
+## Replay export
+
+The Windows Replay image follows the Android ReplayPoster's 1080×1920 summary
+format, 72px margins and content ordering. Android Canvas/Bitmap, Coil and
+Palette are replaced with Java2D and already-imported local artwork. Only the
+summary export is ported here; Android's full individual story-card family is
+not claimed as implemented. Typography uses the Windows system Segoe UI font;
+no Apple SF Pro font files are redistributed. The image is previewed before
+export and saved through a native Windows PNG dialog with overwrite prompting.
+No messaging or external sharing service is invoked.

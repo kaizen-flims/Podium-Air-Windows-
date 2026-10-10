@@ -22,6 +22,7 @@ import kotlin.system.exitProcess
 fun main(args: Array<String>) {
     if (args.contains("--platform-smoke")) { platformSmoke(args); return }
     if (args.contains("--audio-smoke")) { audioSmoke(args); return }
+    if (args.contains("--replay-smoke")) { replaySmoke(args); return }
     if (args.contains("--automix-smoke")) { automixSmoke(args); return }
     val performance = args.contains("--performance-smoke")
     val smoke = args.contains("--ui-smoke") || performance
@@ -176,6 +177,7 @@ private fun platformSmoke(args: Array<String>) {
             check(WindowsFilePicker.chooseForSmoke("--pick-files", fixture.name, directory, 1).singleOrNull()?.let { java.nio.file.Files.isSameFile(it.toPath(), fixture.toPath()) } == true) { "JVM picker returned the wrong Unicode file." }
             check(WindowsFilePicker.chooseForSmoke("--pick-folder", "", directory, 1).singleOrNull()?.let { java.nio.file.Files.isSameFile(it.toPath(), directory.toPath()) } == true) { "JVM picker returned the wrong folder." }
             check(WindowsFilePicker.chooseForSmoke("--save-playlist", "é音.m3u8", directory, 1).singleOrNull()?.let { it.name == "é音.m3u8" && java.nio.file.Files.isSameFile(it.parentFile.toPath(), directory.toPath()) } == true) { "JVM save picker returned the wrong path." }
+            check(WindowsFilePicker.chooseForSmoke("--save-image", "é音.png", directory, 1).singleOrNull()?.let { it.name == "é音.png" && java.nio.file.Files.isSameFile(it.parentFile.toPath(), directory.toPath()) } == true) { "JVM PNG picker returned the wrong path." }
             check(WindowsFilePicker.chooseForSmoke("--pick-files", "", directory, 2).isEmpty()) { "Cancelled picker returned a selection." }
             val pending = launch { WindowsFilePicker.chooseForSmoke("--pick-files", "", directory, 0) }
             delay(750); pending.cancelAndJoin()
@@ -280,6 +282,7 @@ private fun automixSmoke(args: Array<String>) {
             engine.setUpcoming(next)
             withTimeout(90000) { engine.state.first { it.automixStatus?.startsWith("Automix ready") == true || it.automixStatus?.startsWith("Automix uses standard") == true } }.let {
                 check(it.automixStatus?.startsWith("Automix ready") == true) { it.automixStatus.orEmpty() }
+                check(it.automixStatus?.contains("open-unmix vocal mask") == true) { "The packaged vocal model did not contribute measured evidence: ${it.automixStatus}" }
             }
             engine.toggle()
             withTimeout(25000) { advanced.await() }
@@ -296,4 +299,25 @@ private fun automixSmoke(args: Array<String>) {
         }
     } catch (error: Throwable) { result.writeText("FAIL: " + error.message + "\n"); error.printStackTrace(); engine.close(); FxRuntime.exit(); directory.deleteRecursively(); exitProcess(1) }
     engine.close(); FxRuntime.exit(); directory.deleteRecursively(); exitProcess(0)
+}
+
+
+/** The packaged app renders and saves a real Replay PNG through its native save dialog. */
+private fun replaySmoke(args: Array<String>) {
+    val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "replay-smoke.txt")
+    val imagePath = File(args.firstOrNull { it.startsWith("--image=") }?.substringAfter("=") ?: "replay-smoke.png")
+    val directory = java.nio.file.Files.createTempDirectory("podium-replay-smoke-").toFile()
+    var image: java.awt.image.BufferedImage? = null
+    try {
+        val today = java.time.LocalDate.now()
+        val state = SavedState(library = listOf(StoredTrack("a", "a.wav", "Native Replay 音楽", "Podium Air", "Test album")), listening = listOf(ListeningEntry("a", today.toString(), 1_800_000, 10)))
+        val summary = ReplaySummary.from(state, 30, today)
+        image = renderReplayPoster(summary)
+        val target = runBlocking { WindowsFilePicker.chooseForSmoke("--save-image", "Replay 音楽.png", directory, 1).single() }
+        writeReplayPoster(image, target)
+        ImageIO.read(target).let { decoded -> check(decoded.width == 1080 && decoded.height == 1920); decoded.flush() }
+        target.copyTo(imagePath, overwrite = true)
+        result.writeText("PASS: Packaged app rendered the actual listening summary, saved a 1080x1920 PNG through the native Unicode save dialog, and reopened the exported image.\n")
+    } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); error.printStackTrace(); image?.flush(); directory.deleteRecursively(); exitProcess(1) }
+    image?.flush(); directory.deleteRecursively(); exitProcess(0)
 }

@@ -148,6 +148,16 @@ jobs:
             Get-Content $result
             if ($p.ExitCode -ne 0) { throw "$extension integration failed" }
           }
+      - name: Verify packaged Replay PNG export
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'replay-smoke.txt'
+          $image = Join-Path $PWD 'replay-smoke.png'
+          $p = Start-Process $exe -ArgumentList @('--replay-smoke', "--result=$result", "--image=$image") -PassThru
+          if (!$p.WaitForExit(30000)) { $p.Kill(); throw 'Replay PNG export timed out' }
+          if ($p.ExitCode -ne 0 -or !(Test-Path $result) -or !(Test-Path $image)) { throw 'Replay PNG export failed' }
+          Get-Content $result
       - name: Verify measured Automix and original-track seek
         # Existing paused gate follows an additional real Automix check.
         shell: pwsh
@@ -269,6 +279,8 @@ jobs:
             ui-smoke.png
             audio-smoke.txt
             automix-smoke.txt
+            replay-smoke.txt
+            replay-smoke.png
             codec-*-smoke.txt
             windows-media-smoke.txt
             windows-dialog-smoke.txt

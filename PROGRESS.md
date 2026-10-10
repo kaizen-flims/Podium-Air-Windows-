@@ -70,3 +70,10 @@ Android model assets and CPU ONNX Runtime are being verified on Windows.
 No public full release has been declared. Streaming/login/sync and remaining
 network/social features are still unresolved. The website still points to the
 previous explicitly labeled local preview.
+
+Replay summary PNG export now includes a frozen preview, selected-period
+filtering (excluding future records), original poster dimensions/margins,
+local artwork, Unicode native PNG save dialog and atomic output. Unit and
+packaged export checks are included. Native model front ends also passed the
+standalone C++ self-test locally. A Gradle Java-extension name collision found
+by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
