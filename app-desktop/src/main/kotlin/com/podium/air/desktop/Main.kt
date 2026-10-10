@@ -348,14 +348,25 @@ private fun replaySmoke(args: Array<String>) {
     var image: java.awt.image.BufferedImage? = null
     try {
         val today = java.time.LocalDate.now()
-        val state = SavedState(library = listOf(StoredTrack("a", "a.wav", "Native Replay 音楽", "Podium Air", "Test album")), listening = listOf(ListeningEntry("a", today.toString(), 1_800_000, 10)))
+        val state = SavedState(library = listOf(StoredTrack("a", "a.wav", "Native Replay 音楽", "Podium Air", "Test album", genre = "Fixture genre")), listening = listOf(ListeningEntry("a", today.toString(), 1_800_000, 10, mapOf(20 to 1_800_000))))
         val summary = ReplaySummary.from(state, 30, today)
         image = renderReplayPoster(summary)
         val target = runBlocking { WindowsFilePicker.chooseForSmoke("--save-image", "Replay 音楽.png", directory, 1).single() }
         writeReplayPoster(image, target)
         ImageIO.read(target).let { decoded -> check(decoded.width == 1080 && decoded.height == 1920); decoded.flush() }
         target.copyTo(imagePath, overwrite = true)
-        result.writeText("PASS: Packaged app rendered the actual listening summary, saved a 1080x1920 PNG through the native Unicode save dialog, and reopened the exported image.\n")
+        val stories = File(imagePath.absoluteFile.parentFile, "replay-cards").apply { mkdirs() }
+        val hashes = mutableSetOf<String>()
+        ReplayStoryPage.entries.forEach { page ->
+            val poster = renderReplayPoster(summary, page)
+            try {
+                val saved = File(stories, "${page.name.lowercase()}.png"); writeReplayPoster(poster, saved)
+                ImageIO.read(saved).let { decoded -> check(decoded.width == 1080 && decoded.height == 1920); decoded.flush() }
+                hashes += java.security.MessageDigest.getInstance("SHA-256").digest(saved.readBytes()).joinToString("") { "%02x".format(it) }
+            } finally { poster.flush() }
+        }
+        check(hashes.size == 8) { "Individual Replay cards must render distinct pictures." }
+        result.writeText("PASS: Packaged app rendered the actual listening summary, saved a 1080x1920 PNG through the native Unicode save dialog, reopened it, and rendered/saved/reopened all eight distinct Replay story cards.\n")
     } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); error.printStackTrace(); image?.flush(); directory.deleteRecursively(); exitProcess(1) }
     image?.flush(); directory.deleteRecursively(); exitProcess(0)
 }

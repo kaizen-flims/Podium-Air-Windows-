@@ -12,25 +12,46 @@ import java.nio.file.StandardCopyOption
 import java.time.LocalDate
 import javax.imageio.ImageIO
 
-internal data class ReplaySummary(val period: Long, val entries: List<ListeningEntry>, val ranked: List<Pair<StoredTrack, Long>>) {
+internal enum class ReplayPeriod(val chip: String) { THIS_MONTH("This month"), THIS_YEAR("This year"), ALL_TIME("All time") }
+internal data class ReplaySummary(val period: Long, val entries: List<ListeningEntry>, val ranked: List<Pair<StoredTrack, Long>>, val label: String = "Last $period days", val fileLabel: String = "$period-days") {
     val milliseconds = entries.sumOf { it.milliseconds }
     val plays = entries.sumOf { it.plays }
     val artists = ranked.groupBy { it.first.artist }.map { (artist, rows) -> artist to rows.sumOf { it.second } }.sortedByDescending { it.second }
     companion object {
         fun from(state: SavedState, period: Long, today: LocalDate = LocalDate.now()): ReplaySummary {
             require(period in setOf(7L, 30L, 365L))
-            val start = today.minusDays(period - 1).toString(); val end = today.toString()
-            val entries = state.listening.filter { it.day in start..end && it.milliseconds >= 0 && it.plays >= 0 }
+            return between(state, today.minusDays(period - 1), today, period)
+        }
+        fun from(state: SavedState, period: ReplayPeriod, today: LocalDate = LocalDate.now()): ReplaySummary {
+            val first = when (period) {
+                ReplayPeriod.THIS_MONTH -> today.withDayOfMonth(1)
+                ReplayPeriod.THIS_YEAR -> today.withDayOfYear(1)
+                ReplayPeriod.ALL_TIME -> state.listening.mapNotNull { runCatching { LocalDate.parse(it.day) }.getOrNull() }.filter { it <= today }.minOrNull() ?: today
+            }
+            val label = when (period) {
+                ReplayPeriod.THIS_MONTH -> today.format(java.time.format.DateTimeFormatter.ofPattern("MMMM yyyy"))
+                ReplayPeriod.THIS_YEAR -> today.year.toString()
+                ReplayPeriod.ALL_TIME -> "All time"
+            }
+            val fileLabel = when (period) { ReplayPeriod.THIS_MONTH -> today.toString().take(7); ReplayPeriod.THIS_YEAR -> today.year.toString(); ReplayPeriod.ALL_TIME -> "all-time" }
+            return between(state, first, today, today.toEpochDay() - first.toEpochDay() + 1).copy(label = label, fileLabel = fileLabel)
+        }
+        private fun between(state: SavedState, start: LocalDate, end: LocalDate, period: Long): ReplaySummary {
+            val entries = state.listening.filter { row ->
+                val date = runCatching { LocalDate.parse(row.day) }.getOrNull()
+                date != null && date in start..end && row.milliseconds >= 0 && row.plays >= 0
+            }
             val library = state.library.associateBy { it.id }
             val ranked = entries.groupBy { it.trackId }.mapNotNull { (id, rows) -> library[id]?.let { it to rows.sumOf { row -> row.milliseconds } } }.sortedByDescending { it.second }
             return ReplaySummary(period, entries, ranked)
         }
     }
 }
-internal data class ReplayPreview(val image: BufferedImage, val summary: ReplaySummary)
+internal data class ReplayPreview(val image: BufferedImage, val summary: ReplaySummary, val page: ReplayStoryPage? = null)
 
 /** Real listening records, frozen when the preview is opened. No network or messaging. */
-internal fun renderReplayPoster(summary: ReplaySummary): BufferedImage {
+internal fun renderReplayPoster(summary: ReplaySummary, page: ReplayStoryPage? = null): BufferedImage {
+    if (page != null) return renderReplayStory(summary, page)
     val image = BufferedImage(1080, 1920, BufferedImage.TYPE_INT_RGB)
     val graphics = image.createGraphics()
     try {
@@ -52,7 +73,7 @@ internal fun renderReplayPoster(summary: ReplaySummary): BufferedImage {
         }
         text("PODIUM AIR", 72, 112, 38, bold = true)
         text("Your Replay", 72, 242, 96, bold = true)
-        text("Last ${summary.period} days", 72, 313, 38, Color(255, 255, 255, 170))
+        text(summary.label, 72, 313, 38, Color(255, 255, 255, 170))
         text((summary.milliseconds / 60000).toString(), 72, 503, 132, bold = true)
         text("minutes listened", 72, 565, 42, Color(255, 255, 255, 190))
         text("${summary.plays} track ${if (summary.plays == 1) "start" else "starts"} · ${summary.ranked.size} ${if (summary.ranked.size == 1) "track" else "tracks"}", 72, 636, 35, Color(255, 255, 255, 155))

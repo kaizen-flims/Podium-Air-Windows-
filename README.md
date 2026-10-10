@@ -14,15 +14,19 @@ ten-band equalizer, sleep timer, TTML/LRC lyrics, lyric timing/word motion,
 artwork color motion and Replay listening statistics are implemented.
 The development branch also contains native DSP/Beat This!/Open-unmix analysis,
 confidence-based transitions, pitch-preserving WSOLA, opt-in LRCLIB lyrics with
-offline cache, frozen Replay PNG previews and opt-in ListenBrainz scrobbling. Windows shell file/folder dialogs,
+offline cache, frozen Replay PNG previews and opt-in ListenBrainz scrobbling. Replay supports
+the source app's This month / This year / All time views and Intro, Minutes,
+Artists, Songs, Albums, Genres, Habits and Recap cards. Empty album/genre cards
+are hidden; old listening records do not invent hourly statistics. Windows shell file/folder dialogs,
 system media controls, tray, optional notifications and optional startup are included.
 
 Development commit `1b12da5` passed **58 tests with zero failures/errors** and
 all packaged Windows gates in [run 38064057032](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38064057032):
 neural model inference, actual Automix overlap/seek, Replay export, six codecs,
 15 navigation routes, keyboard/DPI/native media checks and MSI lifecycle.
-ListenBrainz with Windows Credential Manager is implemented in the next
-commit; its additional checks are pending. See [BUILD_REPORT.md](BUILD_REPORT.md).
+ListenBrainz with Windows Credential Manager is implemented and undergoing
+expanded Windows checks. Calendar Replay periods and all eight individual
+story PNG cards are also implemented; their new checks are pending. See [BUILD_REPORT.md](BUILD_REPORT.md).
 
 Google login, YouTube streaming/downloads and remote account sync require a
 supported provider integration under the original master prompt. A Google

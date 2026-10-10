@@ -166,9 +166,11 @@ in the lyrics view. No audio or account credentials are transmitted.
 
 The Windows Replay image follows the Android ReplayPoster's 1080×1920 summary
 format, 72px margins and content ordering. Android Canvas/Bitmap, Coil and
-Palette are replaced with Java2D and already-imported local artwork. Only the
-summary export is ported here; Android's full individual story-card family is
-not claimed as implemented. Typography uses Java's logical Dialog font and installed script fallback fonts;
+Palette are replaced with Java2D and already-imported local artwork. The summary plus all eight individual source story card types
+are adapted to native desktop PNG rendering. Original page ordering and hue
+rotations are retained; the desktop's card picker/frozen preview replaces the
+mobile story gestures. Calendar periods and actual hourly statistics are
+adapted without manufacturing unavailable older hourly records. Typography uses Java's logical Dialog font and installed script fallback fonts;
 no Apple SF Pro font files are redistributed. The image is previewed before
 export and saved through a native Windows PNG dialog with overwrite prompting.
 No messaging or external sharing service is invoked.

@@ -98,3 +98,8 @@ by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
 - `db8ab51` corrects the scrobbling test's required thumbnail constructor
   argument and cancels any pending connection before disconnecting. CI rerun
   pending; no tests or acceptance gates were disabled.
+
+- Implemented source calendar Replay periods and all eight individual story
+  PNG cards, plus measured local listening-hour profiles with backward-
+  compatible older records. Added three calendar/rendering/statistics tests and
+  expanded packaged Replay evidence to all cards. New checks pending.

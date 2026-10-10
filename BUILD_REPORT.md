@@ -201,3 +201,22 @@ commit `f3e79165643812ee56da96b08417396d6e19d9c6`.
 Android source/releases and automatic updates remain unchanged. Target-platform
 compilation and checks ran in Windows Actions; the Linux workspace could not
 fetch required build dependencies. Consumer-device acceptance remains pending.
+
+
+## Replay calendar periods and individual stories (checks pending)
+
+Desktop adapters now cover the source's This month / This year / All time
+periods, all eight ordered Intro/Minutes/Artists/Songs/Albums/Genres/Habits/Recap
+PNG cards, original hue offsets and per-card content/rank order. Local tagged
+albums remain distinct by album artist; genre cards use actual imported tags.
+The desktop uses a scrollable card picker and frozen preview/native PNG export
+rather than Android's touch/hold story sequence. Animated story presentation
+and exact source pixel parity are not claimed.
+
+Audible-time recording now additionally stores actual local listening hours.
+Existing schema-1 state loads with an empty hour map; old records are never
+assigned invented hours. Three added tests cover calendar boundaries/invalid
+and future dates, all eight rendered cards/ranking/genre/album identities, and
+pause-safe hour accumulation/backward-compatible statistics. The packaged
+Replay gate saves and reopens all eight cards. These additions await the next
+Windows run; the expected suite is 69 tests.

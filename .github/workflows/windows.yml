@@ -291,6 +291,7 @@ jobs:
             credentials-smoke.txt
             replay-smoke.txt
             replay-smoke.png
+            replay-cards/*.png
             codec-*-smoke.txt
             windows-media-smoke.txt
             windows-dialog-smoke.txt

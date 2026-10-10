@@ -31,8 +31,8 @@ changes the locked product behavior and cannot be silently substituted.
 
 Independent progress remains concrete: original neural Automix, optional LRCLIB
 lyrics, Replay export and native Windows controls are verified; supported
-ListenBrainz and secure Windows credential storage are now being tested. Full
-source story cards, canvas/translation, Last.fm, official native Discord presence,
+ListenBrainz and secure Windows credential storage are now being tested. The individual source Replay PNG cards/calendar periods are now being verified;
+canvas/translation, Last.fm, official native Discord presence,
 shared listening, network addons and device acceptance remain separate gaps.
 The complete installer release and website-link replacement follow end-to-end
 verification of the agreed product. The older public local preview is clearly

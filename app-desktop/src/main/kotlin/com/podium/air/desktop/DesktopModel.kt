@@ -56,7 +56,8 @@ class DesktopModel(
                 val now = System.nanoTime() / 1_000_000
                 val playbackKey = audio.entry?.let { "${it.key}:${audio.session}" }
                 if (audio.playing && audio.entry != null && historyKey != playbackKey) { historyKey = playbackKey; record(audio.entry.song) }
-                recorder.sample(audio.entry?.song?.videoId, playbackKey, audio.playing, now, java.time.LocalDate.now().toString())
+                val localTime = java.time.LocalDateTime.now()
+                recorder.sample(audio.entry?.song?.videoId, playbackKey, audio.playing, now, localTime.toLocalDate().toString(), localTime.hour)
                 scrobbling.sample(audio, now, System.currentTimeMillis() / 1000)
                 if (!audio.playing || now - lastStatsFlush >= 5000) { flushListening(); lastStatsFlush = now }
             }
@@ -221,7 +222,8 @@ class DesktopModel(
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         val audio = engine.state.value
-        recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, java.time.LocalDate.now().toString())
+        val localTime = java.time.LocalDateTime.now()
+        recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, localTime.toLocalDate().toString(), localTime.hour)
         flushListening()
         scope.cancel(); onlineLyrics.close(); scrobbling.close(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.

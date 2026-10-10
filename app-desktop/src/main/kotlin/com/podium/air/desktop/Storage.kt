@@ -65,7 +65,7 @@ class StateStore(val directory: File = defaultDataDirectory()) : StatePersistenc
             state.copy(library = state.library.distinctBy { it.id }, playlists = state.playlists.distinctBy { it.id }.map { it.copy(tracks = it.tracks.filter(known::contains)) },
                 favorites = state.favorites.filter(known::contains).toSet(), history = state.history.distinct().filter(known::contains).take(200),
                 queue = normalizedQueue, cursor = normalizedQueue.indexOfFirst { it.key == selected }.takeIf { it >= 0 } ?: if (normalizedQueue.isEmpty()) -1 else 0, lyricOffsets = state.lyricOffsets.filterKeys(known::contains).mapValues { it.value.coerceIn(-10000, 10000) },
-                listening = state.listening.filter { it.milliseconds >= 0 && it.plays >= 0 }.take(20000), preferences = state.preferences.copy(
+                listening = state.listening.filter { it.milliseconds >= 0 && it.plays >= 0 }.take(20000).map { row -> row.copy(hourMilliseconds = row.hourMilliseconds.filter { (hour, ms) -> hour in 0..23 && ms > 0 && ms <= row.milliseconds }) }, preferences = state.preferences.copy(
                 volume = state.preferences.volume.coerceIn(0f, 1f), crossfadeSeconds = state.preferences.crossfadeSeconds.coerceIn(0, 12),
                 speed = state.preferences.speed.coerceIn(0.5f, 2f), equalizer = List(10) { state.preferences.equalizer.getOrElse(it) { 0.0 }.coerceIn(-12.0, 12.0) }))
         } catch (error: Exception) {
