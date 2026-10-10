@@ -24,6 +24,7 @@ fun main(args: Array<String>) {
     if (args.contains("--audio-smoke")) { audioSmoke(args); return }
     if (args.contains("--replay-smoke")) { replaySmoke(args); return }
     if (args.contains("--automix-smoke")) { automixSmoke(args); return }
+    if (args.contains("--credentials-smoke")) { credentialsSmoke(args); return }
     val performance = args.contains("--performance-smoke")
     val smoke = args.contains("--ui-smoke") || performance
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
@@ -258,6 +259,22 @@ internal fun generateTestWave(file: File, seconds: Int) {
 }
 
 /** Packaged native measurements feed a real two-player PCM transition, then pause/seek/end/cleanup. */
+private fun credentialsSmoke(args: Array<String>) {
+    val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "credentials-smoke.txt")
+    val secret = WindowsSecretStore("test-${java.util.UUID.randomUUID()}")
+    var code = 0
+    try {
+        check(secret.read() == null)
+        secret.write("packaged-fixture-日本🎵")
+        check(secret.read() == "packaged-fixture-日本🎵")
+        secret.write("replacement-fixture"); check(secret.read() == "replacement-fixture")
+        secret.delete(); check(secret.read() == null)
+        result.writeText("PASS: Packaged JNI Windows Credential Manager stored, read, overwrote and deleted an isolated Unicode fixture. No real account credentials were used.\n")
+    } catch (error: Exception) { result.writeText("FAIL: ${error.message}\n"); code = 1 }
+    finally { runCatching { secret.delete() } }
+    exitProcess(code)
+}
+
 private fun automixSmoke(args: Array<String>) {
     val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "automix-smoke.txt")
     val directory = java.nio.file.Files.createTempDirectory("podium-automix-smoke-").toFile()
@@ -342,3 +359,4 @@ private fun replaySmoke(args: Array<String>) {
     } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); error.printStackTrace(); image?.flush(); directory.deleteRecursively(); exitProcess(1) }
     image?.flush(); directory.deleteRecursively(); exitProcess(0)
 }
+

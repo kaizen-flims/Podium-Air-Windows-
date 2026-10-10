@@ -40,7 +40,8 @@ internal fun renderReplayPoster(summary: ReplaySummary): BufferedImage {
         graphics.paint = RadialGradientPaint(900f, 430f, 1100f, floatArrayOf(0f, 1f), arrayOf(Color(215, 109, 119, 200), Color(215, 109, 119, 0))); graphics.fillRect(0, 0, 1080, 1920)
         graphics.paint = GradientPaint(0f, 0f, Color(0, 0, 0, 70), 0f, 1920f, Color(0, 0, 0, 225)); graphics.fillRect(0, 0, 1080, 1920)
         fun text(value: String, x: Int, y: Int, size: Int, color: Color = Color.WHITE, bold: Boolean = false, width: Int = 936) {
-            graphics.font = Font("Segoe UI", if (bold) Font.BOLD else Font.PLAIN, size); graphics.color = color
+            // A logical font lets Java use installed script fallback fonts for multilingual names.
+            graphics.font = Font(Font.DIALOG, if (bold) Font.BOLD else Font.PLAIN, size); graphics.color = color
             var fitted = value.replace(Regex("[\\r\\n\\t]+"), " ")
             if (graphics.fontMetrics.stringWidth(fitted) > width) {
                 val points = fitted.codePoints().toArray(); var count = points.size
@@ -54,7 +55,7 @@ internal fun renderReplayPoster(summary: ReplaySummary): BufferedImage {
         text("Last ${summary.period} days", 72, 313, 38, Color(255, 255, 255, 170))
         text((summary.milliseconds / 60000).toString(), 72, 503, 132, bold = true)
         text("minutes listened", 72, 565, 42, Color(255, 255, 255, 190))
-        text("${summary.plays} track starts · ${summary.ranked.size} tracks", 72, 636, 35, Color(255, 255, 255, 155))
+        text("${summary.plays} track ${if (summary.plays == 1) "start" else "starts"} · ${summary.ranked.size} ${if (summary.ranked.size == 1) "track" else "tracks"}", 72, 636, 35, Color(255, 255, 255, 155))
         text("TOP TRACKS", 72, 763, 38, bold = true)
         summary.ranked.take(5).forEachIndexed { index, (track, ms) ->
             val y = 822 + index * 132
@@ -90,3 +91,4 @@ internal fun writeReplayPoster(image: BufferedImage, target: File) {
         catch (_: java.nio.file.AtomicMoveNotSupportedException) { Files.move(temporary, target.toPath(), StandardCopyOption.REPLACE_EXISTING) }
     } finally { Files.deleteIfExists(temporary) }
 }
+

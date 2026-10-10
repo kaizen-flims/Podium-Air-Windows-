@@ -168,6 +168,15 @@ jobs:
           if (-not $p.WaitForExit(150000)) { $p.Kill(); throw 'Packaged Automix integration timed out' }
           if ($p.ExitCode -ne 0 -or -not (Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Packaged Automix integration failed' }
           Get-Content $result
+      - name: Verify packaged Windows credential storage
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          $result = Join-Path $PWD 'credentials-smoke.txt'
+          $p = Start-Process $exe -ArgumentList @('--credentials-smoke', "--result=$result") -PassThru
+          if (!$p.WaitForExit(30000)) { $p.Kill(); throw 'Credential storage timed out' }
+          if ($p.ExitCode -ne 0 -or !(Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Credential storage failed' }
+          Get-Content $result
       - name: Measure paused desktop CPU, memory and shutdown
         shell: pwsh
         run: |
@@ -279,6 +288,7 @@ jobs:
             ui-smoke.png
             audio-smoke.txt
             automix-smoke.txt
+            credentials-smoke.txt
             replay-smoke.txt
             replay-smoke.png
             codec-*-smoke.txt
@@ -295,3 +305,4 @@ jobs:
             test-summary.txt
             runtime-build.txt
             dependency-inventory.txt
+

@@ -103,7 +103,7 @@ internal class LrcLibLyrics(
         val query = params.entries.joinToString("&") { URLEncoder.encode(it.key, Charsets.UTF_8) + "=" + URLEncoder.encode(it.value, Charsets.UTF_8) }
         val request = HttpRequest.newBuilder(base.resolve("$path?$query")).timeout(Duration.ofSeconds(12))
             .header("User-Agent", "Podium Air Windows (https://github.com/kaizen-flims/Podium-Air-Windows-)").header("Accept", "application/json").GET().build()
-        val future = client.sendAsync(request, HttpResponse.BodyHandler { limitedBody() })
+        val future = client.sendAsync(request, HttpResponse.BodyHandler { limitedHttpBody(MAX_BODY, "LRCLIB response exceeds 2 MB.") })
         try {
             val response = future.get(15, TimeUnit.SECONDS)
             if (response.statusCode() == 404) return null
@@ -112,7 +112,10 @@ internal class LrcLibLyrics(
         } catch (error: ExecutionException) { throw error.cause ?: error }
         finally { if (!future.isDone) future.cancel(true) }
     }
-    private fun limitedBody(): HttpResponse.BodySubscriber<ByteArray> {
+    companion object { private const val MAX_BODY = 2_000_000 }
+}
+
+internal fun limitedHttpBody(limit: Int, message: String): HttpResponse.BodySubscriber<ByteArray> {
         val delegate = HttpResponse.BodySubscribers.ofByteArray()
         return object : HttpResponse.BodySubscriber<ByteArray> {
             var subscription: Flow.Subscription? = null; var received = 0L
@@ -120,12 +123,11 @@ internal class LrcLibLyrics(
             override fun onSubscribe(value: Flow.Subscription) { subscription = value; delegate.onSubscribe(value) }
             override fun onNext(items: List<ByteBuffer>) {
                 received += items.sumOf { it.remaining().toLong() }
-                if (received > MAX_BODY) { subscription?.cancel(); delegate.onError(IllegalStateException("LRCLIB response exceeds 2 MB.")) }
+                if (received > limit) { subscription?.cancel(); delegate.onError(IllegalStateException(message)) }
                 else delegate.onNext(items)
             }
             override fun onError(error: Throwable) = delegate.onError(error)
             override fun onComplete() = delegate.onComplete()
         }
     }
-    companion object { private const val MAX_BODY = 2_000_000 }
-}
+

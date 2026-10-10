@@ -162,7 +162,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                                 Page.QUEUE -> QueueView(model)
                                 Page.LYRICS -> LyricsView(model, Modifier.padding(horizontal = 28.dp))
                                 Page.SETTINGS -> Settings(model, state)
-                                Page.ACCOUNT -> Account()
+                                Page.ACCOUNT -> Account(model)
                                 Page.ABOUT -> About()
                             }
                         }
@@ -602,13 +602,35 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         item { Text("Data", style = MaterialTheme.typography.headlineMedium); Text("Your library, playlists and preferences are stored on this computer. Music files are referenced in place; importing does not copy them. ${defaultDataDirectory().absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
-@Composable private fun Account() {
+@Composable private fun Account(model: DesktopModel) {
+    val state by model.state.collectAsState()
+    val status by model.scrobblingStatus.collectAsState()
+    val busy by model.scrobblingBusy.collectAsState()
+    var token by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Local music", style = MaterialTheme.typography.headlineMedium); Text("No account is needed to use your local collection.")
         Text("YouTube Music • Unavailable", fontWeight = FontWeight.Bold)
-        Text("Google login, personalized streaming, remote playlists and bidirectional account sync have not been implemented. This preview does not collect passwords, cookies or tokens.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Google login, personalized streaming, remote playlists and bidirectional account sync need a supported provider integration. Google passwords and session cookies are not collected.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         Button({ Desktop.getDesktop().browse(URI("https://music.youtube.com")) }) { Text("Open YouTube Music") }
         Text("The service opens in your default browser, with its own sign-in and playback rules. It does not connect or synchronize this app.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalDivider()
+        Text("ListenBrainz", style = MaterialTheme.typography.headlineMedium)
+        Text("Share track, artist and album names and listening timestamps with your ListenBrainz account. Listens count after half a track or four minutes of actual playback, whichever comes first; tracks of 30 seconds or less are excluded. Your token is saved in Windows Credential Manager.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(status, fontSize = 13.sp)
+        if (state.preferences.listenBrainzUser.isNotBlank()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Sharing as ${state.preferences.listenBrainzUser}", Modifier.weight(1f))
+                Switch(state.preferences.listenBrainzEnabled, { model.preferences(state.preferences.copy(listenBrainzEnabled = it)) }, enabled = !busy)
+            }
+            TextButton(model::disconnectListenBrainz, enabled = !busy) { Text("Disconnect and delete saved token") }
+        }
+        OutlinedTextField(token, { token = it.take(100) }, label = { Text("ListenBrainz user token") }, singleLine = true,
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), enabled = !busy, modifier = Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button({ val selected = token; token = ""; model.connectListenBrainz(selected) }, enabled = !busy && token.isNotBlank()) { Text(if (busy) "Connecting…" else "Connect ListenBrainz") }
+            TextButton({ Desktop.getDesktop().browse(URI("https://listenbrainz.org/settings/")) }) { Text("Get my token") }
+        }
+        Text("Network failures are reported. Failed listens are not retained for offline retry.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
     }
 }
@@ -619,7 +641,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Podium Air — Windows Edition", style = MaterialTheme.typography.headlineMedium)
         Text("0.2.0 • Native local music preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
-        Text("Native Windows playback, measured Automix, optional LRCLIB lyrics and Windows media controls are included. Streaming, account integration and full Android feature parity remain unfinished.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Native Windows playback, measured Automix, optional LRCLIB lyrics, ListenBrainz and Windows media controls are included. Google streaming and full Android feature parity remain unfinished.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton({ Desktop.getDesktop().browse(URI("https://github.com/kaizen-flims/Podium-Air-Windows-")) }) { Text("Corresponding source & build instructions") }
         TextButton({ licenses = readResource("/licenses/THIRD_PARTY_NOTICES.md") + "\n\n" + readResource("/licenses/LICENSE") }) { Text("Third-party licenses & legal notices") }
         Text("Free software under GNU GPL version 3. No warranty. You may redistribute it under the license terms.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -637,3 +659,4 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     }, confirmButton = { TextButton({ licenses = null }) { Text("Close") } })
 }
 private fun readResource(path: String): String = object {}.javaClass.getResourceAsStream(path)?.bufferedReader()?.use { it.readText() } ?: "See the corresponding source for $path."
+

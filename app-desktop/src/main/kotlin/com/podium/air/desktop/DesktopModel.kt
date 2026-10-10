@@ -42,6 +42,13 @@ class DesktopModel(
     private var saveJob: Job? = null
     private var lyricsJob: Job? = null
     private var sleepJob: Job? = null
+    private val scrobbling = ScrobblingIntegration(scope, ListenBrainzHttp(), WindowsSecretStore(), mutable.value.preferences) { enabled, username ->
+        change { copy(preferences = preferences.copy(listenBrainzEnabled = enabled, listenBrainzUser = username)) }
+    }
+    val scrobblingStatus = scrobbling.status
+    val scrobblingBusy = scrobbling.busy
+    fun connectListenBrainz(token: String) = scrobbling.connect(token)
+    fun disconnectListenBrainz() = scrobbling.disconnect()
     init {
         engine.configure(mutable.value.preferences)
         scope.launch {
@@ -50,6 +57,7 @@ class DesktopModel(
                 val playbackKey = audio.entry?.let { "${it.key}:${audio.session}" }
                 if (audio.playing && audio.entry != null && historyKey != playbackKey) { historyKey = playbackKey; record(audio.entry.song) }
                 recorder.sample(audio.entry?.song?.videoId, playbackKey, audio.playing, now, java.time.LocalDate.now().toString())
+                scrobbling.sample(audio, now, System.currentTimeMillis() / 1000)
                 if (!audio.playing || now - lastStatsFlush >= 5000) { flushListening(); lastStatsFlush = now }
             }
         }
@@ -189,6 +197,7 @@ class DesktopModel(
             catch (error: Exception) { message.value = error.message; return }
         }
         change { copy(preferences = value) }; engine.configure(value)
+        scrobbling.configure(value.listenBrainzEnabled)
         if (reload) reloadLyrics()
     }
     fun sleepTimer(minutes: Int?) {
@@ -214,8 +223,9 @@ class DesktopModel(
         val audio = engine.state.value
         recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, java.time.LocalDate.now().toString())
         flushListening()
-        scope.cancel(); onlineLyrics.close(); engine.close()
+        scope.cancel(); onlineLyrics.close(); scrobbling.close(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.
         runCatching { synchronized(saveLock) { persistence.save(mutable.value) } }.onFailure { System.err.println("Library save failed: ${it.message}") }
     }
 }
+
