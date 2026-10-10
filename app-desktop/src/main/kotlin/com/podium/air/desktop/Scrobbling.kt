@@ -182,6 +182,7 @@ internal class ScrobblingIntegration(
         }
     }
     fun disconnect() {
+        operation?.cancel()
         configure(false); token = null; saveAccount(false, ""); busy.value = true
         operation = scope.launch {
             try { credentialMutex.withLock { withContext(Dispatchers.IO) { secrets.delete() } }; status.value = "Disconnected from ListenBrainz." }

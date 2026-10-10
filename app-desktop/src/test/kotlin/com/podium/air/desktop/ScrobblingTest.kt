@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.*
 
 class ScrobblingTest {
-    private val track = QueueEntry("entry", Song("track", "雨 \"song\" 🎵", "Artist", albumName = "Album"))
+    private val track = QueueEntry("entry", Song("track", "雨 \"song\" 🎵", "Artist", null, albumName = "Album"))
     private fun audio(playing: Boolean = true, session: Long = 1, duration: Long = 60_000, position: Long = 0) =
         AudioState(entry = track, playing = playing, durationMs = duration, session = session, positionMs = position)
     @Test fun pausedTimeAndSeekDistanceNeverQualifyAListen() {
