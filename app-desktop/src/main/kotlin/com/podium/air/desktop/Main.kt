@@ -278,7 +278,7 @@ private fun automixSmoke(args: Array<String>) {
             engine.seek(40000)
             withTimeout(3000) { engine.state.first { it.positionMs in 39800..40200 } }
             engine.setUpcoming(next)
-            withTimeout(45000) { engine.state.first { it.automixStatus?.startsWith("Automix ready") == true || it.automixStatus?.startsWith("Automix uses standard") == true } }.let {
+            withTimeout(90000) { engine.state.first { it.automixStatus?.startsWith("Automix ready") == true || it.automixStatus?.startsWith("Automix uses standard") == true } }.let {
                 check(it.automixStatus?.startsWith("Automix ready") == true) { it.automixStatus.orEmpty() }
             }
             engine.toggle()

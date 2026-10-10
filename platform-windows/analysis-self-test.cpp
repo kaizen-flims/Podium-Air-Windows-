@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #include "analyzer/audio_analysis.h"
 #include "analyzer/resampler.h"
+#include "analyzer/mel_spectrogram.h"
+#include "analyzer/vocal_spectrogram.h"
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -27,5 +29,17 @@ int main() {
   auto reduced = bitchord::smart::Resample(pcm, rate, rate / 2);
   if (reduced.size() != pcm.size() / 2) throw std::runtime_error("Native resampler duration drift");
   for (float sample : reduced) if (!std::isfinite(sample)) throw std::runtime_error("Nonfinite resampled PCM");
+  std::vector<float> mel_pcm(22050, 0);
+  for (size_t i = 0; i < mel_pcm.size(); ++i) mel_pcm[i] = static_cast<float>(0.1 * std::sin(i * 2 * 3.141592653589793 * 440 / 22050));
+  const auto mel = bitchord::smart::ComputeBeatSpectrogram(mel_pcm, 22050);
+  if (mel.frames < 49 || mel.values.size() != mel.frames * 128) throw std::runtime_error("Beat model mel shape differs");
+  for (float sample : mel.values) if (!std::isfinite(sample) || sample < 0) throw std::runtime_error("Invalid log-mel value");
+  if (!bitchord::smart::ComputeBeatSpectrogram(mel_pcm, 16000).values.empty()) throw std::runtime_error("Wrong mel sample rate accepted");
+  std::vector<float> vocal_pcm(44100, 0);
+  for (size_t i = 0; i < vocal_pcm.size(); ++i) vocal_pcm[i] = static_cast<float>(0.1 * std::sin(i * 2 * 3.141592653589793 * 440 / 44100));
+  const auto vocal = bitchord::smart::ComputeVocalSpectrogram({vocal_pcm, vocal_pcm}, 44100);
+  if (vocal.frames < 42 || vocal.values.size() != vocal.frames * 2049 * 2) throw std::runtime_error("Vocal STFT shape differs");
+  for (float sample : vocal.values) if (!std::isfinite(sample) || sample < 0) throw std::runtime_error("Invalid vocal STFT value");
+  std::cout << "PASS: Original native mel and stereo STFT model front ends produced finite, correctly shaped spectrograms.\n";
   std::cout << "PASS: Original native DSP measured " << measured.bpm << " BPM, real content boundaries and energy; silence cannot authorize beat matching; native resampler retained duration.\n";
 }

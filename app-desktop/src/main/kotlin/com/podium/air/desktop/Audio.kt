@@ -160,7 +160,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
                         plan = computed
                         if (!computed.blocked) { prepared = prepareSmartTransition(nextPcm, computed) { ensureActive() }; file = prepared.file }
                         base = nextPcm
-                        status = if (computed.blocked) "Automix: " + computed.reason else "Automix ready • " + first.bpm.toInt() + " → " + second.bpm.toInt() + " BPM • " + computed.transitionStyle.name.lowercase().replace('_', ' ')
+                        status = if (computed.blocked) "Automix: " + computed.reason else "Automix ready • " + first.bpm.toInt() + " → " + second.bpm.toInt() + " BPM • " + computed.transitionStyle.name.lowercase().replace('_', ' ') + " • " + smartAudio.providers(currentEntry.song.videoId) + " / " + smartAudio.providers(next.song.videoId)
                     } catch (cancelled: CancellationException) { throw cancelled }
                     catch (error: Exception) { base = file; plan = null; status = "Automix uses standard fade: " + error.message }
                 }

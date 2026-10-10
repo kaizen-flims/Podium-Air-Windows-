@@ -16,9 +16,9 @@ New-Item -ItemType Directory -Force $analysis | Out-Null
 $include = Join-Path $env:JAVA_HOME 'include'
 Push-Location $analysis
 try {
-    & cl.exe /nologo /std:c++20 /EHsc /O2 /MT /LD "/I$include" "/I$include/win32" "/I$root/native" "$PSScriptRoot/analysis_jni.cpp" "$root/native/analyzer/audio_analysis.cpp" "$root/native/analyzer/tempo_analysis.cpp" "$root/native/analyzer/resampler.cpp" /FePodiumAnalysis.dll
+    & cl.exe /nologo /std:c++20 /EHsc /O2 /MT /LD "/I$include" "/I$include/win32" "/I$root/native" "$PSScriptRoot/analysis_jni.cpp" "$PSScriptRoot/mel_jni.cpp" "$PSScriptRoot/vocal_jni.cpp" "$root/native/analyzer/mel_spectrogram.cpp" "$root/native/analyzer/vocal_spectrogram.cpp" "$root/native/analyzer/audio_analysis.cpp" "$root/native/analyzer/tempo_analysis.cpp" "$root/native/analyzer/resampler.cpp" /FePodiumAnalysis.dll
     if ($LASTEXITCODE -ne 0) { throw 'Native Automix analysis library compilation failed' }
-    & cl.exe /nologo /std:c++20 /EHsc /O2 /MT "/I$root/native" "$PSScriptRoot/analysis-self-test.cpp" "$root/native/analyzer/audio_analysis.cpp" "$root/native/analyzer/tempo_analysis.cpp" "$root/native/analyzer/resampler.cpp" /FeAnalysisSelfTest.exe
+    & cl.exe /nologo /std:c++20 /EHsc /O2 /MT "/I$root/native" "$PSScriptRoot/analysis-self-test.cpp" "$root/native/analyzer/mel_spectrogram.cpp" "$root/native/analyzer/vocal_spectrogram.cpp" "$root/native/analyzer/audio_analysis.cpp" "$root/native/analyzer/tempo_analysis.cpp" "$root/native/analyzer/resampler.cpp" /FeAnalysisSelfTest.exe
     if ($LASTEXITCODE -ne 0) { throw 'Native Automix analysis test compilation failed' }
     & ./AnalysisSelfTest.exe
     if ($LASTEXITCODE -ne 0) { throw 'Native Automix analysis self-test failed' }

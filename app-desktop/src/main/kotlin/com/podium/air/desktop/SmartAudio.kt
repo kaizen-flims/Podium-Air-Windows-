@@ -8,18 +8,26 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import javax.sound.sampled.AudioSystem
 import kotlin.math.*
+import kotlinx.serialization.json.*
+import java.util.concurrent.ConcurrentHashMap
 
 /** PCM measurements, not metadata guesses. Failed/uncertain analysis stays on the source planner's lower tiers. */
 class SmartAudio(private val directory: File = File(defaultDataDirectory(), "automix")) {
+    private val providers = ConcurrentHashMap<String, String>()
+    fun providers(trackId: String): String = providers[trackId] ?: "native DSP"
+    private fun remember(text: String, trackId: String): TrackAnalysis {
+        providers[trackId] = (Json.parseToJsonElement(text).jsonObject["analysisProviders"] as? JsonPrimitive)?.contentOrNull ?: "native DSP"
+        return TrackFeatures.parse(text, trackId)
+    }
     fun analyze(file: File, trackId: String, checkCancelled: () -> Unit): TrackAnalysis {
         check(TrackFeatures.available) { "Native Automix analysis is unavailable." }
         // preparePcm names immutable decoded files by the source identity. Its access-time
         // refresh must not invalidate an expensive analysis of unchanged PCM.
-        val identity = "dsp-v1|" + file.canonicalPath + "|" + file.length()
+        val identity = "dsp-model-v2|" + file.canonicalPath + "|" + file.length()
         val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
         directory.mkdirs()
         val cached = File(directory, "$key.json")
-        if (cached.isFile && cached.length() < 2_000_000) runCatching { TrackFeatures.parse(cached.readText(), trackId) }.getOrNull()?.let { return it }
+        if (cached.isFile && cached.length() < 2_000_000) runCatching { remember(cached.readText(), trackId) }.getOrNull()?.let { return it }
         val measured = AudioSystem.getAudioInputStream(file).use { input ->
             val format = input.format
             require(format.sampleSizeInBits == 16 && !format.isBigEndian && format.channels in 1..2)
@@ -48,10 +56,20 @@ class SmartAudio(private val directory: File = File(defaultDataDirectory(), "aut
             checkCancelled(); TrackFeatures.analyze(reduced, duration, trackId)
         }
         checkCancelled()
+        val neural = neuralAnalysis(file, measured.first, checkCancelled)
+        checkCancelled()
+        val text = buildJsonObject {
+            Json.parseToJsonElement(measured.second).jsonObject.forEach { (key, value) -> put(key, value) }
+            put("bpm", neural.analysis.bpm); put("beatInterval", neural.analysis.beatInterval)
+            put("beatConfidence", neural.analysis.beatConfidence); put("firstBeat", neural.analysis.firstBeat)
+            put("downbeats", JsonArray(neural.analysis.downbeats.map(::JsonPrimitive)))
+            put("vocalActivityMask", JsonArray(neural.analysis.vocalActivityMask.map(::JsonPrimitive)))
+            put("analysisProviders", listOfNotNull("native DSP", "Beat This! grid".takeIf { neural.beatGrid }, "open-unmix vocal mask".takeIf { neural.vocalMask }).joinToString(" + "))
+        }.toString()
         val temp = Files.createTempFile(directory.toPath(), "analysis-", ".json")
-        try { Files.writeString(temp, measured.second); Files.move(temp, cached.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+        try { Files.writeString(temp, text); Files.move(temp, cached.toPath(), StandardCopyOption.REPLACE_EXISTING) }
         finally { Files.deleteIfExists(temp) }
-        return measured.first
+        return remember(text, trackId)
     }
 }
 

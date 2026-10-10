@@ -113,3 +113,49 @@ JLayer `javazoom:jlayer:1.0.1` provides MP3-to-PCM decoding for the analyzer/mix
 it is LGPL-2.1 software by JavaZOOM contributors. The unmodified JAR remains
 replaceable, its license is bundled at `licenses/jlayer/LGPL-2.1.txt`, and the
 corresponding source accompanies the dependency-source archive.
+
+## Neural Automix adapters and model assets
+
+Windows ports of `BeatTracker`, `VocalTracker`, `MelSpectrogram`, the original C++
+mel/STFT front ends and their JNI bridges retain their Orchard/BitChord
+copyright headers and AGPL-3.0-or-later terms. The adapters remove Android
+Context/Log/settings dependencies and use CPU ONNX Runtime with bounded
+head/tail PCM, cancellation checks, checked resource extraction and native
+session cleanup. The planner remains confidence-aware; inference is evidence,
+not a guarantee of correct beat or vocal predictions.
+
+The exact quantized assets from the Android source commit
+`48902e6b20fdcfeb1723e02d4744849e82d5067a` are pinned and verified by SHA-256:
+
+- `beat_this_int8.onnx`: `9dc29f1fcd713d18f48a2755109fce01429ba6d1639607af8ae5c7449b47070f`
+- `vocals_umxhq_int8.onnx`: `a2be987b55a29bc149d3a6ae99b08175d81f85ee292a8ea21f96c3a473bc94cb`
+
+Gradle downloads these committed bytes at build time; the installed application
+loads its bundled copies and does not contact a model server. No training data
+is included. Windows does not re-export or re-quantize the models.
+
+Beat This! code and published model weights are MIT, Copyright (c) 2024 Institute
+of Computational Perception, JKU Linz, Austria. Upstream license declaration:
+<https://github.com/CPJKU/beat_this#license>. The full notice is bundled at
+`licenses/beat-this/MIT.txt`.
+
+Open-unmix's UMX-HQ weights (the vocals target, not the separate UMX-L model)
+are attributed to Inria / Fabian-Robert Stöter / Antoine Liutkus. The Android
+adapter identifies these as MIT and cites the UMX-HQ deposit:
+<https://zenodo.org/records/3370489>. The upstream full MIT notice is bundled at
+`licenses/open-unmix/MIT.txt`.
+
+ONNX Runtime CPU Java 1.28.0 is MIT, Copyright (c) Microsoft Corporation.
+Its full MIT notice and the exact release's complete ThirdPartyNotices.txt
+are bundled at `licenses/onnxruntime/`. The original dependency JAR remains
+separate and replaceable. Upstream:
+<https://github.com/microsoft/onnxruntime/tree/v1.28.0>.
+
+## Online lyrics
+
+Optional LRCLIB lookup uses the service's public metadata `/api/get` and
+`/api/search` endpoints. Networking and matching are a Windows implementation;
+no LRCLIB server code or database is redistributed. Local TTML/LRC/embedded
+lyrics take priority. Only title, artist, album and duration are sent after the
+user enables the feature; returned lyrics are cached locally and attributed
+in the lyrics view. No audio or account credentials are transmitted.

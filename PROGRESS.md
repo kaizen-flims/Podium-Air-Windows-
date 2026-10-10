@@ -53,3 +53,20 @@
 - Main commit 4948feb passed all 40 tests and Windows packaging/integration checks in run 37980037577. Release preparation validated exact-source provenance and all package hashes. Fixed draft publishing: upload through the release ID after validating its target; a draft Git tag exists only after publication. No partial release was published.
 
 - 2026-10-10: Resumed the complete native-port scope after the public local preview. Added the original AGPL Automix analysis/policy/planner and native DSP/JNI, bounded PCM preparation including MP3/AIFF, pitch-preserving overlap preparation, original-track clock mapping, confidence-based fallback and adaptive EQ handoffs. The Linux native analyzer test measured 120.005 BPM from generated PCM, measured content boundaries and rejected silence for beat matching. Kotlin tests and packaged Windows Automix control/seek/cleanup checks are pending CI. This development branch is not a complete release; online account/streaming/provider and neural-model parity remain unresolved.
+
+### Automix Windows validation and remaining app work — 10 October 2026
+
+Feature commit c2e63ec passed Windows run 38018280923: 48 tests, zero failures;
+actual packaged Automix PCM preparation and overlap; original-track seek while
+paused; all six codecs; 15 UI routes and keyboard shortcuts; native media
+controls/dialogs; installer lifecycle. Paused observation: 1.73% of one logical
+core and 254.07 MB sampled working set. This verifies the DSP/WSOLA change,
+not full Android parity.
+
+Opt-in LRCLIB networking, strict recording/duration matching, body limits,
+cancellation, provider status and bounded offline cache are now implemented.
+Neural Automix adapters, original mel/STFT front ends, the two exact pinned
+Android model assets and CPU ONNX Runtime are being verified on Windows.
+No public full release has been declared. Streaming/login/sync and remaining
+network/social features are still unresolved. The website still points to the
+previous explicitly labeled local preview.

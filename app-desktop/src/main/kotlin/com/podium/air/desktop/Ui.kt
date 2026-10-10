@@ -546,7 +546,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 Switch(prefs.automix, { model.preferences(prefs.copy(automix = it)) }, Modifier.semantics { contentDescription = "Automix" }, enabled = com.music.bitchord.playback.smart.TrackFeatures.available)
             }
             Text(audio.automixStatus ?: if (prefs.automix) "Prepares the next queued track. Automix runs at 1×; uncertain or failed analysis uses an ordinary fade." else "Automix is off. The crossfade setting controls ordinary transitions.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("Uses the original confidence-aware planner with native DSP measurements. Neural beat/vocal models are not bundled; EQ handoffs use desktop equalizer bands.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Uses the original planner, native DSP, Beat This! and open-unmix models. Missing or uncertain model evidence keeps the DSP fallback; EQ handoffs use desktop equalizer bands.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item { Text("Playback speed • ${"%.2f".format(prefs.speed)}×"); Slider(prefs.speed, { model.preferences(prefs.copy(speed = it)) }, valueRange = 0.5f..2f, steps = 5) }
         item {
