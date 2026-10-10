@@ -157,7 +157,7 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
                         val first = smartAudio.analyze(currentPcm, currentEntry.song.videoId) { ensureActive() }
                         val second = smartAudio.analyze(nextPcm, next.song.videoId) { ensureActive() }
                         fun info(entry: QueueEntry, analysis: TrackAnalysis) = TransitionTrackInfo(entry.song.videoId, (analysis.duration * 1000).toLong(), entry.song.title, entry.song.artist, entry.song.albumName.orEmpty())
-                        var computed = planTransition(first, second, info(currentEntry, first), info(next, second), duration = first.duration,
+                        var computed = planTransition(first, second, info(currentEntry, first), info(next, second), currentTime = mutable.value.positionMs / 1000.0, duration = first.duration,
                             fadeSeconds = settings.crossfadeSeconds.takeIf { it > 0 }?.toDouble() ?: 6.0, mode = CrossfadeMode.SMART)
                         // The source policy permits tempo correction only with measured confidence on both grids.
                         if (assessTransitionTier(first, second).tier != TransitionTier.BEATMATCHED) computed = computed.copy(incomingPlaybackRate = 1.0)
@@ -296,3 +296,4 @@ class JavaFxAudioEngine(val mediaFiles: MediaFiles = MediaFiles()) : AudioEngine
     }
 }
 private fun finiteMs(duration: Duration): Long = if (duration.isUnknown || duration.isIndefinite) 0 else duration.toMillis().toLong().coerceAtLeast(0)
+

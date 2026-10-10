@@ -5,6 +5,16 @@ import com.music.bitchord.playback.smart.*
 import kotlin.test.*
 
 class AutomixPlannerTest {
+    @Test fun completedInteriorCueIsReplannedAtTheActualPlayhead() {
+        val analysis = TrackAnalysis(status = "ready", duration = 120.0, contentEndTime = 120.0,
+            mixOutCandidates = listOf(MixCandidate(108.0, 2.0, "outro_start")))
+        val incoming = TrackAnalysis(status = "ready", duration = 120.0)
+        val early = planTransition(analysis, incoming, currentTime = 0.0, duration = 120.0, mode = CrossfadeMode.SMART)
+        val late = planTransition(analysis, incoming, currentTime = 110.0, duration = 120.0, mode = CrossfadeMode.SMART)
+        assertEquals(108.0, early.transitionEnd)
+        assertEquals(120.0, late.transitionEnd)
+        assertFalse(late.blocked); assertTrue(late.transitionStart > 110.0)
+    }
     @Test fun uncertaintyCannotAuthorizeTimeStretch() {
         val metadataOnly = TrackAnalysis(bpm = 120.0, duration = 180.0, key = "C minor")
         assertEquals(TransitionTier.PLAIN_CROSSFADE, assessTransitionTier(metadataOnly, metadataOnly).tier)
@@ -31,3 +41,4 @@ class AutomixPlannerTest {
         assertNull(vocalActivityBetween(TrackAnalysis(), 0.0, 2.0))
     }
 }
+
