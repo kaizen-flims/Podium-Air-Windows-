@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.music.bitchord.data.model.Song
 import com.podium.air.domain.RepeatMode
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -547,7 +549,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     preview?.let { captured ->
         AlertDialog(onDismissRequest = { if (!exporting) { captured.image.flush(); preview = null } },
             title = { Text("Your Replay • ${captured.summary.period} days") },
-            text = { Image(remember(captured) { captured.image.asImageBitmap() }, "Replay export preview", Modifier.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit) },
+            text = { Image(remember(captured) { captured.image.toComposeImageBitmap() }, "Replay export preview", Modifier.fillMaxWidth().heightIn(max = 360.dp), contentScale = ContentScale.Fit) },
             confirmButton = { TextButton({
                 if (!exporting) scope.launch {
                     exporting = true
