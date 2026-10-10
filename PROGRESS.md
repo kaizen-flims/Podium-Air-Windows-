@@ -77,3 +77,24 @@ local artwork, Unicode native PNG save dialog and atomic output. Unit and
 packaged export checks are included. Native model front ends also passed the
 standalone C++ self-test locally. A Gradle Java-extension name collision found
 by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
+
+
+### Verified neural Automix / LRCLIB / Replay checkpoint
+
+- `1b12da5` fixed the Replay coroutine/image-converter compile errors and passed
+  complete Windows run 38064057032: 58 tests, zero failures/errors/skips; bundled
+  neural graphs, actual Automix/seek, six codec PCM/control/end checks, Replay
+  PNG, native media/dialogs, 15 UI routes/keyboard/DPI and MSI lifecycle.
+- Independently verified the report ZIP digest, counted XML results and viewed
+  actual Settings/Replay screenshots. Logical-font fallback and singular labels
+  were corrected after visual inspection of Replay.
+- `dba37cb` adds opt-in ListenBrainz scrobbling, measured audible-time eligibility,
+  documented/rate-limited API calls, masked token input, Windows Credential
+  Manager JNI and eight new tests plus packaged credential smoke. CI pending.
+- This branch remains an unfinished native streaming port. No new full release
+  or website-link replacement has been made. Supported provider/account setup,
+  remaining integrations/source UI and consumer-device acceptance remain open.
+
+- `db8ab51` corrects the scrobbling test's required thumbnail constructor
+  argument and cancels any pending connection before disconnecting. CI rerun
+  pending; no tests or acceptance gates were disabled.

@@ -4,7 +4,51 @@
 passed the Windows checks below, and produced MSI, EXE and portable packages.
 Full Android, provider and Automix parity remains incomplete.
 
-## Verified build
+
+## Development branch verification
+
+`feat/complete-native-parity` is tracked in [draft PR #2](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/2).
+Commit `1b12da522baaf920f8a33820c69087c649e5ea1a` passed
+[Windows run 38064057032](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38064057032)
+with **58 tests, zero failures/errors and zero skipped tests**. The independent
+verification ZIP from the same code's push run has SHA-256
+`1514af05ab10f470f3be49a86ff2d03759d86a6335582b8bbf10737bdf3460d8`;
+its XML reports were counted and actual Replay/Settings screenshots inspected.
+
+Additional verified behavior:
+
+- Original native DSP, mel and stereo STFT front ends, real bundled Beat This!
+  and Open-unmix inference, cancellation, measured tempo/confidence and bounded
+  pitch-preserving WSOLA tests.
+- Packaged Automix using real PCM/model evidence, cancellation/replanning,
+  manual crossfade at zero, a volume change during overlap, paused seek back to
+  the original track clock and natural end.
+- Optional documented LRCLIB retrieval, exact recording matching, offline
+  cache, bounded response bodies and request cancellation via local HTTP tests.
+- Real Replay summary rendering and 1080×1920 PNG export through the native
+  Unicode save dialog, followed by reopening the saved PNG.
+- All six codecs now also undergo actual PCM duration/format/non-silence checks.
+  Existing 15-route/keyboard/native media/dialog/DPI/installer gates passed.
+
+The same-code push-run observation was 1.04% of one logical core and 255.96 MB
+peak sampled app/direct-helper working set while paused. This says nothing
+about model peak memory or sustained listening quality.
+
+Commit `dba37cb52e6fbd7b8b4decdcf21a4110dcadeba8` adds opt-in ListenBrainz,
+audible-time thresholds, serialized one-per-second documented API calls,
+rate-limit handling, masked account input and native Windows Credential Manager
+read/write/overwrite/delete. Eight added state/HTTP/native tests plus a packaged
+credential fixture gate are pending. The fixture's missing thumbnail argument
+was corrected in `db8ab51`; test gates remain enabled. No real user's token or account submission
+was used for automated tests; no real-account acceptance claim is made.
+
+The website and permanent release still target the older local preview. A new
+full installer has not been published: streaming, Google login/sync, remote
+search/downloads and remaining source features are unresolved. The original
+prompt's supported-provider requirement is described in
+[STREAMING_PROVIDER_DECISION.md](docs/STREAMING_PROVIDER_DECISION.md).
+
+## Verified published preview
 
 Released source commit `ad91ba8ac4f960330c5986698072f34441be7c48` passed
 [Windows run 37981495583](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583).
@@ -82,7 +126,8 @@ Temurin source/build scripts, runtime metadata, dependency hashes and package
 checksums. LGPL codec/tag libraries remain replaceable JARs. Original runtime
 legal files and C++/WinRT MIT text are retained. Restricted SF Pro fonts,
 Android binaries, secrets and separately licensed Automix code/models are not
-redistributed. The published preview also includes the pinned Skiko 0.9.22.2
+redistributed in this older published preview. The development branch includes
+Automix under its required AGPL/model/runtime notices. The published preview also includes the pinned Skiko 0.9.22.2
 LICENSE/NOTICE, Skia BSD license and native renderer third-party legal files.
 Application JAR and installer metadata both identify version 0.2.0.
 
@@ -118,11 +163,13 @@ The Android private API/extraction pipeline was not transplanted. Account
 visibly explains this and opens the official browser service without collecting
 credentials or claiming application sync.
 
-Automix's beat-analysis/time-stretch/model pipeline is not ported. Its separate
-AGPL headers must be retained if adapted; applicable model rights and a working
-desktop audio pipeline must be established. Online canvas video, network lyrics/
-translation, scrobbling, Discord RPC, Listen Together, WebDAV/SMB account clients
-and addons remain missing. Replay lacks the source annual sharing presentation.
+The published preview excludes Automix. The development branch now retains the
+original AGPL headers, native front ends and model notices with a verified
+working desktop analysis/time-stretch pipeline. Optional LRCLIB lyrics and
+Replay summary PNG export are verified. ListenBrainz is implemented and being
+checked. Online canvas, translation, Last.fm, Discord RPC, Listen Together,
+WebDAV/SMB account clients and addons remain missing. Replay still lacks the
+complete annual story-card family.
 Exact Android pixel/animation parity is not claimed.
 
 FLAC above 16 bits converts to 16-bit PCM. Opus accepts mono/stereo mapping
