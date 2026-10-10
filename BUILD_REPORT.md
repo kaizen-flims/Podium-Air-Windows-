@@ -1,4 +1,4 @@
-# Build report — 9 October 2026
+# Build report — 10 October 2026
 
 **Podium Air Windows 0.2.0 is a working native local-music preview.** It compiled,
 passed the Windows checks below, and produced MSI, EXE and portable packages.
@@ -6,13 +6,19 @@ Full Android, provider and Automix parity remains incomplete.
 
 ## Verified build
 
-Implementation commit `52d7fec0adb09bd3532c2a87f03d5de8495e2be4` passed
-[Windows run 37962422355](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355).
+Released source commit `ad91ba8ac4f960330c5986698072f34441be7c48` passed
+[Windows run 37981495583](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583).
 **40 tests ran with zero failures/errors.**
 
-[Download installers, portable app and matching sources](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355/artifacts/11632847114) ·
-[Verification reports and screenshots](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355/artifacts/11632452249) ·
-[Draft PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
+[Preview v0.2.0-preview.1](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1)
+is public. [Publisher run 37982272174](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37982272174)
+validated this exact source and uploaded eight permanent assets before publishing:
+MSI, EXE, portable ZIP, application source, dependency sources, third-party notices,
+build evidence and SHA256SUMS. The release tag points to the commit above.
+
+[Download installers, portable app and matching sources](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1) ·
+[Verification reports and screenshots](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583/artifacts/11640779965) ·
+[Merged PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
 
 | Check | Recorded result |
 |---|---|
@@ -22,7 +28,7 @@ Implementation commit `52d7fec0adb09bd3532c2a87f03d5de8495e2be4` passed
 | Windows shell dialogs | Actual Unicode music-file/folder/save selection and cancellation passed; packaged JVM/native protocol passed; cancelling an open dialog left no helper process |
 | Real playback | WAV, FLAC, Opus, MP3, AAC/M4A and AIFF fixtures played, paused, sought, resumed, crossfaded and reached natural end; missing-file error and recovery passed |
 | Resizing/DPI | Startup and route checks at simulated 150/200%; compact navigation and bounded/scrollable layouts; screenshots reviewed |
-| CPU/memory/shutdown | Paused sample: 1.38% of one logical core, 226.43 MB peak sampled working set, including direct helper processes; helper exited with app |
+| CPU/memory/shutdown | Paused sample: 1.04% of one logical core, 237.75 MB peak sampled working set, including direct helper processes; helper exited with app |
 | MSI lifecycle | Silent install to selected directory, installed route/keyboard smoke and silent uninstall passed |
 | Source and packages | Exact runtime check, vendor-source checksum, dependency/native sources, application source, package SHA256 inventory and artifact uploads passed |
 
@@ -76,18 +82,22 @@ Temurin source/build scripts, runtime metadata, dependency hashes and package
 checksums. LGPL codec/tag libraries remain replaceable JARs. Original runtime
 legal files and C++/WinRT MIT text are retained. Restricted SF Pro fonts,
 Android binaries, secrets and separately licensed Automix code/models are not
-redistributed. Release notice/source review remains required before publishing.
+redistributed. The published preview also includes the pinned Skiko 0.9.22.2
+LICENSE/NOTICE, Skia BSD license and native renderer third-party legal files.
+Application JAR and installer metadata both identify version 0.2.0.
 
-The downloaded package was independently inspected: its GitHub artifact digest
-and all five package SHA256 entries matched. The source ZIP records the tested
-commit; 59 code/build/resource files match the working tree after Windows line
-ending normalization. The portable application includes the native helper,
-32 notice files and 51 runtime legal entries; the codec/tag JARs remain separate.
-The vendor runtime-source checksum and exact build metadata also matched.
+The downloaded release package was independently inspected: its GitHub artifact
+digest matched, and all five package hashes and sizes matched both the CI
+inventory and the public GitHub release asset metadata. The source ZIP records
+the released commit; all 83 tracked files match the tested source snapshot after
+Windows line-ending normalization. The portable application includes the native
+helper, versioned application JAR, 42 notice files (including 10 renderer legal
+files) and 50 runtime legal entries. Codec/tag dependencies remain separate JARs.
 
-The artifact source describes the implementation commit above. A subsequent
-report-only commit records this run and links; it does not change the packaged
-application. Artifact retention is temporary (packages request 30 days).
+The source archive describes the released commit above. Follow-up documentation
+records the release and website results without changing packaged application
+code. CI artifacts are temporary; the public prerelease supplies permanent
+installer/source/checksum download URLs.
 
 ## Acceptance gates
 
@@ -98,7 +108,7 @@ application. Artifact retention is temporary (packages request 30 days).
 | C — real audio | Six codec controls/crossfade/natural-end and missing-file recovery passed; physical listening/hotplug pending |
 | D — honest parity | FEATURE_PARITY.md identifies tested local scope and missing source capabilities |
 | E — installable artifact | MSI/EXE/portable/source produced; MSI install/run/uninstall passed; unsigned |
-| F — handoff | README, audit, parity, notices, evidence, client acceptance and draft PR #1 provided |
+| F — handoff | Main source and merged PR #1, public preview assets, permanent website downloads, notices/evidence and client acceptance guide provided |
 
 ## Remaining capabilities and limits
 
@@ -128,10 +138,19 @@ is made. Audio originals remain unchanged.
 mixed-monitor DPI, output changes/hotplug, long-session resources and listening
 quality. Signing credentials were not supplied; SmartScreen warnings may appear.
 
-At the original handoff, no main merge or public release had occurred. Prem
-subsequently explicitly requested publishing the Windows code and release assets.
-Release preparation adds exact Skiko/Skia renderer notices and aligns application
-JAR metadata to 0.2.0. The main-branch build must pass again before the approved
-public preview is published. Android source/releases and auto-update remain unchanged. Target-platform
+Prem explicitly requested publishing the Windows code and release assets. PR #1
+is merged into main and the approved Windows preview is public. The website at
+[https://podium-air-website.pages.dev/](https://podium-air-website.pages.dev/)
+has separate “Download Podium Air for Android” and “Download Podium Air for
+Windows” links with their platform logos. The Windows link targets the permanent
+preview MSI; the existing Android release updater affects only Android links.
+
+[Website verification run 38016631060](https://github.com/kaizen-flims/Podium-Air-Website/actions/runs/38016631060)
+passed Chromium checks at 1440/768/390/320px, platform labels/logos/URLs,
+Android-update isolation and a live production HTTP 200 check. Desktop and mobile
+screenshots were inspected. Cloudflare reported successful deployment of website
+commit `f3e79165643812ee56da96b08417396d6e19d9c6`.
+
+Android source/releases and automatic updates remain unchanged. Target-platform
 compilation and checks ran in Windows Actions; the Linux workspace could not
-fetch required build dependencies.
+fetch required build dependencies. Consumer-device acceptance remains pending.

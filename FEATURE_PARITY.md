@@ -5,9 +5,9 @@
 acceptance. **Blocked** identifies a supported integration or missing pipeline.
 A passing smoke is not proof of every feature or full Android parity.
 
-Final implementation evidence: Windows run
-[37962422355](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355),
-commit `52d7fec0adb09bd3532c2a87f03d5de8495e2be4`, **40 tests with zero
+Published-preview evidence: Windows run
+[37981495583](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583),
+commit `ad91ba8ac4f960330c5986698072f34441be7c48`, **40 tests with zero
 failures/errors**. This run passed all packaged routes/details, Robot
 Ctrl+F/Ctrl+Space, native and packaged Windows media/dialog checks, simulated
 150/200% startup, six codec natural-end checks, missing-file recovery,
@@ -17,8 +17,8 @@ Fresh route and DPI screenshots were reviewed. Navigation/content/mini player
 fit the visible area, short layouts scroll, and Settings exposes volume when
 compact controls hide its mini-player slider. Queue callback/restart statistics
 and concurrent final-save regressions passed. The source/package artifact is
-[available here](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355/artifacts/11632847114);
-[verification reports and screenshots](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355/artifacts/11632452249)
+[available here](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1);
+[verification reports and screenshots](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583/artifacts/11640779965)
 record the results.
 
 | Feature | Status | Implementation and evidence |
@@ -46,7 +46,7 @@ record the results.
 | Keyboard/picker/tray/notifications/startup | Partial | Actual implementation and opt-in preferences; Robot Ctrl+F/play/pause and actual native Unicode file/folder/save/cancellation passed; opt-in tray/startup/notifications need physical acceptance |
 | DPI/resizing/accessibility | Partial | Compact icon navigation, bounded/maximized initial window, labels/shortcuts/scrolling; 100/150/200% startup screenshots inspected; physical/mixed-monitor DPI remains |
 | State persistence/recovery | Verified | Atomic saves, corrupt original preservation, restore filtering, duplicate normalization/offset clamps and ordered shutdown-save tests |
-| CPU/memory/shutdown/device routing | Partial | Cancellable jobs and disposed player/helper lifecycle; paused sample 1.38% of one core, peak 226.43 MB including direct helper; physical hotplug/long-run leak checks remain |
+| CPU/memory/shutdown/device routing | Partial | Cancellable jobs and disposed player/helper lifecycle; paused sample 1.04% of one core, peak 237.75 MB including direct helper; physical hotplug/long-run leak checks remain |
 | Windows installer/portable/source | Verified | MSI/EXE/portable and corresponding source produced; MSI install/run/uninstall verified on Windows Server 2025; unsigned/client acceptance remains |
 
 Screens visibly disclose missing account/Automix functionality. No playback,

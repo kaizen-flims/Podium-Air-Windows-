@@ -44,18 +44,25 @@ Prem has authorized a public Windows preview. The release workflow publishes
 only after the main-branch Windows build and package verification succeed.
 Android releases and automatic updates remain unchanged.
 
-## Get a test build
+## Download the Windows preview
 
-[Download the verified Windows build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355/artifacts/11632847114) ·
-[Successful Windows checks](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37962422355) ·
-[Draft PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
+[Download Podium Air for Windows — MSI](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/download/v0.2.0-preview.1/Podium-Air-Windows-0.2.0-x64.msi) ·
+[All release assets and notes](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1) ·
+[Podium Air website](https://podium-air-website.pages.dev/)
+
+The public **v0.2.0-preview.1** release includes the MSI, EXE installer, portable
+ZIP, exact application source, dependency sources, third-party notices, build
+evidence and SHA256SUMS. It is an unsigned local-music preview for Windows
+10/11 x64. No separate Java installation is needed.
+
+[Successful Windows checks](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583) ·
+[Verification reports and screenshots](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583/artifacts/11640779965) ·
+[Merged PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
 
 The [Windows workflow](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/workflows/windows.yml)
-produces MSI, EXE installer, portable ZIP, matching application source ZIP,
-dependency source bundle and SHA256SUMS in `Podium-Air-Windows-x64`. Artifacts
-are temporary; the workflow requests 30-day retention. GitHub may require
-sign-in to download them. `Windows-verification` holds reports, screenshots,
-codec/native integration results, installer logs and performance samples.
+also stores temporary CI packages for 30 days. `Windows-verification` holds
+reports, screenshots, codec/native integration results, installer logs and
+performance samples. Public release assets can be downloaded without signing in.
 
 The local audio checks can also be run against the portable executable:
 
