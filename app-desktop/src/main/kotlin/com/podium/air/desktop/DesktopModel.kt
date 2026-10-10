@@ -18,6 +18,7 @@ class DesktopModel(
     private val persistence: StatePersistence = StateStore(),
     val localLibrary: LocalLibrary = LocalLibrary(),
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val onlineLyrics: LyricsProvider = LrcLibLyrics(),
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val saveMutex = Mutex()
@@ -35,6 +36,7 @@ class DesktopModel(
     private var lastStatsFlush = 0L
     private var historyKey: String? = null
     val lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
+    val lyricsStatus = MutableStateFlow("Select a track to view lyrics.")
     val sleepRemaining = MutableStateFlow<Long?>(null)
     val platformStatus = MutableStateFlow("Windows media controls initialize when the window opens.")
     private var saveJob: Job? = null
@@ -150,8 +152,21 @@ class DesktopModel(
     }
     private fun record(song: Song) { change { copy(history = (listOf(song.videoId) + history.filterNot { it == song.videoId }).take(200)) } }
     private fun loadLyrics(song: Song) {
-        lyricsJob?.cancel(); lyrics.value = emptyList()
-        lyricsJob = scope.launch { lyrics.value = withContext(Dispatchers.IO) { runCatching { localLibrary.lyrics(song) }.getOrElse { emptyList() } } }
+        lyricsJob?.cancel(); lyrics.value = emptyList(); lyricsStatus.value = "Loading lyrics…"
+        val online = state.value.preferences.onlineLyrics
+        val duration = state.value.library.find { it.id == song.videoId }?.duration ?: engine.state.value.durationMs
+        lyricsJob = scope.launch {
+            try {
+                val local = withContext(Dispatchers.IO) { localLibrary.lyrics(song) }
+                ensureActive()
+                if (local.isNotEmpty()) { lyrics.value = local; lyricsStatus.value = "Sidecar or embedded lyrics" }
+                else {
+                    val result = onlineLyrics.lookup(LyricsQuery(song.title, song.artist, song.albumName.orEmpty(), duration), online)
+                    ensureActive(); lyrics.value = result.lines; lyricsStatus.value = result.status
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { ensureActive(); lyricsStatus.value = "Could not load lyrics: ${error.message}" }
+        }
     }
     fun favorite(id: String) { change { copy(favorites = if (id in favorites) favorites - id else favorites + id) } }
     fun createPlaylist(name: String) { val trimmed = name.trim(); if (trimmed.isNotEmpty()) change { copy(playlists = playlists + Playlist(name = trimmed)) } }
@@ -168,11 +183,13 @@ class DesktopModel(
             playlists = playlists.map { it.copy(tracks = it.tracks.filterNot { track -> track == id }) }) }
     }
     fun preferences(value: Preferences) {
+        val reload = value.onlineLyrics != state.value.preferences.onlineLyrics
         if (value.launchAtStartup != state.value.preferences.launchAtStartup) {
             try { WindowsStartup.set(value.launchAtStartup) }
             catch (error: Exception) { message.value = error.message; return }
         }
         change { copy(preferences = value) }; engine.configure(value)
+        if (reload) reloadLyrics()
     }
     fun sleepTimer(minutes: Int?) {
         sleepJob?.cancel(); sleepRemaining.value = minutes?.times(60L)

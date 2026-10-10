@@ -13,7 +13,9 @@ import kotlin.math.*
 class SmartAudio(private val directory: File = File(defaultDataDirectory(), "automix")) {
     fun analyze(file: File, trackId: String, checkCancelled: () -> Unit): TrackAnalysis {
         check(TrackFeatures.available) { "Native Automix analysis is unavailable." }
-        val identity = "dsp-v1|" + file.canonicalPath + "|" + file.length() + "|" + file.lastModified()
+        // preparePcm names immutable decoded files by the source identity. Its access-time
+        // refresh must not invalidate an expensive analysis of unchanged PCM.
+        val identity = "dsp-v1|" + file.canonicalPath + "|" + file.length()
         val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
         directory.mkdirs()
         val cached = File(directory, "$key.json")

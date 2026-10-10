@@ -444,6 +444,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 @Composable private fun LyricsView(model: DesktopModel, modifier: Modifier = Modifier) {
     val lyrics by model.lyrics.collectAsState(); val audio by model.engine.state.collectAsState(); val saved by model.state.collectAsState()
+    val lyricsStatus by model.lyricsStatus.collectAsState()
     val list = rememberLazyListState()
     val id = audio.entry?.song?.videoId
     val offset = saved.lyricOffsets[id] ?: 0
@@ -466,8 +467,9 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     Column(modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AssistChip({ model.preferences(saved.preferences.copy(lyricsAutoScroll = !saved.preferences.lyricsAutoScroll)) }, { Text(if (saved.preferences.lyricsAutoScroll) "Auto-scroll on" else "Auto-scroll off") })
-            Spacer(Modifier.weight(1f)); Control(Icons.Rounded.Refresh, "Reload sidecar lyrics") { model.reloadLyrics() }
+            Spacer(Modifier.weight(1f)); Control(Icons.Rounded.Refresh, "Reload lyrics") { model.reloadLyrics() }
         }
+        Text(lyricsStatus, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (id != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Control(Icons.Rounded.Remove, "Lyrics 100 milliseconds earlier") { model.lyricOffset(id, offset - 100) }
@@ -476,7 +478,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 TextButton({ model.lyricOffset(id, 0) }) { Text("Reset") }
             }
         }
-        if (lyrics.isEmpty()) { Empty("Place a .ttml or .lrc file beside the audio file with the same filename, or use embedded lyrics.", Modifier.weight(1f)); return@Column }
+        if (lyrics.isEmpty()) { Empty("Place a .ttml or .lrc file beside the audio file with the same filename, use embedded lyrics, or enable online lyrics in Settings.", Modifier.weight(1f)); return@Column }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = PaddingValues(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             itemsIndexed(lyrics) { index, line ->
                 val focused = index in active
@@ -547,6 +549,10 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
             Text("Uses the original confidence-aware planner with native DSP measurements. Neural beat/vocal models are not bundled; EQ handoffs use desktop equalizer bands.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         item { Text("Playback speed • ${"%.2f".format(prefs.speed)}×"); Slider(prefs.speed, { model.preferences(prefs.copy(speed = it)) }, valueRange = 0.5f..2f, steps = 5) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Online lyrics • LRCLIB", Modifier.weight(1f)); Switch(prefs.onlineLyrics, { model.preferences(prefs.copy(onlineLyrics = it)) }, Modifier.semantics { contentDescription = "Online lyrics" }) }
+            Text("Sends the track title, artist, album and duration to lrclib.net. Local lyrics take priority. Matched results are cached for offline use; audio and account details are never sent.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         item { Text("Sleep timer", style = MaterialTheme.typography.titleLarge); if (sleep != null) Text("Pauses in ${formatTime(sleep!! * 1000)}"); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { listOf(15, 30, 60).forEach { minutes -> AssistChip({ model.sleepTimer(minutes) }, { Text("${minutes}m") }) }; AssistChip({ model.sleepTimer(null) }, { Text("Cancel") }) } }
         item { Text("Equalizer", style = MaterialTheme.typography.headlineMedium); TextButton({ model.preferences(prefs.copy(equalizer = List(10) { 0.0 })) }) { Text("Reset to flat") } }
         items(10) { band -> Row(verticalAlignment = Alignment.CenterVertically) { Text(listOf("32 Hz", "64 Hz", "125 Hz", "250 Hz", "500 Hz", "1 kHz", "2 kHz", "4 kHz", "8 kHz", "16 kHz")[band], Modifier.width(64.dp), fontSize = 12.sp); Slider(prefs.equalizer.getOrElse(band) { 0.0 }.toFloat(), { gain -> model.preferences(prefs.copy(equalizer = prefs.equalizer.toMutableList().apply { this[band] = gain.toDouble() })) }, Modifier.weight(1f), valueRange = -12f..12f); Text("${prefs.equalizer.getOrElse(band) { 0.0 }.toInt()} dB", Modifier.width(46.dp), fontSize = 12.sp) } }
@@ -578,7 +584,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Podium Air — Windows Edition", style = MaterialTheme.typography.headlineMedium)
         Text("0.2.0 • Native local music preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
-        Text("This preview supports local music. Streaming, full Android feature parity, and Automix are pending. Windows system media controls are included.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Native Windows playback, measured Automix, optional LRCLIB lyrics and Windows media controls are included. Streaming, account integration and full Android feature parity remain unfinished.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton({ Desktop.getDesktop().browse(URI("https://github.com/kaizen-flims/Podium-Air-Windows-")) }) { Text("Corresponding source & build instructions") }
         TextButton({ licenses = readResource("/licenses/THIRD_PARTY_NOTICES.md") + "\n\n" + readResource("/licenses/LICENSE") }) { Text("Third-party licenses & legal notices") }
         Text("Free software under GNU GPL version 3. No warranty. You may redistribute it under the license terms.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

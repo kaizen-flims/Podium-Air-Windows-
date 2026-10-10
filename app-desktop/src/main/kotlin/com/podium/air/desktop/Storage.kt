@@ -26,7 +26,7 @@ data class StoredTrack(val id: String, val path: String, val title: String, val 
 @Serializable
 data class Playlist(val id: String = UUID.randomUUID().toString(), val name: String, val tracks: List<String> = emptyList())
 @Serializable
-data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false, val reducedMotion: Boolean = false, val dynamicBackground: Boolean = true, val lyricsAutoScroll: Boolean = true, val automix: Boolean = false)
+data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false, val reducedMotion: Boolean = false, val dynamicBackground: Boolean = true, val lyricsAutoScroll: Boolean = true, val automix: Boolean = false, val onlineLyrics: Boolean = false)
 @Serializable
 data class SavedQueueEntry(val key: String, val trackId: String)
 @Serializable
@@ -134,6 +134,11 @@ class LocalLibrary(private val directory: File = defaultDataDirectory()) {
         val lrc = File(audio.parentFile, "${audio.nameWithoutExtension}.lrc")
         if (lrc.isFile) require(lrc.length() <= 2_000_000) { "LRC lyrics exceed the 2 MB limit." }
         val text = if (lrc.isFile) lrc.readText() else runCatching { AudioFileIO.read(audio).tag?.getFirst(FieldKey.LYRICS) }.getOrNull().orEmpty()
+        return parseLyricText(text)
+    }
+}
+
+internal fun parseLyricText(text: String): List<LyricLine> {
         if (text.isBlank()) return emptyList()
         val enhanced = EnhancedLrc.parse(text)
         if (enhanced.isNotEmpty()) return enhanced
@@ -146,5 +151,4 @@ class LocalLibrary(private val directory: File = defaultDataDirectory()) {
             }
         }.toList().sortedBy { it.timeMs }
         return synced.ifEmpty { text.lineSequence().filter { it.isNotBlank() && !it.startsWith("[") }.map { LyricLine(0, it.trim()) }.toList() }
-    }
 }
