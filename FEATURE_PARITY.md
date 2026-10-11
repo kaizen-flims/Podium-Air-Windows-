@@ -5,9 +5,9 @@
 acceptance. **Blocked** identifies a supported integration or missing pipeline.
 A passing smoke is not proof of every feature or full Android parity.
 
-Development code `0573e24ff415ad42c3d8dd2bacc3d583e06f8a2f` passed
-[run 38126328359](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38126328359):
-**79 tests, zero failures/errors/skips**, bundled neural inference, measured
+Development code `9415dc7ac454f3b0b861a4a0b3b24525f7c1dc6f` passed
+[run 38143937527](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38143937527):
+**84 tests, zero failures/errors/skips**, bundled neural inference, measured
 Automix/seek, all eight Replay exports, secure scrobbling/WebDAV contract tests,
 packaged WebDAV download/playback and every existing native/UI/installer gate.
 The shipped portable JAR/models/notices and matching source were inspected.
@@ -37,13 +37,13 @@ record the results.
 | Playlist CRUD/reorder/duplicates | Partial | Persisted local playlists with queue-compatible duplicates; remote sync unavailable |
 | M3U8/M3U interchange | Verified | Round-trip duplicate/unicode/local-path tests; blocked remote URLs reported; interactive picker acceptance remains |
 | Album/artist detail | Partial | Album + album-artist identity and disc/track ordering; tagged local content; remote pages unavailable |
-| Now Playing/mini player/controls | Partial | Packaged real play/pause/seek/resume; volume changed mid-crossfade; physical output/volume assessment remains |
+| Now Playing/mini player/controls | Partial | Source landscape panes/1100dp cap, Controls/Lyrics/Queue selection, dedicated volume and 0.88 paused sleeve scale/500ms easing; packaged light/dark, reduced-motion, playing/paused and compact/DPI variants passed. Physical output/volume and remaining source UI behavior remain |
 | Queue/repeat/shuffle | Verified | Duplicate-safe entry IDs, mutation/current selection, repeat and reversible upcoming shuffle tests; stale callbacks covered |
 | Crossfade | Partial | Real two-player equal-power 0–12s overlap at 1× verified across six format fixtures; no sample-accurate gaplessness or beat alignment |
-| Automix/beat/tempo transitions | Partial | Original AGPL planner/native DSP/mel/STFT and bundled Beat This!/Open-unmix models; confidence-based cues/EQ, bounded WSOLA and original-track seek. 79-test/model and actual packaged transition gates passed; cloud evidence does not establish all Android behavior or consumer listening quality |
+| Automix/beat/tempo transitions | Partial | Original AGPL planner/native DSP/mel/STFT and bundled Beat This!/Open-unmix models; confidence-based cues/EQ, bounded WSOLA and original-track seek. 84-test/model and actual packaged transition gates passed; cloud evidence does not establish all Android behavior or consumer listening quality |
 | Speed/equalizer/sleep | Partial | Actual JavaFX rate/ten-band EQ and monotonic pause timer; listening/device acceptance remains |
 | TTML/LRC/embedded lyrics | Partial | Original TTML/alignment/focus/clock reused; words/duets/backing vocals, per-track offsets, click-to-seek, autoscroll and reduced motion; parser/clock/security tests pass |
-| Word motion/artwork background | Partial | Timed growth/lift/bloom and dominant embedded-art palette motion; faithful source pixel/motion parity remains |
+| Word motion/artwork background | Partial | Timed growth/lift/bloom; original three-pass 128px full-artwork blur, eight-cover cache and finite bitmap fades with reduced motion. Five neutral/spatial-color/cache/bounded-input tests passed; portrait mesh/shader, video canvas and exact source motion parity remain |
 | Online lyrics | Partial | Opt-in documented LRCLIB provider, validated title/artist/duration, bounded response/cache and cancellation. Five actual local HTTP contract tests passed; live catalog availability and other source providers are not guaranteed |
 | Lyrics translation/canvas video | Blocked | Source translation/canvas provider rights/auth and native video implementation remain unresolved |
 | Local formats | Verified | Packaged real controls/crossfade in WAV, FLAC, Opus, MP3, AAC/M4A and AIFF; documented mono/stereo/PCM/cache/container limits |
@@ -56,7 +56,7 @@ record the results.
 | Keyboard/picker/tray/notifications/startup | Partial | Actual implementation and opt-in preferences; Robot Ctrl+F/play/pause and actual native Unicode file/folder/save/cancellation passed; opt-in tray/startup/notifications need physical acceptance |
 | DPI/resizing/accessibility | Partial | Compact icon navigation, bounded/maximized initial window, labels/shortcuts/scrolling; 100/150/200% startup screenshots inspected; physical/mixed-monitor DPI remains |
 | State persistence/recovery | Verified | Atomic saves, corrupt original preservation, restore filtering, duplicate normalization/offset clamps and ordered shutdown-save tests |
-| CPU/memory/shutdown/device routing | Partial | Cancellable jobs and disposed player/helper lifecycle; development paused sample 1.38% of one core, peak 236.69 MB including direct helper; physical hotplug/long-run leak checks remain |
+| CPU/memory/shutdown/device routing | Partial | Cancellable jobs and disposed player/helper lifecycle; development paused expanded-player sample 0.69% of one core, peak 266.14 MB including direct helper; physical hotplug/long-run leak checks remain |
 | Windows installer/portable/source | Verified | MSI/EXE/portable and corresponding source produced; MSI install/run/uninstall verified on Windows Server 2025; unsigned/client acceptance remains |
 
 Screens visibly disclose missing Google/streaming functionality and actual

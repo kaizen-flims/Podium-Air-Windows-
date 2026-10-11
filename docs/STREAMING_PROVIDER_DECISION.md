@@ -33,7 +33,9 @@ Independent progress remains concrete: original neural Automix, optional LRCLIB
 lyrics, Replay export and native Windows controls are verified; supported
 ListenBrainz/native credential storage, all eight Replay cards/calendar periods,
 and HTTPS WebDAV browsing/offline import are tested. Packaged WebDAV download,
-secure credentials and actual native playback also passed.
+secure credentials and actual native playback also passed. The desktop player
+now adapts the source artwork blur, landscape panes and paused sleeve animation;
+84 tests and the packaged/scaled player variants passed.
 Canvas/translation, Last.fm, official native Discord presence,
 shared listening, remaining network addons and device acceptance remain separate gaps.
 The complete installer release and website-link replacement follow end-to-end

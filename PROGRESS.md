@@ -150,3 +150,21 @@ by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
   Screenshot review prompted a small embedded-queue full-height correction.
   The follow-up also observes the paused expanded player instead of Home;
   verification of this follow-up is pending.
+
+### Expanded player verification — 11 October 2026
+
+- Code `9415dc7ac454f3b0b861a4a0b3b24525f7c1dc6f` passed Windows run
+  38143937527 with 84 tests, zero failures/errors/skips and all native,
+  six-codec, neural Automix, WebDAV, Replay, credential and MSI gates.
+- Controls/Lyrics/Queue were exercised in both themes with reduced motion,
+  actual playing/paused artwork and 150/200% compact windows. Final screenshots
+  were inspected, including the queue's full-height/top-aligned viewport.
+- Verification artifact 11703669092 has SHA-256
+  955d479f41fe468d77d566df2584b7f12757f0d4f63d2c9df5f2c48e471aff70. Downloaded XML/package/JAR evidence matched;
+  corresponding source matched all 134 remote Git blobs.
+- The paused expanded player/native helper sample measured 0.69% of one
+  logical core and 266.14 MB peak working set. Multi-hour/physical
+  Windows 10/11 acceptance remains open. The acceptance guide now covers the
+  new player, WebDAV, ListenBrainz and Replay checks.
+- Full streaming/sign-in still depends on the documented provider/app setup.
+  No full release, main merge, website replacement or Android update was made.

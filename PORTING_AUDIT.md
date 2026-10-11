@@ -37,12 +37,12 @@ simply changing the Gradle target would not produce a desktop app.
 | PlaybackService / PlayerConnection / audio sink / output routing | Android-only / reimplement | JavaFX native audio backend on JVM, single-thread lifecycle, reactive StateFlow; Windows JavaFX native libraries packaged |
 | `CrossfadeController` | Android-only orchestration | Two-player equal-power overlap implemented for local tracks at 1×; not claiming sample-accurate gaplessness |
 | `smart/TransitionPlanner.kt` | Reusable after abstraction + separate license | Original policy/planner/analysis reused with AGPLv3-or-later headers and bundled license; source obligations retained under section 13 |
-| Automix analyzer / WSOLA / on-device model | Reused/adapted and tested | Original native DSP, mel/STFT front ends, Beat This!/Open-unmix adapters and exact model bytes; custom bounded pitch-preserving desktop WSOLA; actual model/PCM and packaged transition checks passed 79-test run 38126328359 |
+| Automix analyzer / WSOLA / on-device model | Reused/adapted and tested | Original native DSP, mel/STFT front ends, Beat This!/Open-unmix adapters and exact model bytes; custom bounded pitch-preserving desktop WSOLA; actual model/PCM and packaged transition checks passed 84-test run 38143937527 |
 | YtMusicRepository / Innertube / StreamResolver / PO tokens | Blocked pending compatible supported provider integration | Private API/extraction pipeline and Android WebView path not ported under the prompt's provider-policy constraint |
 | Google / Discord auth, EncryptedPrefs | Android-only / pending supported API | No cookies or credentials collected. No desktop auth/session sync claim |
 | Sources / WebDAV | Desktop adapter tested | Read-only HTTPS Basic-auth browse/selected offline import; original folder semantics, native credential storage, bounded/cancellable requests and nine HTTP/state tests; packaged Unicode download/playback passed. Uploads, direct streaming and sidecar cover scans remain |
 | Addons / JioSaavn / direct SMB accounts | Pending provider/dependency audit and implementation | Mapped/UNC folder import is functional; other adapters are not connected or advertised as complete |
-| Canvas Apple/Spotify/Tidal/community | Pending asset/API rights and player integration | Embedded artwork, extracted dominant-color animated background and reduced-motion setting implemented; online canvas video is not connected |
+| Canvas Apple/Spotify/Tidal/community | Pending asset/API rights and player integration | Embedded artwork and original full-artwork blur/landscape player adapter implemented and checked; portrait mesh and online canvas video are not connected |
 | TTML / lyric clock / lyric focus | Reusable after minimal abstraction | Original parser, alignments and clock reused; clock/focus visibility made public across modules. Word growth, lift, bloom, overlaps, backing vocals, local offsets and click-to-seek implemented |
 | Online lyrics providers / translation | Partial | Optional documented LRCLIB API with strict metadata/duration matching, bounded bodies, cancellation and offline cache; five local HTTP contract tests passed. Other providers/translation remain missing |
 | DownloadService / Downloader / offline DASH/HLS | Android-only + provider policy | No streaming download feature in Windows preview |
@@ -148,4 +148,20 @@ Primary protocol references:
 https://www.rfc-editor.org/rfc/rfc4918.html (PROPFIND/Depth/multistatus) and
 https://www.rfc-editor.org/rfc/rfc7617.html (Basic authentication/TLS/UTF-8).
 Nine actual HTTP/XML/path/state checks and packaged download/native playback
-passed Windows run 38126328359. Real-server and physical-device acceptance remain.
+passed Windows run 38143937527. Real-server and physical-device acceptance remain.
+
+## Desktop player source functions
+
+The full-artwork box-blur functions and relevant landscape layout/pane and
+paused-sleeve constants were reviewed from pinned Android
+`ui/player/ArtworkMeshBackdrop.kt`, `LandscapePlayer.kt` and
+`NowPlayingScreen.kt`. This does not claim that the entire large Android
+player orchestration was ported. Blur algorithm/comments are retained; bounded
+AWT/ImageIO worker decode and cache replace Bitmap/Coil. Source pane timings,
+1100dp cap, paused scale and easing are adapted to mouse/keyboard/desktop resizing.
+The original source license/notices remain bundled.
+
+Five artwork/input/cache tests and packaged light/dark/pane/play-state/scaled-
+window checks passed Windows run 38143937527. The compact desktop view uses the
+full-artwork blur, not the source phone mesh/shader path; canvas video and
+remaining source differences are tracked separately.

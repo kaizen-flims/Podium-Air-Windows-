@@ -8,14 +8,14 @@ preview. No new full release or Android update has been published.
 
 [Draft PR #2](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/2) contains
 the implementation on `feat/complete-native-parity`. Tested executable code:
-`0573e24ff415ad42c3d8dd2bacc3d583e06f8a2f`. [Windows run 38126328359](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38126328359)
-completed successfully with **79 tests, zero failures/errors and zero skips**.
+`9415dc7ac454f3b0b861a4a0b3b24525f7c1dc6f`. [Windows run 38143937527](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38143937527)
+completed successfully with **84 tests, zero failures/errors and zero skips**.
 A later Markdown-only checkpoint records these results without changing executable
 code; it is not represented as a newly tested binary.
 
-[Verification reports, screenshots, exact app JAR and package manifest](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38126328359/artifacts/11696823622)
-have archive SHA-256 `e6ba7ffba4648bfa56703cbd09a7d0e693e1516befbb7e0ab0ccb2a4f5f8e0e2`. Their XML results were independently
-counted. Actual Replay and Sources screenshots were reviewed.
+[Verification reports, screenshots, exact app JAR and package manifest](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38143937527/artifacts/11703669092)
+have archive SHA-256 `955d479f41fe468d77d566df2584b7f12757f0d4f63d2c9df5f2c48e471aff70`. Their XML results were independently
+counted. Actual Replay, Sources and the new player screenshots in both themes/panes and play states were reviewed.
 
 | Check | Verified scope |
 |---|---|
@@ -27,8 +27,9 @@ counted. Actual Replay and Sources screenshots were reviewed.
 | WebDAV | Nine path/XML/actual HTTP/state tests; folder/Unicode handling, Basic auth, origin/folder confinement, redirect refusal, bounded bodies, interrupted atomic transfer and disconnect races |
 | Packaged WebDAV | Packaged JVM/native credentials, authenticated PROPFIND and Unicode conditional GET from a loopback server; actual downloaded WAV metadata, play/pause/seek/natural end and credential deletion |
 | Playback formats | WAV, FLAC, Opus, MP3, AAC/M4A and AIFF: real play/pause/seek/resume/crossfade/end; actual PCM format/duration/non-silence; missing-file recovery |
-| Native/UI | All 16 routes and populated album/playlist detail; Robot Ctrl+F/Ctrl+Space; actual SMTC callbacks, native Unicode file/folder/save/cancel and helper disposal |
-| DPI/performance | Simulated 150/200% startup and scrolling; paused 1.38% of one logical core, 236.69 MB peak sampled app/direct-helper working set; shutdown passed |
+| Native/UI | All 16 routes and populated album/playlist detail; artwork-backed Controls/Lyrics/Queue in both themes, reduced-motion panes and playing/paused sleeve scale; Robot Ctrl+F/Ctrl+Space; actual SMTC callbacks, native Unicode file/folder/save/cancel and helper disposal |
+| Artwork pipeline | Source three-pass blur, 128px worker decode, eight-cover cache and bounded local inputs; five neutral/color-balance/transparency/cache/invalid-image regression tests |
+| DPI/performance | Simulated 150/200% startup and scrolling; paused expanded player 0.69% of one logical core, 266.14 MB peak sampled app/direct-helper working set; shutdown passed |
 | Installer | MSI install at a selected directory, installed UI/keyboard smoke and uninstall passed |
 | Actual package payload | Five file hashes; all tracked source bytes match Git; portable JAR matches tested app; both model SHA-256s, native PE resources, required licenses, replaceable JARs and runtime legal files checked |
 
@@ -49,12 +50,31 @@ full public streaming release. Use the run's Artifacts section for the actual fi
 
 The connector's large installer-archive transfer was incomplete, so an independent
 local inspection of the entire installers is not claimed. The corresponding-source archive was independently downloaded, its SHA-256
-verified, and all **132 tracked source blobs** matched the remote Git tree at
-`0573e24`. The final Windows package inspection checks the actual shipped JAR,
+verified, and all **134 tracked source blobs** matched the remote Git tree at
+`9415dc7`. The final Windows package inspection checks the actual shipped JAR,
 model/native/license payload and portable distribution. The exact app JAR was
 also independently inspected: both pinned model hashes, x64 PE resources and
 all 49 bundled notices match the manifest; the portable runtime contains 50 legal
 files, and JLayer remains a separate, replaceable JAR.
+
+## Desktop player behavior and limits
+
+The source landscape layout is adapted with anchored artwork, a 1100dp cap,
+switchable Controls/Lyrics/Queue, the original pane fade timings and a 0.88
+paused sleeve scale with 500ms easing. Compact windows use the same panes with
+scrolling. The player has its own volume row; the mini player is hidden while
+Now Playing is open. All variants were exercised in the packaged UI, including
+both themes, reduced motion and 150/200% small-window scaling.
+
+The original full-artwork three-pass box blur is prepared from a bounded 128px
+local decode on an IO worker and cached for eight covers. Cover changes fade
+between bitmaps; no perpetual artwork animation or screen-sized blur runs.
+The source's original comments and reuse notices are retained. Desktop
+light/dark scrims and mouse/keyboard pane choices replace phone gestures.
+The portrait mesh/shaders, video canvas and remaining exact UI/motion parity
+are still incomplete. The resource sample above observes the paused expanded player and its native
+helper after startup; it does not establish multi-hour leak or physical-device
+acceptance.
 
 ## WebDAV behavior and limits
 

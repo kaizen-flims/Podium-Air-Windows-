@@ -11,7 +11,7 @@ Local file/folder imports, metadata/artwork, albums/artists, search, favorites,
 history, editable playlists, M3U8 interchange, duplicate-safe queues, repeat/
 shuffle, play/pause/seek/volume, 0–12 second equal-power crossfade, speed,
 ten-band equalizer, sleep timer, TTML/LRC lyrics, lyric timing/word motion,
-artwork color motion and Replay listening statistics are implemented.
+source-based artwork blur/player panes and Replay listening statistics are implemented.
 The development branch also contains native DSP/Beat This!/Open-unmix analysis,
 confidence-based transitions, pitch-preserving WSOLA, opt-in LRCLIB lyrics with
 offline cache, frozen Replay PNG previews and opt-in ListenBrainz scrobbling. The Sources screen also browses personal
@@ -21,8 +21,8 @@ Artists, Songs, Albums, Genres, Habits and Recap cards. Empty album/genre cards
 are hidden; old listening records do not invent hourly statistics. Windows shell file/folder dialogs,
 system media controls, tray, optional notifications and optional startup are included.
 
-Development code `0573e24ff415ad42c3d8dd2bacc3d583e06f8a2f` passed **79 tests with zero failures/errors/skips**
-and all packaged Windows gates in [run 38126328359](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38126328359):
+Development code `9415dc7ac454f3b0b861a4a0b3b24525f7c1dc6f` passed **84 tests with zero failures/errors/skips**
+and all packaged Windows gates in [run 38143937527](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38143937527):
 neural inference, real Automix overlap/seek, all eight Replay cards, six codecs,
 16 navigation routes, keyboard/DPI/native media and credential checks, WebDAV
 download/playback and MSI installation/uninstallation. Package inspection also
@@ -183,3 +183,19 @@ must be trusted by the bundled runtime. Browser SSO, direct remote playback,
 WebDAV uploads/cover-sidecar scans, SMB accounts and addons remain incomplete.
 Cached downloads are in `%LOCALAPPDATA%\\PodiumAirWindows\\webdav\\music`;
 removing a library row does not delete the downloaded original.
+
+## Desktop player adapter
+
+Now Playing follows the source landscape arrangement: artwork stays left,
+while Controls, Lyrics and Queue switch in the right pane. The layout caps at
+1100dp; compact windows retain the same panes with scrolling. Playback expands
+the sleeve; pausing uses the source 0.88 scale and 500ms easing. The expanded
+player owns its volume slider instead of repeating the mini player below it.
+
+The original three-pass 128px artwork blur runs once on an IO worker and uses
+an eight-cover cache. A bitmap fade handles cover changes; reduced motion makes
+the change immediate. Light/dark scrims keep lyrics readable without reducing
+the sleeve to dominant colors. Only local artwork is decoded, with 8 MB file
+and 32-million-pixel input caps and thumbnail subsampling. Five image/cache/input
+tests and packaged player variants passed. Source online canvas/video and the
+portrait mesh/shader behavior remain separate incomplete work.
