@@ -111,7 +111,7 @@ internal fun renderReplayStory(summary: ReplaySummary, page: ReplayStoryPage): B
                 summary.songRows().take(6).forEachIndexed { index, row ->
                     cover(row, 72 + (index % 3) * 318, 780 + (index / 3) * 318, 286)
                 }
-                text("${summary.ranked.size} tracks · ${summary.artists.size} artists", 72, 1580, 44, alpha = 180)
+                text("${summary.ranked.size} ${if (summary.ranked.size == 1) "track" else "tracks"} · ${summary.artists.size} ${if (summary.artists.size == 1) "artist" else "artists"}", 72, 1580, 44, alpha = 180)
             }
             ReplayStoryPage.SONGS, ReplayStoryPage.ARTISTS, ReplayStoryPage.ALBUMS -> {
                 rows.firstOrNull()?.let { row ->

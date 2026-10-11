@@ -78,7 +78,7 @@ private enum class Page(val title: String, val icon: ImageVector) {
     LIBRARY("Library", Icons.Rounded.LibraryMusic), PLAYLISTS("Playlists", Icons.Rounded.QueueMusic),
     ALBUMS("Albums", Icons.Rounded.Album), ARTISTS("Artists", Icons.Rounded.Person), HISTORY("History", Icons.Rounded.History), REPLAY("Replay", Icons.Rounded.Insights),
     PLAYER("Now Playing", Icons.Rounded.MusicNote), QUEUE("Queue", Icons.Rounded.PlaylistPlay), LYRICS("Lyrics", Icons.Rounded.Lyrics),
-    ACCOUNT("Account", Icons.Rounded.AccountCircle), SETTINGS("Settings", Icons.Rounded.Settings), ABOUT("About", Icons.Rounded.Info),
+    SOURCES("Sources", Icons.Rounded.CloudQueue), ACCOUNT("Account", Icons.Rounded.AccountCircle), SETTINGS("Settings", Icons.Rounded.Settings), ABOUT("About", Icons.Rounded.Info),
 }
 private data class Route(val page: Page = Page.HOME, val detail: String? = null, val title: String = page.title)
 
@@ -163,6 +163,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                                 Page.LYRICS -> LyricsView(model, Modifier.padding(horizontal = 28.dp))
                                 Page.SETTINGS -> Settings(model, state)
                                 Page.ACCOUNT -> Account(model)
+                                Page.SOURCES -> Sources(model, state)
                                 Page.ABOUT -> About()
                             }
                         }
@@ -606,7 +607,71 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Track notifications", Modifier.weight(1f)); Switch(prefs.notifications, { model.preferences(prefs.copy(notifications = it)) }) }
         }
         item { Text("Keyboard shortcuts", style = MaterialTheme.typography.headlineMedium); Text("Ctrl+O — import files\nCtrl+Shift+O — import folder\nCtrl+F — search\nCtrl+Space — play/pause\nCtrl+Left/Right — previous/next\nAlt+Left/Right — seek 10 seconds\nEsc — leave collection") }
-        item { Text("Data", style = MaterialTheme.typography.headlineMedium); Text("Your library, playlists and preferences are stored on this computer. Music files are referenced in place; importing does not copy them. ${defaultDataDirectory().absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("Data", style = MaterialTheme.typography.headlineMedium); Text("Your library, playlists and preferences are stored on this computer. Local imports reference the original files; WebDAV imports download selected tracks for offline playback. ${defaultDataDirectory().absolutePath}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+@OptIn(ExperimentalLayoutApi::class)
+@Composable private fun Sources(model: DesktopModel, state: SavedState) {
+    val entries by model.davEntries.collectAsState()
+    val location by model.davLocation.collectAsState()
+    val status by model.davStatus.collectAsState()
+    val busy by model.davBusy.collectAsState()
+    val importing by model.importing.collectAsState()
+    var url by remember { mutableStateOf(state.preferences.webDavUrl) }
+    var user by remember { mutableStateOf(state.preferences.webDavUser) }
+    var password by remember { mutableStateOf("") }
+    var selected by remember(location, entries) { mutableStateOf(setOf<URI>()) }
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+        item {
+            Text("WebDAV music library", style = MaterialTheme.typography.headlineMedium)
+            Text("Browse your personal server and import selected tracks for offline playback. Your password is saved in Windows Credential Manager. Files are downloaded to this computer; the server is read only.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        item { OutlinedTextField(url, { url = it.take(2000) }, label = { Text("HTTPS music folder URL") }, singleLine = true, enabled = !busy && !importing, modifier = Modifier.fillMaxWidth()) }
+        item { OutlinedTextField(user, { user = it.take(200) }, label = { Text("Username (optional)") }, singleLine = true, enabled = !busy && !importing, modifier = Modifier.fillMaxWidth()) }
+        item { OutlinedTextField(password, { password = it.take(1000) }, label = { Text("Password or app password") }, singleLine = true, visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(), enabled = !busy && !importing, modifier = Modifier.fillMaxWidth()) }
+        item {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button({ val value = password; password = ""; model.connectDav(url, user, value) }, enabled = !busy && !importing && url.isNotBlank()) { Text("Connect") }
+                if (state.preferences.webDavUrl.isNotBlank()) {
+                    OutlinedButton({ model.browseDav() }, enabled = !busy && !importing) { Text("Browse saved folder") }
+                    TextButton({ password = ""; model.disconnectDav() }, enabled = !busy && !importing) { Text("Disconnect") }
+                }
+                if (busy) TextButton(model::cancelDav) { Text("Cancel") }
+            }
+            Text(status, fontSize = 13.sp)
+        }
+        location?.let { current ->
+            item {
+                val root = runCatching { DavPaths.root(state.preferences.webDavUrl) }.getOrNull()
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (root != null && current != root) IconButton({ model.browseDav(DavPaths.parent(root, current)) }, enabled = !busy && !importing) { Icon(Icons.Rounded.ArrowUpward, "Parent folder") }
+                    Text(current.path, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    IconButton({ model.browseDav(current) }, enabled = !busy && !importing) { Icon(Icons.Rounded.Refresh, "Refresh WebDAV folder") }
+                }
+            }
+            item {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button({ model.importDav(entries.filter { it.uri in selected }) }, enabled = !busy && !importing && selected.isNotEmpty()) { Text("Import ${selected.size} selected") }
+                    TextButton({ selected = entries.filter { it.audio }.take(100).map { it.uri }.toSet() }, enabled = !busy && !importing) { Text("Select tracks") }
+                    TextButton({ selected = emptySet() }, enabled = !importing && selected.isNotEmpty()) { Text("Clear") }
+                }
+                Text("MP3, WAV, AIFF, M4A/AAC, FLAC and Opus • up to 100 tracks / 5 GB per import • 750 MB per file", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        items(entries, key = { it.uri.toASCIIString() }) { entry ->
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (entry.folder) {
+                    Icon(Icons.Rounded.Folder, null, tint = AccentRed, modifier = Modifier.padding(12.dp))
+                    TextButton({ model.browseDav(entry.uri) }, enabled = !busy && !importing, modifier = Modifier.weight(1f)) { Text(entry.name, Modifier.fillMaxWidth(), maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                } else {
+                    Checkbox(entry.uri in selected, { checked -> selected = if (checked) (selected + entry.uri).take(100).toSet() else selected - entry.uri }, enabled = !busy && !importing)
+                    Text(entry.name, Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    entry.bytes?.let { Text("${it / 1_000_000} MB", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            }
+        }
+        if (location != null && entries.isEmpty() && !busy) item { Text("No supported audio files or subfolders in this folder.") }
+        item { Text("Mapped Windows/SMB folders can also be imported using Import folder. Direct SMB accounts, WebDAV uploads and addon sources remain unfinished.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 @Composable private fun Account(model: DesktopModel) {
@@ -666,4 +731,3 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     }, confirmButton = { TextButton({ licenses = null }) { Text("Close") } })
 }
 private fun readResource(path: String): String = object {}.javaClass.getResourceAsStream(path)?.bufferedReader()?.use { it.readText() } ?: "See the corresponding source for $path."
-

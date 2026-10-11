@@ -49,6 +49,49 @@ class DesktopModel(
     val scrobblingBusy = scrobbling.busy
     fun connectListenBrainz(token: String) = scrobbling.connect(token)
     fun disconnectListenBrainz() = scrobbling.disconnect()
+    private val dav = DavSession(scope, savedRoot = { state.value.preferences.webDavUrl }) { url, user ->
+        change { copy(preferences = preferences.copy(webDavUrl = url, webDavUser = user)) }
+    }
+    val davEntries = dav.entries
+    val davLocation = dav.location
+    val davStatus = dav.status
+    val davBusy = dav.busy
+    fun connectDav(url: String, user: String, password: String) = dav.connect(url, user, password)
+    fun browseDav(uri: java.net.URI? = null) = dav.browse(uri)
+    fun cancelDav() = dav.cancel()
+    fun disconnectDav() { importJob?.cancel(); dav.disconnect() }
+    fun importDav(entries: List<DavEntry>) {
+        if (importing.value || dav.busy.value || entries.isEmpty()) return
+        val selected = entries.filter { it.audio }.distinctBy { it.uri }.take(100)
+        importJob = scope.launch {
+            importing.value = true
+            var imported = 0; var downloadedBytes = 0L
+            try {
+                for ((index, entry) in selected.withIndex()) {
+                    ensureActive(); importProgress.value = (index + 1) to selected.size
+                    if (downloadedBytes + (entry.bytes ?: 750_000_000) > 5_000_000_000) {
+                        message.value = "Imported $imported tracks. The 5 GB per-import limit was reached."; break
+                    }
+                    val file = dav.download(entry, File(defaultDataDirectory(), "webdav/music"))
+                    downloadedBytes += file.length()
+                    val result = withContext(Dispatchers.IO) { localLibrary.import(listOf(file), { ensureActive() }) }
+                    ensureActive()
+                    val track = result.first.singleOrNull() ?: error("Downloaded track could not be imported.")
+                    val filename = entry.name.substringBeforeLast('.')
+                    val named = track.copy(
+                        title = if (track.title == file.nameWithoutExtension) filename.substringAfter(" - ") else track.title,
+                        artist = if (track.artist == "Unknown artist" && " - " in filename) filename.substringBefore(" - ") else track.artist,
+                        album = if (track.album == "Local music") entry.uri.path.substringBeforeLast('/').substringAfterLast('/').ifBlank { "WebDAV music" } else track.album,
+                    )
+                    change { copy(library = (library + named).associateBy { it.id }.values.toList()) }
+                    imported++
+                    message.value = "Imported $imported WebDAV tracks for offline playback."
+                }
+            } catch (e: CancellationException) { message.value = "WebDAV import cancelled. $imported completed tracks remain available."; throw e }
+            catch (e: Exception) { message.value = "WebDAV import stopped after $imported tracks: ${e.message}" }
+            finally { importing.value = false; importProgress.value = null }
+        }
+    }
     init {
         engine.configure(mutable.value.preferences)
         scope.launch {
@@ -225,9 +268,8 @@ class DesktopModel(
         val localTime = java.time.LocalDateTime.now()
         recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, localTime.toLocalDate().toString(), localTime.hour)
         flushListening()
-        scope.cancel(); onlineLyrics.close(); scrobbling.close(); engine.close()
+        scope.cancel(); onlineLyrics.close(); scrobbling.close(); dav.close(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.
         runCatching { synchronized(saveLock) { persistence.save(mutable.value) } }.onFailure { System.err.println("Library save failed: ${it.message}") }
     }
 }
-

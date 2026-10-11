@@ -148,7 +148,7 @@ fun main(args: Array<String>) {
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(if (performance) 20000 else 2500)
                         val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                        File(result).writeText(if (performance) "PASS: Paused native window and Windows media helper stayed responsive during the performance observation.\n" else "PASS: Compose desktop window, all 15 navigation routes, populated playlist/album detail, Ctrl+F and Ctrl+Space playback/pause verified.\n")
+                        File(result).writeText(if (performance) "PASS: Paused native window and Windows media helper stayed responsive during the performance observation.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, Ctrl+F and Ctrl+Space playback/pause verified.\n")
                         val png = args.firstOrNull { it.startsWith("--screenshot=") }?.substringAfter("=")
                         if (png != null) runCatching {
                             ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(png))
@@ -370,4 +370,3 @@ private fun replaySmoke(args: Array<String>) {
     } catch (error: Throwable) { result.writeText("FAIL: ${error.message}\n"); error.printStackTrace(); image?.flush(); directory.deleteRecursively(); exitProcess(1) }
     image?.flush(); directory.deleteRecursively(); exitProcess(0)
 }
-
