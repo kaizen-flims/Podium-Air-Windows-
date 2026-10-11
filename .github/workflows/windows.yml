@@ -277,6 +277,41 @@ jobs:
             podium-air-windows-source.zip
             dependency-sources.zip
             SHA256SUMS.txt
+      # Keep the combined bundle for the existing release validator, and expose
+      # smaller downloads so installers/source can be fetched independently.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-installers
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            app-desktop/build/compose/binaries/main/msi/*.msi
+            app-desktop/build/compose/binaries/main/exe/*.exe
+            SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-portable
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            podium-air-windows-portable.zip
+            SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-corresponding-source
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            podium-air-windows-source.zip
+            SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-dependency-sources
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dependency-sources.zip
+            SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
