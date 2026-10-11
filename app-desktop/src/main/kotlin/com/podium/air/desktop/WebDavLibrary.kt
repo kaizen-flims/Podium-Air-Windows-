@@ -135,22 +135,24 @@ internal class DavClient(
         check(response.statusCode() == 207) { "WebDAV directory request returned HTTP ${response.statusCode()}." }
         parseDavListing(response.body().toString(Charsets.UTF_8), root, directory)
     }
-    suspend fun download(root: URI, entry: DavEntry, username: String, password: String, directory: File): File = runInterruptible(Dispatchers.IO) {
+    suspend fun download(root: URI, entry: DavEntry, username: String, password: String, directory: File, byteBudget: Long = maxFileBytes): File = runInterruptible(Dispatchers.IO) {
+        val allowed = minOf(maxFileBytes, byteBudget)
+        require(allowed > 0) { "WebDAV import has reached its download limit." }
         require(entry.audio && DavPaths.within(root, entry.uri)) { "Select a supported audio file inside the WebDAV folder." }
-        require(entry.bytes == null || entry.bytes in 1..maxFileBytes) { "WebDAV track is empty or exceeds 750 MB." }
+        require(entry.bytes == null || entry.bytes in 1..allowed) { "WebDAV track is empty or exceeds the file/import limit." }
         directory.mkdirs()
         val key = MessageDigest.getInstance("SHA-256").digest(entry.uri.toASCIIString().toByteArray()).joinToString("") { "%02x".format(it) }
         val extension = entry.uri.path.substringAfterLast('.').lowercase(Locale.ROOT)
         val target = File(directory, "$key.$extension")
         val temp = Files.createTempFile(directory.toPath(), "webdav-", ".part")
-        val sink = DavFileBody(temp.toFile(), maxFileBytes)
+        val sink = DavFileBody(temp.toFile(), allowed)
         try {
             val request = request(root, entry.uri, username, password)
             entry.etag?.takeUnless { it.startsWith("W/") }?.let { request.header("If-Match", it) }
             val response = await(request.GET().build(), HttpResponse.BodyHandler { info ->
                 if (info.statusCode() != 200) sink.fail(IllegalStateException("WebDAV download returned HTTP ${info.statusCode()}."))
                 val size = info.headers().firstValueAsLong("Content-Length").orElse(-1)
-                if (size > maxFileBytes) sink.fail(IllegalStateException("WebDAV track exceeds 750 MB."))
+                if (size > allowed) sink.fail(IllegalStateException("WebDAV track exceeds the file/import limit."))
                 sink
             })
             check(response.statusCode() == 200 && sink.count > 0) { "WebDAV download failed or was empty." }

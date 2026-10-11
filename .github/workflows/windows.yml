@@ -158,6 +158,22 @@ jobs:
           if (!$p.WaitForExit(30000)) { $p.Kill(); throw 'Replay PNG export timed out' }
           if ($p.ExitCode -ne 0 -or !(Test-Path $result) -or !(Test-Path $image)) { throw 'Replay PNG export failed' }
           Get-Content $result
+      - name: Verify packaged WebDAV import and playback
+        shell: pwsh
+        run: |
+          $portFile = Join-Path $PWD 'webdav-fixture-port.txt'
+          $server = Start-Process python -ArgumentList @('scripts/webdav_fixture.py', "--port-file=$portFile") -PassThru
+          try {
+            for ($attempt = 0; $attempt -lt 50 -and !(Test-Path $portFile); $attempt++) { Start-Sleep -Milliseconds 100 }
+            if (!(Test-Path $portFile)) { throw 'WebDAV fixture did not start' }
+            $port = (Get-Content $portFile -Raw).Trim()
+            $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+            $result = Join-Path $PWD 'webdav-smoke.txt'
+            $p = Start-Process $exe -ArgumentList @('--webdav-smoke', "--server=http://127.0.0.1:$port/music/", "--result=$result") -PassThru
+            if (!$p.WaitForExit(45000)) { $p.Kill(); throw 'Packaged WebDAV timed out' }
+            if ($p.ExitCode -ne 0 -or !(Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Packaged WebDAV failed' }
+            Get-Content $result
+          } finally { if (!$server.HasExited) { $server.Kill(); $server.WaitForExit() } }
       - name: Verify measured Automix and original-track seek
         # Existing paused gate follows an additional real Automix check.
         shell: pwsh
@@ -232,16 +248,17 @@ jobs:
       - name: Summarize test and runtime evidence
         shell: pwsh
         run: |
-          $tests = 0; $failures = 0
+          $tests = 0; $failures = 0; $skipped = 0
           Get-ChildItem -Recurse -Path . -Filter 'TEST-*.xml' | Where-Object FullName -Match 'test-results' | ForEach-Object {
             [xml]$report = Get-Content $_.FullName
             $tests += [int]$report.testsuite.tests
             $failures += [int]$report.testsuite.failures + [int]$report.testsuite.errors
+            $skipped += [int]$report.testsuite.skipped
           }
-          "Tests: $tests; failures/errors: $failures" | Tee-Object -FilePath test-summary.txt
+          "Tests: $tests; failures/errors: $failures; skipped: $skipped" | Tee-Object -FilePath test-summary.txt
           Get-Content "$env:JAVA_HOME/release" | Out-File runtime-build.txt
           Get-Content app-desktop/build/generated/notices/licenses/DEPENDENCIES.txt | Out-File dependency-inventory.txt
-          if ($tests -lt 40 -or $failures -ne 0) { throw 'Expected test suites did not all run successfully' }
+          if ($tests -lt 79 -or $failures -ne 0 -or $skipped -ne 0) { throw 'Expected test suites did not all run successfully' }
       - name: Collect separately licensed dependency sources
         shell: pwsh
         run: |
@@ -265,6 +282,9 @@ jobs:
           git archive --format=zip -o podium-air-windows-source.zip HEAD
           Compress-Archive -Path 'app-desktop/build/compose/binaries/main/app/Podium Air' -DestinationPath podium-air-windows-portable.zip
           Get-FileHash app-desktop/build/compose/binaries/main/msi/*.msi, app-desktop/build/compose/binaries/main/exe/*.exe, podium-air-windows-portable.zip, podium-air-windows-source.zip, dependency-sources.zip -Algorithm SHA256 | Format-List | Out-File SHA256SUMS.txt
+      - name: Inspect actual packages, models, source and bundled licenses
+        shell: pwsh
+        run: python scripts/inspect_windows_package.py
       - uses: actions/upload-artifact@v4
         with:
           name: Podium-Air-Windows-x64
@@ -324,6 +344,8 @@ jobs:
             audio-smoke.txt
             automix-smoke.txt
             credentials-smoke.txt
+            webdav-smoke.txt
+            package-inspection/
             replay-smoke.txt
             replay-smoke.png
             replay-cards/*.png

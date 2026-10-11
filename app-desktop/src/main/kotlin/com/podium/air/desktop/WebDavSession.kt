@@ -77,9 +77,9 @@ internal class DavSession(
             finally { if (epoch == command) busy.value = false }
         }
     }
-    suspend fun download(entry: DavEntry, directory: File): File {
+    suspend fun download(entry: DavEntry, directory: File, byteBudget: Long = 750_000_000): File {
         val credentials = credentials()
-        return client.download(DavPaths.root(credentials.root), entry, credentials.username, credentials.password, directory)
+        return client.download(DavPaths.root(credentials.root), entry, credentials.username, credentials.password, directory, byteBudget)
     }
     fun cancel() { ++epoch; job?.cancel(); busy.value = false; status.value = "WebDAV operation cancelled." }
     fun disconnect() {

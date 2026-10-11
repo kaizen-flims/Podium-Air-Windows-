@@ -25,6 +25,7 @@ fun main(args: Array<String>) {
     if (args.contains("--replay-smoke")) { replaySmoke(args); return }
     if (args.contains("--automix-smoke")) { automixSmoke(args); return }
     if (args.contains("--credentials-smoke")) { credentialsSmoke(args); return }
+    if (args.contains("--webdav-smoke")) { webDavSmoke(args); return }
     val performance = args.contains("--performance-smoke")
     val smoke = args.contains("--ui-smoke") || performance
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
@@ -259,6 +260,39 @@ internal fun generateTestWave(file: File, seconds: Int) {
 }
 
 /** Packaged native measurements feed a real two-player PCM transition, then pause/seek/end/cleanup. */
+private fun webDavSmoke(args: Array<String>) {
+    val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "webdav-smoke.txt")
+    val directory = java.nio.file.Files.createTempDirectory("podium-webdav-smoke").toFile()
+    val secrets = WindowsSecretStore("test-${java.util.UUID.randomUUID()}")
+    val engine = JavaFxAudioEngine()
+    var code = 0
+    try {
+        runBlocking {
+            val root = DavPaths.root(args.firstOrNull { it.startsWith("--server=") }?.substringAfter("=") ?: error("WebDAV fixture URL is required."))
+            check(root.host == "127.0.0.1" && root.path == "/music/") { "WebDAV smoke accepts only its loopback fixture." }
+            val fixture = DavCredentials(root.toString(), "smoke", "smoke-only")
+            secrets.write(kotlinx.serialization.json.Json.encodeToString(DavCredentials.serializer(), fixture))
+            val saved = kotlinx.serialization.json.Json.decodeFromString<DavCredentials>(secrets.read() ?: error("Credential fixture was not stored."))
+            DavClient().use { client ->
+                val entry = client.list(root, root, saved.username, saved.password).single()
+                check(entry.name == "雨 music.wav" && entry.audio)
+                val downloaded = client.download(root, entry, saved.username, saved.password, directory)
+                check(downloaded.length() == entry.bytes)
+                val track = LocalLibrary(directory).import(listOf(downloaded)).first.single()
+                check(track.duration == 6000L)
+                engine.open(com.podium.air.domain.QueueEntry(song = track.song()))
+                withTimeout(15000) { engine.state.first { it.error != null || it.playing && it.positionMs > 300 } }.let { check(it.error == null) { it.error.orEmpty() } }
+                engine.pause(); withTimeout(3000) { engine.state.first { !it.playing } }
+                engine.seek(2000); withTimeout(3000) { engine.state.first { it.positionMs in 1900..2200 } }
+                engine.toggle(); withTimeout(10000) { engine.state.first { it.completed || it.error != null } }.let { check(it.error == null && it.completed) }
+            }
+            secrets.delete(); check(secrets.read() == null)
+            result.writeText("PASS: Packaged WebDAV authenticated PROPFIND, Unicode conditional GET, secure credential round-trip, real metadata import and downloaded-track play/pause/seek/natural end passed. Only loopback fixture credentials were used.\n")
+        }
+    } catch (e: Throwable) { result.writeText("FAIL: WebDAV fixture: ${e.javaClass.simpleName}: ${e.message}\n"); code = 1 }
+    finally { runCatching { secrets.delete() }; engine.close(); FxRuntime.exit(); directory.deleteRecursively() }
+    exitProcess(code)
+}
 private fun credentialsSmoke(args: Array<String>) {
     val result = File(args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "credentials-smoke.txt")
     val secret = WindowsSecretStore("test-${java.util.UUID.randomUUID()}")

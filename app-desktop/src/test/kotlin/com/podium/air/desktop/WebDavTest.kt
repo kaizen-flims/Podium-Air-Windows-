@@ -109,13 +109,14 @@ class WebDavTest {
     @Test fun oversizedListingsAndChunkedTracksFailWithNoPartialFile() = runBlocking {
         Server { exchange ->
             if (exchange.requestMethod == "PROPFIND") send(exchange, ByteArray(2_000_001) { 32 }, 207)
-            else { exchange.sendResponseHeaders(200, 0); exchange.responseBody.use { it.write(ByteArray(2048) { 1 }) } }
+            else { exchange.sendResponseHeaders(200, 0); exchange.responseBody.use { it.write(ByteArray(if (exchange.requestURI.path.endsWith("budget.wav")) 256 else 2048) { 1 }) } }
         }.use { server ->
             DavClient(maxFileBytes = 1024).use { client ->
                 assertFails { client.list(server.root, server.root, "", "") }
                 val directory = Files.createTempDirectory("dav-limit").toFile()
                 try {
                     assertFails { client.download(server.root, DavEntry(server.root.resolve("x.wav"), "x.wav", false), "", "", directory) }
+                    assertFails { client.download(server.root, DavEntry(server.root.resolve("budget.wav"), "budget.wav", false), "", "", directory, byteBudget = 128) }
                     assertTrue(directory.listFiles().orEmpty().isEmpty())
                 } finally { directory.deleteRecursively() }
             }

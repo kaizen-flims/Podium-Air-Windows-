@@ -72,7 +72,7 @@ class DesktopModel(
                     if (downloadedBytes + (entry.bytes ?: 750_000_000) > 5_000_000_000) {
                         message.value = "Imported $imported tracks. The 5 GB per-import limit was reached."; break
                     }
-                    val file = dav.download(entry, File(defaultDataDirectory(), "webdav/music"))
+                    val file = dav.download(entry, File(defaultDataDirectory(), "webdav/music"), 5_000_000_000 - downloadedBytes)
                     downloadedBytes += file.length()
                     val result = withContext(Dispatchers.IO) { localLibrary.import(listOf(file), { ensureActive() }) }
                     ensureActive()
