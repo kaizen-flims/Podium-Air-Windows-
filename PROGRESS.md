@@ -168,3 +168,10 @@ by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
   new player, WebDAV, ListenBrainz and Replay checks.
 - Full streaming/sign-in still depends on the documented provider/app setup.
   No full release, main merge, website replacement or Android update was made.
+
+## 11 October — completion prompt implementation
+
+- c42c0af integrated native Liquid Glass and Android/custom/common container lyric readers. Only compile/UI checks ran during development.
+- 4285397 fixed a visually observed tagged-MP3 JavaFX failure via JLayer PCM decoding; real tagged files then imported/restored/played/paused and rendered lyrics in both themes (run 38147720644).
+- Final integration extends artwork behind the floating chrome and recreates cached glass layers on theme/blur switches. Full regression and installer packaging run after this integrated app, then screenshot review and exact-artifact prerelease promotion. The old preview and Android update channels are preserved.
+- Online/account and service-dependent gaps remain explicit; no full-parity claim or mock functionality.

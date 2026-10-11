@@ -42,7 +42,7 @@ record the results.
 | Crossfade | Partial | Real two-player equal-power 0–12s overlap at 1× verified across six format fixtures; no sample-accurate gaplessness or beat alignment |
 | Automix/beat/tempo transitions | Partial | Original AGPL planner/native DSP/mel/STFT and bundled Beat This!/Open-unmix models; confidence-based cues/EQ, bounded WSOLA and original-track seek. 84-test/model and actual packaged transition gates passed; cloud evidence does not establish all Android behavior or consumer listening quality |
 | Speed/equalizer/sleep | Partial | Actual JavaFX rate/ten-band EQ and monotonic pause timer; listening/device acceptance remains |
-| TTML/LRC/embedded lyrics | Partial | Original TTML/alignment/focus/clock reused; words/duets/backing vocals, per-track offsets, click-to-seek, autoscroll and reduced motion; parser/clock/security tests pass |
+| TTML/LRC/embedded lyrics | Partial | New container reader: ID3 USLT/SYLT milliseconds, FLAC/Vorbis/Opus comments, M4A ©lyr/freeform, custom Android word tags and UTF-16 sidecars; empty/invalid sidecars fall back. Real tagged fixtures imported/restored/played/paused and rendered in both themes at 4285397. User file acceptance remains.  Original TTML/alignment/focus/clock reused; words/duets/backing vocals, per-track offsets, click-to-seek, autoscroll and reduced motion; parser/clock/security tests pass |
 | Word motion/artwork background | Partial | Timed growth/lift/bloom; original three-pass 128px full-artwork blur, eight-cover cache and finite bitmap fades with reduced motion. Five neutral/spatial-color/cache/bounded-input tests passed; portrait mesh/shader, video canvas and exact source motion parity remain |
 | Online lyrics | Partial | Opt-in documented LRCLIB provider, validated title/artist/duration, bounded response/cache and cancellation. Five actual local HTTP contract tests passed; live catalog availability and other source providers are not guaranteed |
 | Lyrics translation/canvas video | Blocked | Source translation/canvas provider rights/auth and native video implementation remain unresolved |
@@ -66,3 +66,9 @@ branding, icons and dark/light colors are retained; restricted SF Pro fonts are
 replaced with platform typography. Physical Windows 10/11 device listening,
 keyboard/tray/picker/startup, hotplug and full source animation parity require
 acceptance beyond the cloud runner.
+
+## 0.3.0 integrated candidate
+
+Native Liquid Glass uses the compatible Apache-2.0 KMP backdrop renderer and the original Android Kyant0/backdrop chromatic shader. Saturation 1.5, blur 8dp, refraction height/amount 24dp, tint 0.4 and theme highlights match the Android integration. Full-resolution Windows processing replaces Android's 0.33 optimization. Floating chrome is excluded from its own backdrop capture; current-track artwork extends behind glass. Theme/blur changes recreate cached native effect layers. These final changes require the release build's UI inspection. Noctis/Tunetastic were audited but not copied.
+
+The source for account/online discovery/search/downloads still calls private `data/innertube/Innertube.kt` and `auth/YtMusicLoginScreen.kt` cookie capture. `data/lyrics/LyricsTranslation.kt` uses non-Cloud translation endpoints; canvas sources impersonate service mobile clients. `data/discord/DiscordRPC.kt` uses personal bearer tokens. None is silently substituted into a supported desktop account implementation. Registered app/provider permission and protocol selection remain required for the corresponding integrations.

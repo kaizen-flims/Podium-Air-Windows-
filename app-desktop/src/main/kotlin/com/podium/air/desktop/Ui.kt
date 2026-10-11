@@ -102,6 +102,8 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     val colors = if (state.preferences.dark) Dark else Light
     val compact = LocalWindowInfo.current.containerSize.width / LocalDensity.current.density < 900f
     MaterialTheme(colorScheme = colors, typography = Typography) {
+        // Recreate native effect nodes on a theme/blur change: the alpha renderer caches effect layers.
+        key(state.preferences.dark, state.preferences.liquidGlass, state.preferences.reduceDynamicBlur) {
         val liveColors by rememberUpdatedState(colors)
         val backdrop = rememberLayerBackdrop { drawRect(liveColors.background); drawContent() }
         CompositionLocalProvider(LocalGlassBackdrop provides backdrop,
@@ -123,7 +125,11 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         }.focusRequester(rootFocus).focusable()) {
             Box(Modifier.fillMaxSize()) {
                 // Capture only the page: floating chrome is a sibling, never part of its own backdrop.
-                Row(Modifier.fillMaxSize().background(colors.background).then(if (LocalGlassEnabled.current) Modifier.layerBackdrop(backdrop) else Modifier)) {
+                Box(Modifier.fillMaxSize().background(colors.background).then(if (LocalGlassEnabled.current) Modifier.layerBackdrop(backdrop) else Modifier)) {
+                    if (state.preferences.dynamicBackground && route.page in listOf(Page.PLAYER, Page.LYRICS)) {
+                        ArtworkBackground(audio.entry?.song?.thumbnailUrl, state.preferences)
+                    }
+                    Row(Modifier.fillMaxSize()) {
                     Spacer(Modifier.width(if (compact) 64.dp else 190.dp))
                     Column(Modifier.weight(1f).fillMaxHeight().padding(top = 88.dp)) {
                         if (message != null) Notice(message!!, onDismiss = { model.message.value = null })
@@ -167,6 +173,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                         }
                     }
                 }
+                }
                 Row(Modifier.fillMaxSize()) {
                     Navigation(route, state.preferences.dark, compact) { route = Route(it) }
                     Box(Modifier.weight(1f)) {
@@ -191,6 +198,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         }
         }
 
+        }
         if (createName != null) AlertDialog(onDismissRequest = { createName = null }, title = { Text("New playlist") },
             text = { OutlinedTextField(createName!!, { createName = it }, label = { Text("Playlist name") }, singleLine = true) },
             confirmButton = { TextButton({ model.createPlaylist(createName!!); createName = null }, enabled = !createName.isNullOrBlank()) { Text("Create") } },
@@ -480,7 +488,6 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
         onSurfaceVariant = if (dark) Color.White.copy(alpha = 0.80f) else Color.Black.copy(alpha = 0.70f))
     MaterialTheme(colorScheme = colors) {
         BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            if (state.preferences.dynamicBackground) ArtworkBackground(song.thumbnailUrl, state.preferences)
             val wide = maxWidth > 720.dp
             val content = Modifier.widthIn(max = 1100.dp).fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)
             if (wide) {

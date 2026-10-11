@@ -11,6 +11,9 @@ manifest = json.loads(Path('release/preview.json').read_text())
 repo = os.environ['GH_REPO']
 assert repo == 'kaizen-flims/Podium-Air-Windows-'
 source = os.environ['SOURCE_SHA']
+source_branch = os.environ.get('SOURCE_BRANCH', 'main')
+assert source_branch in ('main', 'feat/complete-native-parity')
+assert manifest.get('source_branch', 'main') == source_branch
 token = os.environ['GH_TOKEN']
 base = f'https://api.github.com/repos/{repo}'
 headers = {'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json',
@@ -31,7 +34,15 @@ if any(not r['draft'] for r in existing):
     print('The approved preview is already published; no public assets were changed.')
     raise SystemExit(0)
 assert len(existing) <= 1, 'Multiple drafts require review before publishing'
-assert request(base + '/git/ref/heads/main')['object']['sha'] == source, 'Build must match current main'
+promotion_sha = os.environ.get('PROMOTION_SHA', source)
+def verify_source():
+    assert request(base + '/git/ref/heads/' + source_branch)['object']['sha'] == promotion_sha, 'Source branch changed during publication'
+    if promotion_sha != source:
+        diff = request(base + '/compare/' + source + '...' + promotion_sha)
+        assert diff['total_commits'] == 1 and [file['filename'] for file in diff['files']] == ['release/promotion.json'], 'Promotion must change only its reviewed build pointer'
+    run = request(base + '/actions/runs/' + os.environ['BUILD_RUN'])
+    assert run['head_sha'] == source and run['conclusion'] == 'success' and run['event'] == 'push', 'Preview needs the exact successful source build'
+verify_source()
 notes = Path('release/preview-notes.md').read_text() + '\n\n' + Path('release-assets/BUILD_EVIDENCE.txt').read_text()
 metadata = {'tag_name': manifest['tag'], 'target_commitish': source, 'name': manifest['title'],
             'body': notes, 'draft': True, 'prerelease': True, 'make_latest': 'false'}
@@ -57,7 +68,7 @@ for path in files:
     if result.get('digest'):
         assert result['digest'] == expected, path.name
     print('Uploaded and verified ' + path.name, flush=True)
-assert request(base + '/git/ref/heads/main')['object']['sha'] == source
+verify_source()
 state = request(base + f"/releases/{release['id']}")
 assert state['draft'] and state['target_commitish'] == source and len(state['assets']) == len(files)
 public = request(base + f"/releases/{release['id']}", 'PATCH', {'draft': False, 'prerelease': True, 'make_latest': 'false'})

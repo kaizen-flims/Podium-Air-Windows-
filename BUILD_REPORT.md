@@ -1,3 +1,13 @@
+# 0.3.0 candidate build status
+
+The new code has been integrated before final regression/packaging. The compile-only Windows checkpoint `4285397150ffd33ce5602759248802abbaef403e`, run [38147720644](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38147720644), passed real tagged-audio import, persistence, restore, playback/pause and visible lyrics UI for USLT, millisecond SYLT, Android FLAC enhanced fields, Opus comments and M4A ©lyr. Its all-route/player UI check also passed. No large regression suite was run at that development checkpoint.
+
+Screenshot review found a JavaFX rejection of tagged MP3 at the previous checkpoint; JLayer-to-PCM preparation fixed the actual playback failure. Final code also rebuilds glass effect nodes on theme/blur changes and extends the artwork backdrop behind floating chrome. The full integrated release build verifies these final changes, installer behavior, existing native integrations, codecs, performance and regression suites before publication. This report does not claim those future checks already passed.
+
+Preview publication uses a reviewed successful build's exact artifacts, corresponding source, hashes and required license notices. It does not rebuild the app or run another Windows test suite. Google/YouTube native streaming/sign-in/sync remain unresolved; the public preview must disclose this. Cloud Windows validation does not replace the user's physical Windows 10/11 acceptance.
+
+## Historical 0.2 development checkpoint
+
 # Build report — 11 October 2026
 
 **The native development build works; the complete streaming-focused Windows

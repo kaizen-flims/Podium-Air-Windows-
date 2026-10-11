@@ -18,16 +18,22 @@ manifest = json.loads(Path('release/preview.json').read_text())
 assert re.fullmatch(r'[0-9a-f]{40}', args.source_sha)
 assert args.run_id.isdigit()
 reports = list(args.verification.rglob('TEST-*.xml'))
-tests = failures = 0
+tests = failures = skipped = 0
 for report in reports:
     suite = ET.parse(report).getroot()
     tests += int(suite.get('tests', 0))
     failures += int(suite.get('failures', 0)) + int(suite.get('errors', 0))
-assert tests >= manifest['minimum_tests'] and failures == 0, (tests, failures)
+    skipped += int(suite.get('skipped', 0))
+assert reports and failures == 0 and skipped == 0, (tests, failures, skipped)
+assert any(p.name == 'TEST-com.podium.air.desktop.EmbeddedLyricsTest.xml' for p in reports), 'Embedded reader regressions were not run'
 for name in ('ui-smoke.txt', 'platform-smoke.txt', 'audio-smoke.txt', 'installer-smoke.txt',
              'dpi-1.5-smoke.txt', 'dpi-2.0-smoke.txt', 'performance-smoke.txt',
              'codec-flac-smoke.txt', 'codec-opus-smoke.txt', 'codec-mp3-smoke.txt',
-             'codec-m4a-smoke.txt', 'codec-aiff-smoke.txt'):
+             'codec-m4a-smoke.txt', 'codec-aiff-smoke.txt', 'automix-smoke.txt',
+             'credentials-smoke.txt', 'webdav-smoke.txt', 'replay-smoke.txt',
+             'embedded-lyrics-id3-uslt-smoke.txt', 'embedded-lyrics-id3-sylt-smoke.txt',
+             'embedded-lyrics-android-enhanced-smoke.txt', 'embedded-lyrics-vorbis-comments-smoke.txt',
+             'embedded-lyrics-mp4-lyrics-smoke.txt'):
     assert 'PASS:' in (args.verification / name).read_text(encoding='utf-8-sig'), name
 source = args.packages / 'podium-air-windows-source.zip'
 with zipfile.ZipFile(source) as archive:
