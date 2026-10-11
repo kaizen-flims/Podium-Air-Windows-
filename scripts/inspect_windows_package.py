@@ -48,7 +48,7 @@ with zipfile.ZipFile(root / 'podium-air-windows-source.zip') as source:
         checked += 1
 
 dist = root / 'app-desktop/build/compose/binaries/main/app/Podium Air'
-jars = list((dist / 'app').glob('*.jar'))
+jars = list((dist / 'app').rglob('*.jar'))
 application = []
 for file in jars:
     with zipfile.ZipFile(file) as jar:
@@ -58,6 +58,7 @@ require(len(application) == 1, 'Could not identify the actual application JAR')
 app = application[0]
 # Retain the exact small JAR as diagnostic evidence even if a subsequent gate fails.
 (out / 'application.jar').write_bytes(app.read_bytes())
+(out / 'classpath-jars.json').write_text(json.dumps([file.relative_to(dist).as_posix() for file in jars], indent=2) + '\n')
 with zipfile.ZipFile(app) as jar:
     names = jar.namelist()
     for name in ('com/podium/air/desktop/DavSession.class', 'com/podium/air/desktop/DavClient.class',
@@ -92,11 +93,23 @@ with zipfile.ZipFile(root / 'podium-air-windows-portable.zip') as portable:
     require(hashlib.sha256(portable.read(packaged_app[0])).digest() == hashlib.sha256(app.read_bytes()).digest(), 'Portable JAR differs from tested app')
     legal = [name for name in portable.namelist() if '/runtime/legal/' in name and not name.endswith('/')]
     require(len(legal) >= 40, 'Portable runtime legal files are incomplete')
-    require(any(name.endswith('/app/jlayer-1.0.1.jar') for name in portable.namelist()), 'LGPL JLayer is not a replaceable JAR')
+    jlayer = []
+    for file in jars:
+        if file == app:
+            continue
+        with zipfile.ZipFile(file) as dependency:
+            if 'javazoom/jl/decoder/Bitstream.class' in dependency.namelist():
+                jlayer.append(file)
+    require(len(jlayer) == 1, 'LGPL JLayer is not a separate replaceable JAR')
+    relative = jlayer[0].relative_to(dist).as_posix()
+    entries = [name for name in portable.namelist() if name.endswith('/' + relative)]
+    require(len(entries) == 1, 'Portable ZIP lacks the separate JLayer JAR')
+    require(hashlib.sha256(portable.read(entries[0])).digest() == hashlib.sha256(jlayer[0].read_bytes()).digest(), 'Portable JLayer differs from tested library')
 
 report = {'sourceCommit': commit, 'trackedSourceFilesChecked': checked, 'packages': packages,
           'applicationJar': {'name': app.name, 'bytes': app.stat().st_size, 'sha256': hashlib.sha256(app.read_bytes()).hexdigest()},
           'models': models, 'nativeBinaries': binaries, 'noticeFiles': len(notices),
-          'portableRuntimeLegalFiles': len(legal), 'replaceableRuntimeJars': len(jars), 'unsigned': True}
+          'portableRuntimeLegalFiles': len(legal), 'replaceableRuntimeJars': len(jars),
+          'lgplJLayer': {'path': relative, 'sha256': hashlib.sha256(jlayer[0].read_bytes()).hexdigest()}, 'unsigned': True}
 (out / 'manifest.json').write_text(json.dumps(report, indent=2) + '\n')
 print('PASS: Five package hashes, exact source, portable JAR, both pinned models, native PE resources and bundled licenses verified.')
