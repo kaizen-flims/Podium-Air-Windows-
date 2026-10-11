@@ -56,9 +56,11 @@ for file in jars:
             application.append(file)
 require(len(application) == 1, 'Could not identify the actual application JAR')
 app = application[0]
+# Retain the exact small JAR as diagnostic evidence even if a subsequent gate fails.
+(out / 'application.jar').write_bytes(app.read_bytes())
 with zipfile.ZipFile(app) as jar:
     names = jar.namelist()
-    for name in ('com/podium/air/desktop/WebDavSession.class', 'com/podium/air/desktop/DavClient.class',
+    for name in ('com/podium/air/desktop/DavSession.class', 'com/podium/air/desktop/DavClient.class',
                  'com/podium/air/desktop/ScrobblingIntegration.class', 'com/podium/air/desktop/ReplayStoriesKt.class'):
         require(name in names, 'Missing feature: ' + name)
     models = {}
@@ -83,8 +85,6 @@ with zipfile.ZipFile(app) as jar:
     for required in ('agpl', 'onnx', 'beat', 'unmix'):
         require(any(required in name.lower() for name in notices), 'Missing bundled license: ' + required)
     require(not any('sfpro' in name.lower().replace('-', '').replace('_', '') and name.lower().endswith(('.otf', '.ttf')) for name in names), 'Restricted SF Pro font was bundled')
-    # A small exact copy supports independent inspection of the app and its resources.
-    (out / 'application.jar').write_bytes(app.read_bytes())
 
 with zipfile.ZipFile(root / 'podium-air-windows-portable.zip') as portable:
     packaged_app = [name for name in portable.namelist() if name.endswith('/app/' + app.name)]
