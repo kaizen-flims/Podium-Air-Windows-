@@ -1,4 +1,4 @@
-# Porting audit — updated 10 October 2026
+# Porting audit — updated 11 October 2026
 
 Source: `kaizen-flims/Podium-Air`, default branch `main`, commit
 `48902e6b20fdcfeb1723e02d4744849e82d5067a` (Podium Air v1.0.1 revision 1).
@@ -33,19 +33,20 @@ simply changing the Gradle target would not produce a desktop app.
 | Brand images | Reusable | Original mono mark and Glow Flow app icon retained; Windows icon derived |
 | SF Pro Display OTF files | Blocked pending redistribution rights | Not bundled; desktop default system font used |
 | `LocalMediaRepository` | Android-only / reimplement | MediaStore, URI permissions and MediaMetadataRetriever replaced with Windows Common Item Dialogs, cancellable filesystem scanning and jaudiotagger |
-| `AppSettings`, SearchHistory, LastPlayed, ListeningStats | Android-only persistence bindings | Atomic JSON store, preferences, favorites and recent history implemented. Elapsed-time recorder and 7/30/365-day Replay implemented; summary PNG preview/export is now ported; all eight individual story card PNG types and calendar month/year/all-time filters now have desktop adapters, with additional checks pending |
+| `AppSettings`, SearchHistory, LastPlayed, ListeningStats | Android-only persistence bindings | Atomic JSON store, preferences, favorites and recent history implemented. Elapsed-time recorder and 7/30/365-day Replay implemented; summary PNG preview/export is now ported; all eight individual story card PNG types and calendar month/year/all-time filters now have desktop adapters, with all eight export/calendar/statistics checks passed |
 | PlaybackService / PlayerConnection / audio sink / output routing | Android-only / reimplement | JavaFX native audio backend on JVM, single-thread lifecycle, reactive StateFlow; Windows JavaFX native libraries packaged |
 | `CrossfadeController` | Android-only orchestration | Two-player equal-power overlap implemented for local tracks at 1×; not claiming sample-accurate gaplessness |
 | `smart/TransitionPlanner.kt` | Reusable after abstraction + separate license | Original policy/planner/analysis reused with AGPLv3-or-later headers and bundled license; source obligations retained under section 13 |
-| Automix analyzer / WSOLA / on-device model | Reused/adapted and tested | Original native DSP, mel/STFT front ends, Beat This!/Open-unmix adapters and exact model bytes; custom bounded pitch-preserving desktop WSOLA; actual model/PCM and packaged transition checks passed 58-test run 38064057032 |
+| Automix analyzer / WSOLA / on-device model | Reused/adapted and tested | Original native DSP, mel/STFT front ends, Beat This!/Open-unmix adapters and exact model bytes; custom bounded pitch-preserving desktop WSOLA; actual model/PCM and packaged transition checks passed 79-test run 38126328359 |
 | YtMusicRepository / Innertube / StreamResolver / PO tokens | Blocked pending compatible supported provider integration | Private API/extraction pipeline and Android WebView path not ported under the prompt's provider-policy constraint |
 | Google / Discord auth, EncryptedPrefs | Android-only / pending supported API | No cookies or credentials collected. No desktop auth/session sync claim |
-| Sources, addon modules, JioSaavn, WebDAV, SMB | Pending provider/dependency audit and implementation | Not connected or advertised as functional |
+| Sources / WebDAV | Desktop adapter tested | Read-only HTTPS Basic-auth browse/selected offline import; original folder semantics, native credential storage, bounded/cancellable requests and nine HTTP/state tests; packaged Unicode download/playback passed. Uploads, direct streaming and sidecar cover scans remain |
+| Addons / JioSaavn / direct SMB accounts | Pending provider/dependency audit and implementation | Mapped/UNC folder import is functional; other adapters are not connected or advertised as complete |
 | Canvas Apple/Spotify/Tidal/community | Pending asset/API rights and player integration | Embedded artwork, extracted dominant-color animated background and reduced-motion setting implemented; online canvas video is not connected |
 | TTML / lyric clock / lyric focus | Reusable after minimal abstraction | Original parser, alignments and clock reused; clock/focus visibility made public across modules. Word growth, lift, bloom, overlaps, backing vocals, local offsets and click-to-seek implemented |
 | Online lyrics providers / translation | Partial | Optional documented LRCLIB API with strict metadata/duration matching, bounded bodies, cancellation and offline cache; five local HTTP contract tests passed. Other providers/translation remain missing |
 | DownloadService / Downloader / offline DASH/HLS | Android-only + provider policy | No streaming download feature in Windows preview |
-| ListenBrainz | Adapted, additional checks pending | Documented API with actual audible-time thresholds, one-request-per-second pacing and rate headers; Windows Credential Manager stores user tokens. No real-account submission has been tested |
+| ListenBrainz | Adapted and contract/native tested | Documented API with actual audible-time thresholds, one-request-per-second pacing and rate headers; Windows Credential Manager stores user tokens. No real-account submission has been tested |
 | Last.fm / Discord RPC / Listen Together | Pending supported desktop integration | Last.fm application setup, official native Discord RPC/application ID and a supported shared-listening service contract remain missing; Android Discord account-token gateway impersonation is not copied |
 | Widgets / Android Auto / foreground notifications / haptics | Android-only | Desktop file chooser, standard window controls, AWT tray, optional notifications/startup and native Windows SMTC provided; physical media-key/device checks remain |
 
@@ -131,3 +132,20 @@ qualifying listens. The UI reports failed submissions; offline retries are not
 implemented. Windows native storage uses CredWriteW/CredReadW/CredDeleteW for
 `PodiumAirWindows/` generic credentials in the current user's credential set:
 https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credwritew.
+
+## WebDAV adapter references and evidence
+
+Pinned source `data/webdav/WebDavClient.kt`, `WebDavConfig.kt`,
+`WebDavRepository.kt` and `ui/screens/SourcesScreen.kt` were reviewed before
+porting. Android OkHttp/shared interceptors/settings/media binding were replaced
+with JDK HTTP/atomic disk import and current-user Windows Credential Manager.
+Source behavior is adapted; direct Android streaming/upload/cover traversal is
+not claimed. Exact origin/port/folder checks, DAV success propstat handling,
+case-sensitive paths, disabled XML entities, redirect refusal and bounded transfers
+improve the desktop boundary. No remote account or private server was contacted.
+
+Primary protocol references:
+https://www.rfc-editor.org/rfc/rfc4918.html (PROPFIND/Depth/multistatus) and
+https://www.rfc-editor.org/rfc/rfc7617.html (Basic authentication/TLS/UTF-8).
+Nine actual HTTP/XML/path/state checks and packaged download/native playback
+passed Windows run 38126328359. Real-server and physical-device acceptance remain.

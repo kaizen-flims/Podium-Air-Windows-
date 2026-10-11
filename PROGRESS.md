@@ -103,3 +103,25 @@ by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
   PNG cards, plus measured local listening-hour profiles with backward-
   compatible older records. Added three calendar/rendering/statistics tests and
   expanded packaged Replay evidence to all cards. New checks pending.
+
+
+### WebDAV and packaged-payload verification — 11 October 2026
+
+- `016c63c` exposes separate installer/portable/source/dependency downloads while
+  retaining the combined release-validator bundle. All Windows gates passed.
+  Downloaded corresponding source matched all 127 tracked Git blobs.
+- `65ef6f9` adds Sources/WebDAV browsing, Windows Credential Manager, selected
+  offline import and nine actual HTTP/XML/path/state/cancellation tests. Run
+  38124280801 passed 79 tests with zero failures/errors/skips and all existing
+  native/UI/installer gates. Source screenshots and the XML ZIP were inspected.
+- Checkpoint `0573e24` includes the packaged loopback WebDAV download/native playback gate,
+  enforces actual per-import byte limits, requires 79 tests/no skips, and inspects
+  actual packages/source/model/native/license payloads. Run 38126328359 passed
+  all gates. Its verification digest is e6ba7ffba4648bfa56703cbd09a7d0e693e1516befbb7e0ab0ccb2a4f5f8e0e2.
+  The independently downloaded source matches all 132 remote Git blobs; the
+  exact packaged JAR/model/x64-native/license evidence also matched. The PR
+  run 38126332001 passed as well. Paused sample: 1.38% of one logical core,
+  236.69 MB peak app/direct-helper working set. MSI install/launch/uninstall passed.
+- The full streaming release remains unfinished. Five product work blocks remain,
+  starting with the supported provider/OAuth application dependency. No new full
+  release, main merge, website link replacement or Android update was made.

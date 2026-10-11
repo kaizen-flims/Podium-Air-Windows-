@@ -14,19 +14,20 @@ ten-band equalizer, sleep timer, TTML/LRC lyrics, lyric timing/word motion,
 artwork color motion and Replay listening statistics are implemented.
 The development branch also contains native DSP/Beat This!/Open-unmix analysis,
 confidence-based transitions, pitch-preserving WSOLA, opt-in LRCLIB lyrics with
-offline cache, frozen Replay PNG previews and opt-in ListenBrainz scrobbling. Replay supports
+offline cache, frozen Replay PNG previews and opt-in ListenBrainz scrobbling. The Sources screen also browses personal
+HTTPS WebDAV folders and imports selected tracks for offline playback. Replay supports
 the source app's This month / This year / All time views and Intro, Minutes,
 Artists, Songs, Albums, Genres, Habits and Recap cards. Empty album/genre cards
 are hidden; old listening records do not invent hourly statistics. Windows shell file/folder dialogs,
 system media controls, tray, optional notifications and optional startup are included.
 
-Development commit `1b12da5` passed **58 tests with zero failures/errors** and
-all packaged Windows gates in [run 38064057032](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38064057032):
-neural model inference, actual Automix overlap/seek, Replay export, six codecs,
-15 navigation routes, keyboard/DPI/native media checks and MSI lifecycle.
-ListenBrainz with Windows Credential Manager is implemented and undergoing
-expanded Windows checks. Calendar Replay periods and all eight individual
-story PNG cards are also implemented; their new checks are pending. See [BUILD_REPORT.md](BUILD_REPORT.md).
+Development code `0573e24ff415ad42c3d8dd2bacc3d583e06f8a2f` passed **79 tests with zero failures/errors/skips**
+and all packaged Windows gates in [run 38126328359](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38126328359):
+neural inference, real Automix overlap/seek, all eight Replay cards, six codecs,
+16 navigation routes, keyboard/DPI/native media and credential checks, WebDAV
+download/playback and MSI installation/uninstallation. Package inspection also
+checks five hashes, matching source, pinned models, native binaries and bundled
+licenses. [Build report](BUILD_REPORT.md) records evidence and limits.
 
 Google login, YouTube streaming/downloads and remote account sync require a
 supported provider integration under the original master prompt. A Google
@@ -62,7 +63,7 @@ Android releases and automatic updates remain unchanged.
 ## Download the published Windows preview
 
 These assets are the older local-music preview. They do **not** contain the new
-development-branch Automix/lyrics/Replay/ListenBrainz work. Full installers will
+development-branch Automix/lyrics/Replay/ListenBrainz/WebDAV work. Full installers will
 replace the website link after the complete streaming port is verified.
 
 [Download Podium Air for Windows — MSI](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/download/v0.2.0-preview.1/Podium-Air-Windows-0.2.0-x64.msi) ·
@@ -79,7 +80,9 @@ evidence and SHA256SUMS. It is an unsigned local-music preview for Windows
 [Merged PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
 
 The [Windows workflow](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/workflows/windows.yml)
-also stores temporary CI packages for 30 days. `Windows-verification` holds
+also stores temporary CI packages for 30 days. Separate Windows-installers,
+Windows-portable, Windows-corresponding-source and Windows-dependency-sources
+downloads expose each part without requiring the combined bundle. `Windows-verification` holds
 reports, screenshots, codec/native integration results, installer logs and
 performance samples. Public release assets can be downloaded without signing in.
 
@@ -160,3 +163,23 @@ Listening shares track/artist/album metadata and timestamps only after opt-in.
 Paused time and seek distances do not count; qualifying listens require half
 the track or four minutes, whichever is lower, and tracks at or below 30 seconds
 are excluded. Failed submissions are reported and are not saved for offline retry.
+
+## Personal WebDAV library
+
+Open Sources, enter an HTTPS music-folder URL and optional username/password,
+then Connect. Browse subfolders, select tracks and Import selected. Successful
+imports appear in Library and remain playable offline; tagged metadata/artwork
+is read locally. Untagged tracks use filename artist/title and parent-folder album.
+The password is saved in Windows Credential Manager; ordinary preferences save
+only the URL and username. Disconnect deletes the saved credentials and keeps
+already imported files. No requests occur at startup or without a user command.
+
+The configured origin and music-folder boundary are enforced, redirects are not
+followed, XML external entities are disabled, and cancellation closes network
+transfers and removes incomplete files. Listings are limited to 2 MB / 5,000
+entries. Imports allow 100 selected tracks / 5 GB of actual bytes, with 750 MB
+per file; completed tracks survive a later failure/cancellation. HTTPS certificates
+must be trusted by the bundled runtime. Browser SSO, direct remote playback,
+WebDAV uploads/cover-sidecar scans, SMB accounts and addons remain incomplete.
+Cached downloads are in `%LOCALAPPDATA%\\PodiumAirWindows\\webdav\\music`;
+removing a library row does not delete the downloaded original.
