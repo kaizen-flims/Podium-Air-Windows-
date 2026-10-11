@@ -26,7 +26,7 @@ data class StoredTrack(val id: String, val path: String, val title: String, val 
 @Serializable
 data class Playlist(val id: String = UUID.randomUUID().toString(), val name: String, val tracks: List<String> = emptyList())
 @Serializable
-data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false, val reducedMotion: Boolean = false, val dynamicBackground: Boolean = true, val lyricsAutoScroll: Boolean = true, val automix: Boolean = false, val onlineLyrics: Boolean = false, val listenBrainzEnabled: Boolean = false, val listenBrainzUser: String = "", val webDavUrl: String = "", val webDavUser: String = "")
+data class Preferences(val dark: Boolean = true, val volume: Float = 0.8f, val crossfadeSeconds: Int = 0, val speed: Float = 1f, val equalizer: List<Double> = List(10) { 0.0 }, val closeToTray: Boolean = false, val launchAtStartup: Boolean = false, val notifications: Boolean = false, val reducedMotion: Boolean = false, val dynamicBackground: Boolean = true, val lyricsAutoScroll: Boolean = true, val automix: Boolean = false, val onlineLyrics: Boolean = false, val listenBrainzEnabled: Boolean = false, val listenBrainzUser: String = "", val webDavUrl: String = "", val webDavUser: String = "", val liquidGlass: Boolean = true, val reduceDynamicBlur: Boolean = false)
 @Serializable
 data class SavedQueueEntry(val key: String, val trackId: String)
 @Serializable
@@ -127,14 +127,26 @@ class LocalLibrary(private val directory: File = defaultDataDirectory()) {
         return tracks to failures
     }
     fun folder(folder: File, checkCancelled: () -> Unit = {}): List<File> = folder.walkTopDown().onEnter { checkCancelled(); !it.isHidden && !Files.isSymbolicLink(it.toPath()) }.filter { checkCancelled(); it.isFile && it.extension.lowercase() in extensions }.toList()
-    fun lyrics(track: Song): List<LyricLine> {
-        val audio = track.localPath?.let(::File) ?: return emptyList()
-        val ttml = File(audio.parentFile, "${audio.nameWithoutExtension}.ttml")
-        if (ttml.isFile) { require(ttml.length() <= 2_000_000) { "TTML lyrics exceed the 2 MB limit." }; return TtmlLyrics.parse(ttml.readText()) }
-        val lrc = File(audio.parentFile, "${audio.nameWithoutExtension}.lrc")
-        if (lrc.isFile) require(lrc.length() <= 2_000_000) { "LRC lyrics exceed the 2 MB limit." }
-        val text = if (lrc.isFile) lrc.readText() else runCatching { AudioFileIO.read(audio).tag?.getFirst(FieldKey.LYRICS) }.getOrNull().orEmpty()
-        return parseLyricText(text)
+    fun lyrics(track: Song): List<LyricLine> = loadLyrics(track)?.lines.orEmpty()
+    internal fun loadLyrics(track: Song): EmbeddedLyrics.Result? {
+        val audio = track.localPath?.let(::File) ?: return null
+        // A stale, empty or invalid sidecar must not conceal valid embedded lyrics.
+        for (extension in listOf("ttml", "lrc", "lyrics")) {
+            val file = File(audio.parentFile, "${audio.nameWithoutExtension}.$extension")
+            if (!file.isFile || file.length() !in 1..2_000_000) continue
+            val lines = runCatching {
+                val bytes = file.readBytes()
+                val charset = when {
+                    bytes.size >= 2 && bytes[0] == 0xff.toByte() && bytes[1] == 0xfe.toByte() -> Charsets.UTF_16LE
+                    bytes.size >= 2 && bytes[0] == 0xfe.toByte() && bytes[1] == 0xff.toByte() -> Charsets.UTF_16BE
+                    else -> Charsets.UTF_8
+                }
+                val text = String(bytes, charset).trimStart('\uFEFF')
+                if (extension == "ttml") TtmlLyrics.parse(text) else parseLyricText(text)
+            }.getOrNull()
+            if (lines != null && lines.any { it.text.isNotBlank() }) return EmbeddedLyrics.Result(lines, "Sidecar ${extension.uppercase()}")
+        }
+        return EmbeddedLyrics.read(audio)
     }
 }
 

@@ -209,9 +209,9 @@ class DesktopModel(
         val duration = state.value.library.find { it.id == song.videoId }?.duration ?: engine.state.value.durationMs
         lyricsJob = scope.launch {
             try {
-                val local = withContext(Dispatchers.IO) { localLibrary.lyrics(song) }
+                val local = withContext(Dispatchers.IO) { localLibrary.loadLyrics(song) }
                 ensureActive()
-                if (local.isNotEmpty()) { lyrics.value = local; lyricsStatus.value = "Sidecar or embedded lyrics" }
+                if (local != null) { lyrics.value = local.lines; lyricsStatus.value = local.source + if (local.lines.any { it.timeMs > 0 || it.isWordSynced }) " • synchronized" else " • untimed text" }
                 else {
                     val result = onlineLyrics.lookup(LyricsQuery(song.title, song.artist, song.albumName.orEmpty(), duration), online)
                     ensureActive(); lyrics.value = result.lines; lyricsStatus.value = result.status

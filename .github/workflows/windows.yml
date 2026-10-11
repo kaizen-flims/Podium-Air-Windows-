@@ -9,6 +9,8 @@ on:
         description: 'Run real audio/crossfade smoke test (requires a working audio output on runner)'
         type: boolean
         default: false
+env:
+  PODIUM_BUILD_PHASE: integration
 permissions:
   contents: read
 concurrency:
@@ -74,7 +76,11 @@ jobs:
             Copy-Item $file.FullName $target
           }
           "Upstream native renderer legal files collected: $($legal.Count). Exact Skia/Skiko LICENSE and NOTICE files are also committed resources."
+      - name: Compile integrated native app
+        if: env.PODIUM_BUILD_PHASE == 'integration'
+        run: .\gradlew.bat --no-daemon :app-desktop:createDistributable
       - name: Tests and native packages
+        if: env.PODIUM_BUILD_PHASE == 'release'
         run: .\gradlew.bat --no-daemon :shared-domain:check :app-desktop:check :app-desktop:createDistributable :app-desktop:packageMsi :app-desktop:packageExe
       - name: Launch packaged app and verify rendered window
         shell: pwsh
@@ -87,7 +93,27 @@ jobs:
           if (-not (Test-Path $result)) { throw 'App exited without rendering the Compose window' }
           Get-Content $result
           if ($p.ExitCode -ne 0) { throw "UI process failed with $($p.ExitCode)" }
+      - name: Verify embedded lyrics visibly in the packaged app
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            choco install ffmpeg --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw 'Could not install the test-only fixture encoder' }
+          }
+          python scripts/make_lyrics_fixtures.py
+          if ($LASTEXITCODE -ne 0) { throw 'Tagged audio fixture generation failed' }
+          $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+          foreach ($case in (Get-Content embedded-lyrics-cases.json -Raw | ConvertFrom-Json)) {
+            $name = [IO.Path]::GetFileNameWithoutExtension($case.file)
+            $result = Join-Path $PWD "embedded-lyrics-$name-smoke.txt"
+            $shots = Join-Path $PWD "embedded-lyrics-screenshots/$name"
+            $p = Start-Process $exe -ArgumentList @('--ui-smoke', "--embedded-ui=`"$($case.file)`"", "--expect-lyrics=`"$($case.marker)`"", "--result=`"$result`"", "--screenshots=`"$shots`"") -PassThru
+            if (-not $p.WaitForExit(30000)) { $p.Kill(); throw "$name embedded lyrics did not render" }
+            if ($p.ExitCode -ne 0 -or !(Test-Path $result)) { throw "$name packaged lyrics failed" }
+            Get-Content $result
+          }
       - name: Verify packaged Windows helper
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
@@ -97,6 +123,7 @@ jobs:
           Get-Content $result
           if ($p.ExitCode -ne 0) { throw 'Packaged Windows integration failed' }
       - name: Verify small window at 150 and 200 percent scaling
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
@@ -111,6 +138,7 @@ jobs:
           }
           Remove-Item Env:JAVA_TOOL_OPTIONS
       - name: Attempt real audio integration smoke
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
@@ -129,6 +157,7 @@ jobs:
             } else { throw "Real audio integration failed: $failure" }
           }
       - name: Verify packaged playback for each supported codec
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
@@ -149,6 +178,7 @@ jobs:
             if ($p.ExitCode -ne 0) { throw "$extension integration failed" }
           }
       - name: Verify packaged Replay PNG export
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
@@ -159,6 +189,7 @@ jobs:
           if ($p.ExitCode -ne 0 -or !(Test-Path $result) -or !(Test-Path $image)) { throw 'Replay PNG export failed' }
           Get-Content $result
       - name: Verify packaged WebDAV import and playback
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $portFile = Join-Path $PWD 'webdav-fixture-port.txt'
@@ -175,6 +206,7 @@ jobs:
             Get-Content $result
           } finally { if (!$server.HasExited) { $server.Kill(); $server.WaitForExit() } }
       - name: Verify measured Automix and original-track seek
+        if: env.PODIUM_BUILD_PHASE == 'release'
         # Existing paused gate follows an additional real Automix check.
         shell: pwsh
         run: |
@@ -185,6 +217,7 @@ jobs:
           if ($p.ExitCode -ne 0 -or -not (Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Packaged Automix integration failed' }
           Get-Content $result
       - name: Verify packaged Windows credential storage
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
@@ -194,6 +227,7 @@ jobs:
           if ($p.ExitCode -ne 0 -or !(Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Credential storage failed' }
           Get-Content $result
       - name: Measure paused expanded-player CPU, memory and shutdown
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
@@ -223,6 +257,7 @@ jobs:
           if ($used -gt 0.50 -or $peak -gt 1500) { throw 'Paused app exceeds the conservative CPU/memory smoke budget' }
           if ($children | Where-Object { Get-Process -Id $_ -ErrorAction SilentlyContinue }) { throw 'Native media helper remained alive after app shutdown' }
       - name: Install MSI, launch installed app and uninstall
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $msi = (Get-ChildItem 'app-desktop/build/compose/binaries/main/msi/*.msi' | Select-Object -First 1).FullName
@@ -246,6 +281,7 @@ jobs:
           if (Test-Path (Join-Path $installed 'Podium Air.exe')) { throw 'MSI uninstall left the application installed' }
           'PASS: MSI installed at the selected directory, installed app rendered all routes, and MSI uninstalled successfully.' | Set-Content installer-smoke.txt
       - name: Summarize test and runtime evidence
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           $tests = 0; $failures = 0; $skipped = 0
@@ -260,6 +296,7 @@ jobs:
           Get-Content app-desktop/build/generated/notices/licenses/DEPENDENCIES.txt | Out-File dependency-inventory.txt
           if ($tests -lt 84 -or $failures -ne 0 -or $skipped -ne 0) { throw 'Expected test suites did not all run successfully' }
       - name: Collect separately licensed dependency sources
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           .\gradlew.bat --no-daemon :app-desktop:collectDependencySources
@@ -277,15 +314,18 @@ jobs:
           @("Temurin source: $runtimeSource", "Upstream source commit: https://github.com/adoptium/jdk21u/commit/1c417fbfc2f70ab03a565b0af0a5a3c6f5e15ad6", 'Build scripts: https://github.com/adoptium/temurin-build/commit/e6ba7dec3d07654074559310376a3ae89da5f4ac') | Set-Content build/dependency-sources/TEMURIN-SOURCE.txt
           Compress-Archive -Path 'build/dependency-sources/*' -DestinationPath dependency-sources.zip
       - name: Archive corresponding source and portable app
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: |
           git archive --format=zip -o podium-air-windows-source.zip HEAD
           Compress-Archive -Path 'app-desktop/build/compose/binaries/main/app/Podium Air' -DestinationPath podium-air-windows-portable.zip
           Get-FileHash app-desktop/build/compose/binaries/main/msi/*.msi, app-desktop/build/compose/binaries/main/exe/*.exe, podium-air-windows-portable.zip, podium-air-windows-source.zip, dependency-sources.zip -Algorithm SHA256 | Format-List | Out-File SHA256SUMS.txt
       - name: Inspect actual packages, models, source and bundled licenses
+        if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
         run: python scripts/inspect_windows_package.py
       - uses: actions/upload-artifact@v4
+        if: env.PODIUM_BUILD_PHASE == 'release'
         with:
           name: Podium-Air-Windows-x64
           if-no-files-found: error
@@ -300,6 +340,7 @@ jobs:
       # Keep the combined bundle for the existing release validator, and expose
       # smaller downloads so installers/source can be fetched independently.
       - uses: actions/upload-artifact@v4
+        if: env.PODIUM_BUILD_PHASE == 'release'
         with:
           name: Windows-installers
           if-no-files-found: error
@@ -309,6 +350,7 @@ jobs:
             app-desktop/build/compose/binaries/main/exe/*.exe
             SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
+        if: env.PODIUM_BUILD_PHASE == 'release'
         with:
           name: Windows-portable
           if-no-files-found: error
@@ -317,6 +359,7 @@ jobs:
             podium-air-windows-portable.zip
             SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
+        if: env.PODIUM_BUILD_PHASE == 'release'
         with:
           name: Windows-corresponding-source
           if-no-files-found: error
@@ -325,6 +368,7 @@ jobs:
             podium-air-windows-source.zip
             SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
+        if: env.PODIUM_BUILD_PHASE == 'release'
         with:
           name: Windows-dependency-sources
           if-no-files-found: error
@@ -340,6 +384,8 @@ jobs:
             **/build/reports/tests/
             **/build/test-results/test/
             ui-smoke.txt
+            embedded-lyrics-*-smoke.txt
+            embedded-lyrics-screenshots/
             ui-smoke.png
             audio-smoke.txt
             automix-smoke.txt

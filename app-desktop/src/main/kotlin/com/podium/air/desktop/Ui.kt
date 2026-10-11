@@ -21,6 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import com.kashif_e.backdrop.backdrops.rememberLayerBackdrop
+import com.kashif_e.backdrop.backdrops.layerBackdrop
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -63,9 +65,11 @@ import java.net.URI
 val AccentRed = Color(0xFFFA2D48)
 private val Dark = darkColorScheme(primary = Color.White, onPrimary = Color.Black, background = Color.Black,
     onBackground = Color.White, surface = Color(0xFF0D0D0F), onSurface = Color.White,
+    secondary = AccentRed, onSecondary = Color.White, secondaryContainer = Color(0xFF3C1420), onSecondaryContainer = Color.White, surfaceTint = AccentRed,
     surfaceVariant = Color(0xFF1C1C1E), onSurfaceVariant = Color(0xFF8E8E93), outline = Color(0xFF2C2C2E))
 private val Light = lightColorScheme(primary = Color.Black, onPrimary = Color.White, background = Color.White,
     onBackground = Color.Black, surface = Color(0xFFF7F7F9), onSurface = Color.Black,
+    secondary = AccentRed, onSecondary = Color.White, secondaryContainer = Color(0xFFFFE8ED), onSecondaryContainer = Color(0xFF8A132D), surfaceTint = AccentRed,
     surfaceVariant = Color(0xFFF2F2F7), onSurfaceVariant = Color(0xFF6E6E73), outline = Color(0xFFE5E5EA))
 private val Typography = Typography(
     displayLarge = androidx.compose.ui.text.TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 34.sp, letterSpacing = (-0.8).sp),
@@ -84,7 +88,7 @@ private enum class Page(val title: String, val icon: ImageVector) {
 private data class Route(val page: Page = Page.HOME, val detail: String? = null, val title: String = page.title)
 
 @Composable
-fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}, onSmokeFailure: (Throwable) -> Unit = { throw it }, startOnPlayer: Boolean = false) {
+fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}, onSmokeFailure: (Throwable) -> Unit = { throw it }, startOnPlayer: Boolean = false, embeddedLyricsCheck: String? = null) {
     val state by model.state.collectAsState()
     val audio by model.engine.state.collectAsState()
     val message by model.message.collectAsState()
@@ -98,6 +102,10 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     val colors = if (state.preferences.dark) Dark else Light
     val compact = LocalWindowInfo.current.containerSize.width / LocalDensity.current.density < 900f
     MaterialTheme(colorScheme = colors, typography = Typography) {
+        val backdrop = rememberLayerBackdrop { drawRect(colors.background); drawContent() }
+        CompositionLocalProvider(LocalGlassBackdrop provides backdrop,
+            LocalGlassEnabled provides (state.preferences.liquidGlass && !state.preferences.reduceDynamicBlur),
+            LocalChromeInset provides if (route.page == Page.PLAYER) 0.dp else 110.dp) {
         Surface(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             when {
@@ -112,24 +120,11 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 else -> false
             }
         }.focusRequester(rootFocus).focusable()) {
-            Column {
-                Row(Modifier.weight(1f)) {
-                    BoxWithConstraints {
-                        // The sidebar stays scrollable at small window heights and at 200% DPI.
-                        Navigation(route, state.preferences.dark, compact, { route = Route(it) })
-                    }
-                    VerticalDivider(color = colors.outline)
-                    Column(Modifier.weight(1f).fillMaxHeight()) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = if (compact) 12.dp else 28.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (route.detail != null) Control(Icons.Rounded.ArrowBack, "Back") { route = Route(route.page) }
-                            Text(if (route.page == Page.PLAYLISTS && route.detail != null) state.playlists.find { it.id == route.detail }?.name ?: route.title else route.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            if (importing) { progress?.let { Text("${it.first}/${it.second}", fontSize = 12.sp) }; CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp); Control(Icons.Rounded.Close, "Cancel import") { model.cancelImport() } }
-                            else {
-                                if (compact) Control(Icons.Rounded.Add, "Import music (Ctrl+O)") { filePicker(false) }
-                                else TextButton(onClick = { filePicker(false) }) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Import music") }
-                                Control(Icons.Rounded.FolderOpen, "Import folder (Ctrl+Shift+O)") { filePicker(true) }
-                            }
-                        }
+            Box(Modifier.fillMaxSize()) {
+                // Capture only the page: floating chrome is a sibling, never part of its own backdrop.
+                Row(Modifier.fillMaxSize().then(if (LocalGlassEnabled.current) Modifier.layerBackdrop(backdrop) else Modifier)) {
+                    Spacer(Modifier.width(if (compact) 64.dp else 190.dp))
+                    Column(Modifier.weight(1f).fillMaxHeight().padding(top = 88.dp)) {
                         if (message != null) Notice(message!!, onDismiss = { model.message.value = null })
                         if (audio.error != null) Notice(audio.error!!, error = true)
                         AnimatedContent(route, transitionSpec = { fadeIn(tween(if (state.preferences.reducedMotion) 0 else 150)) togetherWith fadeOut(tween(if (state.preferences.reducedMotion) 0 else 100)) }, label = "navigation", modifier = Modifier.weight(1f)) { selected ->
@@ -171,12 +166,30 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                         }
                     }
                 }
+                Row(Modifier.fillMaxSize()) {
+                    Navigation(route, state.preferences.dark, compact) { route = Route(it) }
+                    Box(Modifier.weight(1f)) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).liquidGlass(RoundedCornerShape(24.dp)).padding(horizontal = 12.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (route.detail != null) Control(Icons.Rounded.ArrowBack, "Back") { route = Route(route.page) }
+                            Text(if (route.page == Page.PLAYLISTS && route.detail != null) state.playlists.find { it.id == route.detail }?.name ?: route.title else route.title, style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (importing) { progress?.let { Text("${it.first}/${it.second}", fontSize = 12.sp) }; CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp); Control(Icons.Rounded.Close, "Cancel import") { model.cancelImport() } }
+                            else {
+                                if (compact) Control(Icons.Rounded.Add, "Import music (Ctrl+O)") { filePicker(false) }
+                                else TextButton(onClick = { filePicker(false) }) { Icon(Icons.Rounded.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Import music") }
+                                Control(Icons.Rounded.FolderOpen, "Import folder (Ctrl+Shift+O)") { filePicker(true) }
+                            }
+                        }
+                    }
+                }
                 if (route.page != Page.PLAYER) {
-                    HorizontalDivider(color = colors.outline)
-                    MiniPlayer(model, state) { route = Route(Page.PLAYER) }
+                    Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = (if (compact) 64.dp else 190.dp) + 12.dp, end = 12.dp, bottom = 12.dp)) {
+                        MiniPlayer(model, state) { route = Route(Page.PLAYER) }
+                    }
                 }
             }
         }
+        }
+
         if (createName != null) AlertDialog(onDismissRequest = { createName = null }, title = { Text("New playlist") },
             text = { OutlinedTextField(createName!!, { createName = it }, label = { Text("Playlist name") }, singleLine = true) },
             confirmButton = { TextButton({ model.createPlaylist(createName!!); createName = null }, enabled = !createName.isNullOrBlank()) { Text("Create") } },
@@ -184,6 +197,14 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         LaunchedEffect(Unit) {
             rootFocus.requestFocus()
             try {
+            if (smoke && embeddedLyricsCheck != null) {
+                route = Route(Page.LYRICS)
+                withTimeout(10000) { model.lyrics.first { lines -> lines.any { embeddedLyricsCheck in it.text } } }
+                delay(650); onSmokePage("embedded-lyrics-dark")
+                model.preferences(model.state.value.preferences.copy(dark = false, reducedMotion = true))
+                delay(650); onSmokePage("embedded-lyrics-light")
+                onReady(); return@LaunchedEffect
+            }
             if (smoke) {
                 for (page in Page.entries) { route = Route(page); delay(450); onSmokePage(page.name.lowercase()) }
                 val playlist = state.playlists.firstOrNull()
@@ -227,7 +248,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 
 @Composable private fun Navigation(route: Route, dark: Boolean, compact: Boolean, navigate: (Page) -> Unit) {
-    Column(Modifier.width(if (compact) 64.dp else 190.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).verticalScroll(rememberScrollState()).padding(if (compact) 8.dp else 12.dp)) {
+    Column(Modifier.width(if (compact) 64.dp else 190.dp).fillMaxHeight().padding(8.dp).liquidGlass(RoundedCornerShape(26.dp)).verticalScroll(rememberScrollState()).padding(if (compact) 8.dp else 12.dp)) {
         val logo = remember { SkiaImage.makeFromEncoded(requireNotNull(object {}.javaClass.getResourceAsStream("/brand/mono.png")).readBytes()).asImageBitmap() }
         Row(Modifier.padding(8.dp, 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Image(logo, "Podium Air", Modifier.size(32.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (dark) Color.White else Color.Black))
@@ -266,7 +287,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     }
 }
 @Composable private fun Home(model: DesktopModel, state: SavedState, navigate: (Route) -> Unit, picker: (Boolean) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(28.dp, 0.dp, 28.dp, 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(28.dp, 0.dp, 28.dp, LocalChromeInset.current + 28.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(24.dp)) {
                 Text("YOUR MUSIC. YOUR SPACE.", color = AccentRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -301,7 +322,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     }
 }
 @Composable private fun Explore(state: SavedState, navigate: (Route) -> Unit) {
-    LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(Modifier.padding(horizontal = 28.dp), contentPadding = PaddingValues(bottom = LocalChromeInset.current), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Explore your collection", style = MaterialTheme.typography.headlineMedium); Text("Albums and artists from your imported tracks.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { CollectionLink("Albums", "${state.library.map { it.albumKey }.distinct().size} albums", Icons.Rounded.Album) { navigate(Route(Page.ALBUMS)) } }
         item { CollectionLink("Artists", "${state.library.map { it.artist }.distinct().size} artists", Icons.Rounded.Person) { navigate(Route(Page.ARTISTS)) } }
@@ -317,7 +338,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 @Composable private fun TrackList(songs: List<Song>, model: DesktopModel, state: SavedState, modifier: Modifier = Modifier, emptyText: String = "This collection is empty.", playlist: Playlist? = null) {
     if (songs.isEmpty()) { Empty(emptyText, modifier); return }
-    LazyColumn(modifier.fillMaxSize()) {
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = LocalChromeInset.current)) {
         item { Row(verticalAlignment = Alignment.CenterVertically) { Text("${songs.size} tracks", Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp); TextButton({ model.play(songs) }) { Icon(Icons.Rounded.PlayArrow, null); Text("Play all") } } }
         itemsIndexed(songs, key = { index, song -> "${song.videoId}:$index" }) { index, song ->
             TrackRow(song, index, songs.size, model, state, { model.play(songs, index) }, playlist)
@@ -354,7 +375,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         confirmButton = { TextButton({ model.removeTrack(song.videoId); remove = false }) { Text("Remove") } }, dismissButton = { TextButton({ remove = false }) { Text("Cancel") } })
 }
 @Composable private fun Playlists(state: SavedState, create: () -> Unit, import: () -> Unit, open: (Playlist) -> Unit) {
-    LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.padding(horizontal = 28.dp), contentPadding = PaddingValues(bottom = LocalChromeInset.current), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { Row { TextButton(create) { Icon(Icons.Rounded.Add, null); Text("New playlist") }; TextButton(import) { Text("Import M3U8") } } }
         items(state.playlists, key = { it.id }) { p -> CollectionLink(p.name, "${p.tracks.size} tracks", Icons.Rounded.QueueMusic) { open(p) } }
         if (state.playlists.isEmpty()) item { Empty("Create a playlist, then add tracks using each song's action menu.") }
@@ -374,7 +395,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 }
 @Composable private fun Collections(state: SavedState, page: Page, open: (String, String) -> Unit) {
     val groups = state.library.groupBy { if (page == Page.ALBUMS) it.albumKey else it.artist }.toSortedMap(String.CASE_INSENSITIVE_ORDER)
-    LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.padding(horizontal = 28.dp), contentPadding = PaddingValues(bottom = LocalChromeInset.current), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(groups.entries.toList(), key = { it.key }) { entry -> val title = if (page == Page.ALBUMS) entry.value.first().album else entry.key
             CollectionLink(title, "${entry.value.size} tracks" + if (page == Page.ALBUMS) " • ${entry.value.first().albumArtist.ifBlank { entry.value.first().artist }}" else "", page.icon) { open(entry.key, title) } }
         if (groups.isEmpty()) item { Empty("Import tracks to browse ${page.title.lowercase()}.") }
@@ -387,7 +408,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     val audio by model.engine.state.collectAsState()
     BoxWithConstraints {
     val showVolume = maxWidth > 680.dp
-    Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().liquidGlass(RoundedCornerShape(28.dp)).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).clickable(onClick = open), verticalAlignment = Alignment.CenterVertically) {
             Art(audio.entry?.song, 46); Spacer(Modifier.width(12.dp)); Column {
                 Text(audio.entry?.song?.title ?: "Podium Air", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
@@ -520,7 +541,7 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
 @Composable private fun QueueView(model: DesktopModel, embedded: Boolean = false) {
     val queue by model.queue.collectAsState()
     if (queue.entries.isEmpty()) { Empty("Your queue is empty. Play a collection or add a song to queue."); return }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = if (embedded) 0.dp else 28.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = if (embedded) 0.dp else 28.dp), contentPadding = PaddingValues(bottom = LocalChromeInset.current)) {
         if (!embedded) item { PlayerControls(model); Spacer(Modifier.height(16.dp)) }
         itemsIndexed(queue.entries, key = { _, it -> it.key }) { index, entry ->
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (index == queue.cursor) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent).clickable { model.selectQueue(index) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -554,14 +575,17 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
     val synced = lyrics.any { it.timeMs > 0 || it.isWordSynced }
     val active = if (synced) activeLyricRows(lyrics, position) else emptyList()
     val current = active.lastOrNull() ?: -1
-    LaunchedEffect(audio.entry?.key, current, saved.preferences.lyricsAutoScroll) { if (current >= 0 && saved.preferences.lyricsAutoScroll) list.animateScrollToItem((active.first() - 1).coerceAtLeast(0)) }
+    LaunchedEffect(audio.entry?.key, current, saved.preferences.lyricsAutoScroll) { if (current >= 0 && saved.preferences.lyricsAutoScroll) {
+        val row = (active.first() - 1).coerceAtLeast(0)
+        if (saved.preferences.reducedMotion) list.scrollToItem(row) else list.animateScrollToItem(row)
+    } }
     Column(modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AssistChip({ model.preferences(saved.preferences.copy(lyricsAutoScroll = !saved.preferences.lyricsAutoScroll)) }, { Text(if (saved.preferences.lyricsAutoScroll) "Auto-scroll on" else "Auto-scroll off") })
             Spacer(Modifier.weight(1f)); Control(Icons.Rounded.Refresh, "Reload lyrics") { model.reloadLyrics() }
         }
         Text(lyricsStatus, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (id != null) {
+        if (id != null && synced) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Control(Icons.Rounded.Remove, "Lyrics 100 milliseconds earlier") { model.lyricOffset(id, offset - 100) }
                 Text("Timing ${if (offset >= 0) "+" else ""}${offset} ms", fontSize = 11.sp)
@@ -570,7 +594,7 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
             }
         }
         if (lyrics.isEmpty()) { Empty("Place a .ttml or .lrc file beside the audio file with the same filename, use embedded lyrics, or enable online lyrics in Settings.", Modifier.weight(1f)); return@Column }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = PaddingValues(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = list, contentPadding = PaddingValues(top = 24.dp, bottom = LocalChromeInset.current + 24.dp), verticalArrangement = Arrangement.spacedBy(22.dp)) {
             itemsIndexed(lyrics) { index, line ->
                 val focused = index in active
                 val alpha by animateFloatAsState(if (!synced || focused) 1f else 0.35f, label = "lyric")
@@ -614,7 +638,7 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
     val data = summary.entries
     val milliseconds = data.sumOf { it.milliseconds }
     val ranked = data.groupBy { it.trackId }.entries.sortedByDescending { it.value.sumOf { stat -> stat.milliseconds } }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = 28.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(bottom = LocalChromeInset.current + 28.dp)) {
         item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { ReplayPeriod.entries.forEach { choice -> FilterChip(period == choice, { period = choice; story = null }, { Text(choice.chip) }) } } }
         item { LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             item { FilterChip(story == null, { story = null }, { Text("Whole Replay") }) }
@@ -666,9 +690,11 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
 }
 @Composable private fun Settings(model: DesktopModel, state: SavedState) {
     val prefs = state.preferences; val sleep by model.sleepRemaining.collectAsState(); val platform by model.platformStatus.collectAsState(); val audio by model.engine.state.collectAsState()
-    LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(bottom = LocalChromeInset.current + 24.dp)) {
         item { Text("Appearance", style = MaterialTheme.typography.headlineMedium); Row(verticalAlignment = Alignment.CenterVertically) { Text("Dark theme", Modifier.weight(1f)); Switch(prefs.dark, { model.preferences(prefs.copy(dark = it)) }) }
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Reduce motion", Modifier.weight(1f)); Switch(prefs.reducedMotion, { model.preferences(prefs.copy(reducedMotion = it)) }) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Liquid Glass", Modifier.weight(1f)); Switch(prefs.liquidGlass, { model.preferences(prefs.copy(liquidGlass = it)) }) }
+            Row(verticalAlignment = Alignment.CenterVertically) { Text("Reduce dynamic blur", Modifier.weight(1f)); Switch(prefs.reduceDynamicBlur, { model.preferences(prefs.copy(reduceDynamicBlur = it)) }) }
             Row(verticalAlignment = Alignment.CenterVertically) { Text("Artwork background", Modifier.weight(1f)); Switch(prefs.dynamicBackground, { model.preferences(prefs.copy(dynamicBackground = it)) }) } }
         item { Text("Playback", style = MaterialTheme.typography.headlineMedium); Text("Volume • ${(prefs.volume * 100).toInt()}%"); Slider(prefs.volume, { model.preferences(prefs.copy(volume = it)) }, Modifier.fillMaxWidth().semantics { contentDescription = "Playback volume" }, valueRange = 0f..1f); Text("Crossfade • ${prefs.crossfadeSeconds}s"); Slider(prefs.crossfadeSeconds.toFloat(), { model.preferences(prefs.copy(crossfadeSeconds = it.toInt())) }, valueRange = 0f..12f, steps = 11); Text("Equal-power volume overlap. Crossfade is cancelled by seeking and is disabled at playback speeds other than 1×. Automix uses a separate measured transition plan when enabled.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item {
@@ -709,7 +735,7 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
     var user by remember { mutableStateOf(state.preferences.webDavUser) }
     var password by remember { mutableStateOf("") }
     var selected by remember(location, entries) { mutableStateOf(setOf<URI>()) }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 28.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = PaddingValues(bottom = LocalChromeInset.current + 24.dp)) {
         item {
             Text("WebDAV music library", style = MaterialTheme.typography.headlineMedium)
             Text("Browse your personal server and import selected tracks for offline playback. Your password is saved in Windows Credential Manager. Files are downloaded to this computer; the server is read only.", color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -800,7 +826,7 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
     val licensePaths = remember { readResource("/licenses/INDEX.txt").lineSequence().filter { it.startsWith("licenses/") }.toList() }
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Podium Air — Windows Edition", style = MaterialTheme.typography.headlineMedium)
-        Text("0.2.0 • Native local music preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
+        Text("0.3.0 • Native Windows preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
         Text("Native Windows playback, measured Automix, optional LRCLIB lyrics, ListenBrainz and Windows media controls are included. Google streaming and full Android feature parity remain unfinished.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton({ Desktop.getDesktop().browse(URI("https://github.com/kaizen-flims/Podium-Air-Windows-")) }) { Text("Corresponding source & build instructions") }
         TextButton({ licenses = readResource("/licenses/THIRD_PARTY_NOTICES.md") + "\n\n" + readResource("/licenses/LICENSE") }) { Text("Third-party licenses & legal notices") }

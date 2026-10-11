@@ -203,3 +203,20 @@ and remain GPL-3.0-only with corresponding source and existing upstream credits.
 AWT/ImageIO, bounded local thumbnail decoding, cached textures, desktop mouse/
 keyboard controls and light/dark contrast replace Android/Coil/window bindings.
 No source SF Pro fonts, canvas footage or remote provider assets were added.
+
+## Liquid Glass desktop adaptation (11 October 2026)
+
+Uses Kashif-E/KMPLiquidGlass `io.github.kashif-mehmood-km:backdrop:0.0.1-alpha02`, Apache-2.0,
+Copyright 2026 Kyant (original) and Kashif Mehmood (KMP port). The complete license
+and notice are bundled in `licenses/kmp-liquid-glass/`; the desktop sources JAR
+is included in the dependency-source archive. https://github.com/Kashif-E/KMPLiquidGlass
+
+`LiquidGlass.kt` adapts the GPLv3 Android integration glue from the pinned Podium
+Air source, itself adapted from EchoMusicApp/Echo-Music. `AndroidGlassLens.kt`
+ports the original Android app's vendored Kyant0/backdrop v2.0.0 lens math and
+chromatic-dispersion shader (Copyright 2025 Kyant, Apache-2.0) to the Skia filter
+API, retaining its header and negative refraction amount. The original saturation
+1.5, 8dp blur, 24dp lens depth/amount, 0.4 theme tint and highlights are retained.
+Windows currently processes the backdrop at full resolution rather than the
+Android app's 0.33 resolution optimization. Noctis (MIT, Avalonia) and Tunetastic
+(GPLv3, WinUI) were inspected but no code from them is copied.

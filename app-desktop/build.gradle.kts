@@ -19,6 +19,7 @@ dependencies {
     implementation(compose.desktop.currentOs)
     implementation(compose.material3)
     implementation(compose.materialIconsExtended)
+    implementation("io.github.kashif-mehmood-km:backdrop:0.0.1-alpha02")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     implementation("net.jthink:jaudiotagger:3.0.1")
@@ -40,7 +41,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "Podium Air"
-            packageVersion = "0.2.0"
+            packageVersion = "0.3.0"
             description = "Podium Air — Windows Edition"
             vendor = "Prem Das aka Kaizen"
             copyright = "Copyright © 2026 Prem Das and upstream contributors"
@@ -136,6 +137,7 @@ dependencies {
     dependencySources("org.jflac:jflac-codec:1.5.2:sources")
     dependencySources("io.github.jaredmdobson:concentus:1.0.2:sources")
     dependencySources("javazoom:jlayer:1.0.1:sources")
+    dependencySources("io.github.kashif-mehmood-km:backdrop-desktop:0.0.1-alpha02:sources")
     for (module in listOf("base", "graphics", "media")) dependencySources("org.openjfx:javafx-$module:21.0.9:sources")
 }
 tasks.register<Copy>("collectDependencySources") {

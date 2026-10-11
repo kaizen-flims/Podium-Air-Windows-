@@ -27,6 +27,8 @@ fun main(args: Array<String>) {
     if (args.contains("--credentials-smoke")) { credentialsSmoke(args); return }
     if (args.contains("--webdav-smoke")) { webDavSmoke(args); return }
     val performance = args.contains("--performance-smoke")
+    val embeddedFixture = args.firstOrNull { it.startsWith("--embedded-ui=") }?.substringAfter("=")?.let(::File)
+    val embeddedCheck = args.firstOrNull { it.startsWith("--expect-lyrics=") }?.substringAfter("=")
     val smoke = args.contains("--ui-smoke") || performance
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
     if (smoke) {
@@ -42,9 +44,12 @@ fun main(args: Array<String>) {
             paint.color = Color(0xF9, 0xD9, 0x78); paint.fillRect(50, 38, 28, 52)
         } finally { paint.dispose() }
         ImageIO.write(cover, "png", artwork); cover.flush()
-        val a = StoredTrack("smoke-a", first.absolutePath, "Generated test tone", "UI smoke fixture", "Test album", 6000, artwork.absolutePath)
+        val a = if (embeddedFixture != null) {
+            require(!embeddedCheck.isNullOrBlank()) { "An embedded lyric fixture needs its expected text." }
+            LocalLibrary(store.directory).import(listOf(embeddedFixture)).first.single().copy(artwork = artwork.absolutePath)
+        } else StoredTrack("smoke-a", first.absolutePath, "Generated test tone", "UI smoke fixture", "Test album", 6000, artwork.absolutePath)
         val b = StoredTrack("smoke-b", second.absolutePath, "Second test tone", "UI smoke fixture", "Test album", 6000)
-        File(store.directory, "test-tone.ttml").writeText("<tt><body><p begin='0' end='2'><span begin='0' end='1.2'>Podium </span><span begin='1.2' end='2'>Air</span></p></body></tt>")
+        if (embeddedFixture == null) File(store.directory, "test-tone.ttml").writeText("<tt><body><p begin='0' end='2'><span begin='0' end='1.2'>Podium </span><span begin='1.2' end='2'>Air</span></p></body></tt>")
         store.save(SavedState(queue = listOf(SavedQueueEntry("ui-current", a.id), SavedQueueEntry("ui-next", b.id)), cursor = 0, library = listOf(a, b), playlists = listOf(Playlist(name = "Smoke playlist", tracks = listOf(a.id, b.id))), favorites = setOf(a.id), history = listOf(b.id, a.id)))
     }
     val model = DesktopModel(JavaFxAudioEngine(), store)
@@ -142,7 +147,7 @@ fun main(args: Array<String>) {
                     }.onFailure { model.message.value = "System tray is unavailable: ${it.message}" }
                 }
             }
-            PodiumApp(model, ::pick, ::pickPlaylist, startOnPlayer = performance, smoke = smoke && !performance, onSmokePage = { page ->
+            PodiumApp(model, ::pick, ::pickPlaylist, startOnPlayer = performance, smoke = smoke && !performance, embeddedLyricsCheck = embeddedCheck, onSmokePage = { page ->
                 val screenshots = args.firstOrNull { it.startsWith("--screenshots=") }?.substringAfter("=")
                 if (screenshots != null) {
                     val output = File(screenshots).apply { mkdirs() }
@@ -158,7 +163,7 @@ fun main(args: Array<String>) {
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(if (performance) 20000 else 2500)
                         val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                        File(result).writeText(if (performance) "PASS: Paused expanded player window and Windows media helper stayed responsive during the performance observation.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, artwork-backed controls/lyrics/queue in both themes, reduced-motion panes, playing/paused sleeve scale, Ctrl+F and Ctrl+Space playback/pause verified.\n")
+                        File(result).writeText(if (performance) "PASS: Paused expanded player window and Windows media helper stayed responsive during the performance observation.\n" else if (embeddedFixture != null) "PASS: ${embeddedFixture.name} imported, persisted, restored and rendered in the packaged lyrics UI in both themes: ${model.lyricsStatus.value}.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, artwork-backed controls/lyrics/queue in both themes, reduced-motion panes, playing/paused sleeve scale, Ctrl+F and Ctrl+Space playback/pause verified.\n")
                         val png = args.firstOrNull { it.startsWith("--screenshot=") }?.substringAfter("=")
                         if (png != null) runCatching {
                             ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(png))
