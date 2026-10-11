@@ -1,6 +1,6 @@
 # Podium Air — Windows Edition
 
-Native Kotlin/Compose Windows adaptation of [Podium Air Android](https://github.com/kaizen-flims/Podium-Air), made with ❤️ by Prem. This development branch prepares **0.3.0-preview.1**; the published 0.2.0 preview and Android releases are preserved. **Google login, YouTube playback/downloads and remote playlist sync are not implemented.**
+Native Kotlin/Compose Windows adaptation of [Podium Air Android](https://github.com/kaizen-flims/Podium-Air), made with ❤️ by Prem. **0.3.0-preview.1 is published**, with the old Windows preview and Android releases preserved. **Google login, YouTube playback/downloads and remote playlist sync are not implemented.**
 
 ## In this preview
 
@@ -12,9 +12,9 @@ Native Kotlin/Compose Windows adaptation of [Podium Air Android](https://github.
 
 ## Download and acceptance
 
-The release pipeline publishes [0.3.0-preview.1](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.3.0-preview.1) only after building EXE/MSI/portable packages, verifying the integrated app and reviewing actual screenshots. Until publication succeeds, use the existing [0.2.0 preview](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1). The Java runtime is bundled; installers are unsigned.
+[Download the Windows x64 MSI](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/download/v0.3.0-preview.1/Podium-Air-Windows-0.3.0-x64.msi). The [0.3.0 release](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.3.0-preview.1) also contains an EXE installer, portable ZIP, matching app/dependency sources, notices, build evidence and SHA-256 checksums. The Java runtime is bundled; installers are unsigned. The [website](https://podium-air-website.pages.dev/) Windows buttons have been updated to this MSI; Android downloads are unchanged.
 
-The integrated tagged-audio checkpoint at `4285397150ffd33ce5602759248802abbaef403e` imported/persisted/restored/played/paused real MP3 USLT/SYLT, FLAC enhanced lyrics, Opus comments and M4A ©lyr, and rendered them in both themes. These are generated tagged audio files, not lyric text injected into the UI. [Windows run](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38147720644). A final release build follows the remaining glass capture/theme correction. The user's own audio file still needs acceptance.
+Released executable source `584160d88cb0be0a6f3409bd8feb5e09c3126a6d` passed the [integrated Windows build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38148562182), including actual tagged-file import/persistence/restore/playback and visible lyrics, glass/theme/player inspection, native integrations, six codecs and MSI install/launch/uninstall. The [publication run](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38149562724) promoted these exact files without rebuilding. Windows cloud CI does not replace the user's own-file and physical-device acceptance. See the [build report](BUILD_REPORT.md).
 
 ## Remaining integration dependencies
 

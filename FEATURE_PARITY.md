@@ -5,15 +5,15 @@
 acceptance. **Blocked** identifies a supported integration or missing pipeline.
 A passing smoke is not proof of every feature or full Android parity.
 
-Development code `9415dc7ac454f3b0b861a4a0b3b24525f7c1dc6f` passed
-[run 38143937527](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38143937527):
-**84 tests, zero failures/errors/skips**, bundled neural inference, measured
+Published executable code `584160d88cb0be0a6f3409bd8feb5e09c3126a6d` passed
+[run 38148562182](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38148562182):
+**89 tests, zero failures/errors/skips**, actual tagged-file playback/lyrics, Liquid Glass theme/artwork capture, bundled neural inference, measured
 Automix/seek, all eight Replay exports, secure scrobbling/WebDAV contract tests,
 packaged WebDAV download/playback and every existing native/UI/installer gate.
 The shipped portable JAR/models/notices and matching source were inspected.
-This proves the stated development scope, not a complete streaming release.
+The [0.3.0 preview](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.3.0-preview.1) contains these exact files. Full streaming/Android parity remains incomplete.
 
-Published-preview evidence: Windows run
+Historical 0.2-preview evidence: Windows run
 [37981495583](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583),
 commit `ad91ba8ac4f960330c5986698072f34441be7c48`, **40 tests with zero
 failures/errors**. This run passed all packaged routes/details, Robot
@@ -67,8 +67,8 @@ replaced with platform typography. Physical Windows 10/11 device listening,
 keyboard/tray/picker/startup, hotplug and full source animation parity require
 acceptance beyond the cloud runner.
 
-## 0.3.0 integrated candidate
+## 0.3.0 integrated release
 
-Native Liquid Glass uses the compatible Apache-2.0 KMP backdrop renderer and the original Android Kyant0/backdrop chromatic shader. Saturation 1.5, blur 8dp, refraction height/amount 24dp, tint 0.4 and theme highlights match the Android integration. Full-resolution Windows processing replaces Android's 0.33 optimization. Floating chrome is excluded from its own backdrop capture; current-track artwork extends behind glass. Theme/blur changes recreate cached native effect layers. These final changes require the release build's UI inspection. Noctis/Tunetastic were audited but not copied.
+Native Liquid Glass uses the compatible Apache-2.0 KMP backdrop renderer and the original Android Kyant0/backdrop chromatic shader. Saturation 1.5, blur 8dp, refraction height/amount 24dp, tint 0.4 and theme highlights match the Android integration. Full-resolution Windows processing replaces Android's 0.33 optimization. Floating chrome is excluded from its own backdrop capture; current-track artwork extends behind glass. Theme/blur changes recreate cached native effect layers. The final release screenshots were inspected in both themes; tagged MP3/FLAC/Opus/M4A playback and lyric UI passed. Paused player/helper use measured 0.35% of one logical core and 271.05 MB peak sampled working set. Noctis/Tunetastic were audited but not copied.
 
 The source for account/online discovery/search/downloads still calls private `data/innertube/Innertube.kt` and `auth/YtMusicLoginScreen.kt` cookie capture. `data/lyrics/LyricsTranslation.kt` uses non-Cloud translation endpoints; canvas sources impersonate service mobile clients. `data/discord/DiscordRPC.kt` uses personal bearer tokens. None is silently substituted into a supported desktop account implementation. Registered app/provider permission and protocol selection remain required for the corresponding integrations.

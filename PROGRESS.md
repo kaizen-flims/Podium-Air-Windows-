@@ -175,3 +175,10 @@ by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
 - 4285397 fixed a visually observed tagged-MP3 JavaFX failure via JLayer PCM decoding; real tagged files then imported/restored/played/paused and rendered lyrics in both themes (run 38147720644).
 - Final integration extends artwork behind the floating chrome and recreates cached glass layers on theme/blur switches. Full regression and installer packaging run after this integrated app, then screenshot review and exact-artifact prerelease promotion. The old preview and Android update channels are preserved.
 - Online/account and service-dependent gaps remain explicit; no full-parity claim or mock functionality.
+
+### Published integrated preview — 11 October 2026
+
+- Released executable source/tag: `584160d88cb0be0a6f3409bd8feb5e09c3126a6d`. Windows run 38148562182 passed the integrated native/installer regression and real tagged-file playback/lyrics. Final artwork-glass and both-theme screenshots were reviewed. Verification archive SHA-256: `6b6693a9105725433aed78b53c323f468f84d9bba0a32e51a88ad1cc9b3b6bd3`.
+- Run 38149562724 promoted the exact artifacts without rebuilding or rerunning Windows tests. Public `v0.3.0-preview.1` has eight verified permanent assets: MSI, EXE, portable, matching source, dependency sources, notices, evidence and checksums. The previous preview remains preserved.
+- Website commit `c2a71983c0dc80768e887505cac516f63a2b37cd` updates only the Windows release link and relevant download checks. Run 38149660302 passed responsive platform labels/logos/layout, anonymous MSI HEAD/binary signature and live Cloudflare HTTP 200 with the new link. All three Android download button lines remain byte-identical; Android source main is still `48902e6b20fdcfeb1723e02d4744849e82d5067a`.
+- Full Android parity remains unfinished: supported streaming provider/desktop OAuth setup, remaining translation/canvas/presence/shared-listening/network integrations, exact UI/motion gaps and physical Windows acceptance. No account or consumer-hardware success is claimed.

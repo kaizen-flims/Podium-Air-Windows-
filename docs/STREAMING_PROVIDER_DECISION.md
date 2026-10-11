@@ -38,6 +38,4 @@ now adapts the source artwork blur, landscape panes and paused sleeve animation;
 84 tests and the packaged/scaled player variants passed.
 Canvas/translation, Last.fm, official native Discord presence,
 shared listening, remaining network addons and device acceptance remain separate gaps.
-The complete installer release and website-link replacement follow end-to-end
-verification of the agreed product. The older public local preview is clearly
-identified as a preview and is not described as full parity.
+The new [0.3.0 preview](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.3.0-preview.1) publishes the integrated native glass, embedded-lyrics and existing Automix/local features, with matching sources and honest service gaps. Website Windows links now point to that installer. Its release is distinct from completion of the full streaming product; the provider decision above remains necessary.
