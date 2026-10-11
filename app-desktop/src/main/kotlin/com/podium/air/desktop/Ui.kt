@@ -102,7 +102,8 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     val colors = if (state.preferences.dark) Dark else Light
     val compact = LocalWindowInfo.current.containerSize.width / LocalDensity.current.density < 900f
     MaterialTheme(colorScheme = colors, typography = Typography) {
-        val backdrop = rememberLayerBackdrop { drawRect(colors.background); drawContent() }
+        val liveColors by rememberUpdatedState(colors)
+        val backdrop = rememberLayerBackdrop { drawRect(liveColors.background); drawContent() }
         CompositionLocalProvider(LocalGlassBackdrop provides backdrop,
             LocalGlassEnabled provides (state.preferences.liquidGlass && !state.preferences.reduceDynamicBlur),
             LocalChromeInset provides if (route.page == Page.PLAYER) 0.dp else 110.dp) {
@@ -122,7 +123,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         }.focusRequester(rootFocus).focusable()) {
             Box(Modifier.fillMaxSize()) {
                 // Capture only the page: floating chrome is a sibling, never part of its own backdrop.
-                Row(Modifier.fillMaxSize().then(if (LocalGlassEnabled.current) Modifier.layerBackdrop(backdrop) else Modifier)) {
+                Row(Modifier.fillMaxSize().background(colors.background).then(if (LocalGlassEnabled.current) Modifier.layerBackdrop(backdrop) else Modifier)) {
                     Spacer(Modifier.width(if (compact) 64.dp else 190.dp))
                     Column(Modifier.weight(1f).fillMaxHeight().padding(top = 88.dp)) {
                         if (message != null) Notice(message!!, onDismiss = { model.message.value = null })
@@ -200,6 +201,11 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
             if (smoke && embeddedLyricsCheck != null) {
                 route = Route(Page.LYRICS)
                 withTimeout(10000) { model.lyrics.first { lines -> lines.any { embeddedLyricsCheck in it.text } } }
+                withTimeout(15000) { model.engine.state.first { it.error != null || it.durationMs > 0 } }.let { check(it.error == null) { it.error.orEmpty() } }
+                model.toggle()
+                withTimeout(5000) { model.engine.state.first { it.playing || it.error != null } }.let { check(it.error == null) { it.error.orEmpty() } }
+                delay(350); model.toggle()
+                withTimeout(3000) { model.engine.state.first { !it.playing } }
                 delay(650); onSmokePage("embedded-lyrics-dark")
                 model.preferences(model.state.value.preferences.copy(dark = false, reducedMotion = true))
                 delay(650); onSmokePage("embedded-lyrics-light")
@@ -250,9 +256,9 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
 @Composable private fun Navigation(route: Route, dark: Boolean, compact: Boolean, navigate: (Page) -> Unit) {
     Column(Modifier.width(if (compact) 64.dp else 190.dp).fillMaxHeight().padding(8.dp).liquidGlass(RoundedCornerShape(26.dp)).verticalScroll(rememberScrollState()).padding(if (compact) 8.dp else 12.dp)) {
         val logo = remember { SkiaImage.makeFromEncoded(requireNotNull(object {}.javaClass.getResourceAsStream("/brand/mono.png")).readBytes()).asImageBitmap() }
-        Row(Modifier.padding(8.dp, 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 4.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Image(logo, "Podium Air", Modifier.size(32.dp), colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(if (dark) Color.White else Color.Black))
-            if (!compact) { Spacer(Modifier.width(8.dp)); Text("Podium Air", fontWeight = FontWeight.Bold, fontSize = 18.sp) }
+            if (!compact) { Spacer(Modifier.width(8.dp)); Text("Podium Air", fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1) }
         }
         if (!compact) Text("WINDOWS EDITION", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(10.dp, 0.dp, 0.dp, 12.dp))
         Page.entries.forEach { page ->

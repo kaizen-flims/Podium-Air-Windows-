@@ -23,6 +23,7 @@ class MediaFiles(private val directory: File = File(defaultDataDirectory(), "dec
     /** The analyzer/mixer reads real PCM, including MP3 and AIFF that JavaFX normally plays directly. */
     fun preparePcm(source: File, checkCancelled: () -> Unit = {}): File {
         val decoded = prepare(source, checkCancelled)
+        if (decoded != source && decoded.extension.equals("wav", true)) return decoded
         val identity = "pcm-v1|" + source.canonicalPath + "|" + source.length() + "|" + source.lastModified()
         val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
         synchronized(locks[(key.hashCode() and Int.MAX_VALUE) % locks.size]) {
@@ -52,7 +53,7 @@ class MediaFiles(private val directory: File = File(defaultDataDirectory(), "dec
     }
     fun prepare(source: File, checkCancelled: () -> Unit = {}): File {
         require(source.isFile) { "File is missing: ${source.name}. Reimport it or remove it from your library." }
-        if (source.extension.lowercase() !in setOf("flac", "opus", "ogg", "m4a")) return source
+        if (source.extension.lowercase() !in setOf("flac", "opus", "ogg", "m4a", "mp3")) return source
         val identity = "v3|${source.canonicalPath}|${source.length()}|${source.lastModified()}"
         val key = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
         synchronized(locks[(key.hashCode() and Int.MAX_VALUE) % locks.size]) {
@@ -64,6 +65,7 @@ class MediaFiles(private val directory: File = File(defaultDataDirectory(), "dec
             val temp = Files.createTempFile(directory.toPath(), "decode-", ".tmp").toFile()
             try {
                 when (source.extension.lowercase()) {
+                    "mp3" -> decodeMp3(source, temp, checkCancelled)
                     "flac" -> decodeFlac(source, temp, checkCancelled)
                     "m4a" -> decodeAac(source, temp, checkCancelled)
                     else -> decodeOpus(source, temp, checkCancelled)
