@@ -193,7 +193,7 @@ jobs:
           if (!$p.WaitForExit(30000)) { $p.Kill(); throw 'Credential storage timed out' }
           if ($p.ExitCode -ne 0 -or !(Test-Path $result)) { if (Test-Path $result) { Get-Content $result }; throw 'Credential storage failed' }
           Get-Content $result
-      - name: Measure paused desktop CPU, memory and shutdown
+      - name: Measure paused expanded-player CPU, memory and shutdown
         shell: pwsh
         run: |
           $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'

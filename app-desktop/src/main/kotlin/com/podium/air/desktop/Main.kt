@@ -142,7 +142,7 @@ fun main(args: Array<String>) {
                     }.onFailure { model.message.value = "System tray is unavailable: ${it.message}" }
                 }
             }
-            PodiumApp(model, ::pick, ::pickPlaylist, smoke = smoke && !performance, onSmokePage = { page ->
+            PodiumApp(model, ::pick, ::pickPlaylist, startOnPlayer = performance, smoke = smoke && !performance, onSmokePage = { page ->
                 val screenshots = args.firstOrNull { it.startsWith("--screenshots=") }?.substringAfter("=")
                 if (screenshots != null) {
                     val output = File(screenshots).apply { mkdirs() }
@@ -158,7 +158,7 @@ fun main(args: Array<String>) {
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(if (performance) 20000 else 2500)
                         val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                        File(result).writeText(if (performance) "PASS: Paused native window and Windows media helper stayed responsive during the performance observation.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, artwork-backed controls/lyrics/queue in both themes, reduced-motion panes, playing/paused sleeve scale, Ctrl+F and Ctrl+Space playback/pause verified.\n")
+                        File(result).writeText(if (performance) "PASS: Paused expanded player window and Windows media helper stayed responsive during the performance observation.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, artwork-backed controls/lyrics/queue in both themes, reduced-motion panes, playing/paused sleeve scale, Ctrl+F and Ctrl+Space playback/pause verified.\n")
                         val png = args.firstOrNull { it.startsWith("--screenshot=") }?.substringAfter("=")
                         if (png != null) runCatching {
                             ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(png))

@@ -84,13 +84,13 @@ private enum class Page(val title: String, val icon: ImageVector) {
 private data class Route(val page: Page = Page.HOME, val detail: String? = null, val title: String = page.title)
 
 @Composable
-fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}, onSmokeFailure: (Throwable) -> Unit = { throw it }) {
+fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}, onSmokeFailure: (Throwable) -> Unit = { throw it }, startOnPlayer: Boolean = false) {
     val state by model.state.collectAsState()
     val audio by model.engine.state.collectAsState()
     val message by model.message.collectAsState()
     val importing by model.importing.collectAsState()
     val progress by model.importProgress.collectAsState()
-    var route by remember { mutableStateOf(Route()) }
+    var route by remember { mutableStateOf(Route(if (startOnPlayer) Page.PLAYER else Page.HOME)) }
     var playerPane by remember { mutableStateOf(PlayerPane.CONTROLS) }
     var search by remember { mutableStateOf("") }
     var createName by remember { mutableStateOf<String?>(null) }
@@ -520,7 +520,7 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
 @Composable private fun QueueView(model: DesktopModel, embedded: Boolean = false) {
     val queue by model.queue.collectAsState()
     if (queue.entries.isEmpty()) { Empty("Your queue is empty. Play a collection or add a song to queue."); return }
-    LazyColumn(Modifier.padding(horizontal = if (embedded) 0.dp else 28.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = if (embedded) 0.dp else 28.dp)) {
         if (!embedded) item { PlayerControls(model); Spacer(Modifier.height(16.dp)) }
         itemsIndexed(queue.entries, key = { _, it -> it.key }) { index, entry ->
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (index == queue.cursor) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent).clickable { model.selectQueue(index) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -143,3 +143,10 @@ by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
   windows. Package inspection also requires the new backdrop class.
 - Windows validation is pending for this change; the prior 79-test checkpoint
   remains the latest verified build. No full release or website change was made.
+
+- Initial player build `f33d598` passed all 84 tests and every Windows gate in
+  run 38142815467. Its downloaded verification/source matched their artifact
+  hashes; all 134 source blobs and actual JAR/model/native/license evidence matched.
+  Screenshot review prompted a small embedded-queue full-height correction.
+  The follow-up also observes the paused expanded player instead of Home;
+  verification of this follow-up is pending.
