@@ -191,3 +191,15 @@ set. Windows system libraries are linked through the platform SDK; no Microsoft
 credential database, credentials or SDK binaries are redistributed. Disconnect
 turns sharing off and requests deletion of the saved app credential. Failed
 submissions are reported and have no persistent offline retry queue.
+
+## Original artwork/player adapters
+
+The desktop full-artwork blur reuses the three-pass box-blur algorithm and
+comments from Android `ui/player/ArtworkMeshBackdrop.kt`. Landscape pane
+arrangement, pane fades, 1100dp width cap, 500ms easing and 0.88 paused sleeve
+scale follow `LandscapePlayer.kt` / `NowPlayingScreen.kt`. All are pinned to
+Podium Air Android commit `48902e6b20fdcfeb1723e02d4744849e82d5067a`
+and remain GPL-3.0-only with corresponding source and existing upstream credits.
+AWT/ImageIO, bounded local thumbnail decoding, cached textures, desktop mouse/
+keyboard controls and light/dark contrast replace Android/Coil/window bindings.
+No source SF Pro fonts, canvas footage or remote provider assets were added.

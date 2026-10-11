@@ -33,7 +33,16 @@ fun main(args: Array<String>) {
         store.directory.mkdirs()
         val first = File(store.directory, "test-tone.wav"); generateTestWave(first, 6)
         val second = File(store.directory, "second-tone.wav"); generateTestWave(second, 6)
-        val a = StoredTrack("smoke-a", first.absolutePath, "Generated test tone", "UI smoke fixture", "Test album", 6000)
+        val artwork = File(store.directory, "generated-cover.png")
+        val cover = java.awt.image.BufferedImage(128, 128, java.awt.image.BufferedImage.TYPE_INT_RGB)
+        val paint = cover.createGraphics()
+        try {
+            paint.color = Color(0xA5, 0x13, 0x2D); paint.fillRect(0, 0, 64, 128)
+            paint.color = Color(0x15, 0x2D, 0x68); paint.fillRect(64, 0, 64, 128)
+            paint.color = Color(0xF9, 0xD9, 0x78); paint.fillRect(50, 38, 28, 52)
+        } finally { paint.dispose() }
+        ImageIO.write(cover, "png", artwork); cover.flush()
+        val a = StoredTrack("smoke-a", first.absolutePath, "Generated test tone", "UI smoke fixture", "Test album", 6000, artwork.absolutePath)
         val b = StoredTrack("smoke-b", second.absolutePath, "Second test tone", "UI smoke fixture", "Test album", 6000)
         File(store.directory, "test-tone.ttml").writeText("<tt><body><p begin='0' end='2'><span begin='0' end='1.2'>Podium </span><span begin='1.2' end='2'>Air</span></p></body></tt>")
         store.save(SavedState(queue = listOf(SavedQueueEntry("ui-current", a.id), SavedQueueEntry("ui-next", b.id)), cursor = 0, library = listOf(a, b), playlists = listOf(Playlist(name = "Smoke playlist", tracks = listOf(a.id, b.id))), favorites = setOf(a.id), history = listOf(b.id, a.id)))
@@ -149,7 +158,7 @@ fun main(args: Array<String>) {
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(if (performance) 20000 else 2500)
                         val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                        File(result).writeText(if (performance) "PASS: Paused native window and Windows media helper stayed responsive during the performance observation.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, Ctrl+F and Ctrl+Space playback/pause verified.\n")
+                        File(result).writeText(if (performance) "PASS: Paused native window and Windows media helper stayed responsive during the performance observation.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, artwork-backed controls/lyrics/queue in both themes, reduced-motion panes, playing/paused sleeve scale, Ctrl+F and Ctrl+Space playback/pause verified.\n")
                         val png = args.firstOrNull { it.startsWith("--screenshot=") }?.substringAfter("=")
                         if (png != null) runCatching {
                             ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(png))

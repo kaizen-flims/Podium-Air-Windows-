@@ -61,7 +61,7 @@ app = application[0]
 (out / 'classpath-jars.json').write_text(json.dumps([file.relative_to(dist).as_posix() for file in jars], indent=2) + '\n')
 with zipfile.ZipFile(app) as jar:
     names = jar.namelist()
-    for name in ('com/podium/air/desktop/DavSession.class', 'com/podium/air/desktop/DavClient.class',
+    for name in ('com/podium/air/desktop/ArtworkBackdropCache.class', 'com/podium/air/desktop/DavSession.class', 'com/podium/air/desktop/DavClient.class',
                  'com/podium/air/desktop/ScrobblingIntegration.class', 'com/podium/air/desktop/ReplayStoriesKt.class'):
         require(name in names, 'Missing feature: ' + name)
     models = {}

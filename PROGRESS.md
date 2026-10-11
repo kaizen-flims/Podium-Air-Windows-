@@ -125,3 +125,21 @@ by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
 - The full streaming release remains unfinished. Five product work blocks remain,
   starting with the supported provider/OAuth application dependency. No new full
   release, main merge, website link replacement or Android update was made.
+
+
+### Desktop player parity — 11 October 2026
+
+- Replaced the three-color drifting backdrop with the original source's
+  three-pass, 128px full-artwork blur. Decode/blur runs on IO workers; an
+  eight-cover cache bounds memory and the draw path has no perpetual animation.
+  Covers keep their spatial color balance; reduced motion cuts transitions.
+- Adapted source landscape arrangement: anchored artwork left, selectable
+  Controls/Lyrics/Queue right, 1100dp maximum width and source pane fades.
+  Compact windows expose the same panes with scrolling. Source 0.88 paused
+  sleeve scale / 500ms easing and a dedicated player volume row are implemented.
+- Added five image/cache/input regression tests and generated artwork in the
+  packaged UI fixture. UI smoke now exercises every player pane in light/dark
+  reduced-motion modes plus actual playing/paused covers, including scaled
+  windows. Package inspection also requires the new backdrop class.
+- Windows validation is pending for this change; the prior 79-test checkpoint
+  remains the latest verified build. No full release or website change was made.

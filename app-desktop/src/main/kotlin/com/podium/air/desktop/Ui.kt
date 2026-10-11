@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -90,6 +91,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     val importing by model.importing.collectAsState()
     val progress by model.importProgress.collectAsState()
     var route by remember { mutableStateOf(Route()) }
+    var playerPane by remember { mutableStateOf(PlayerPane.CONTROLS) }
     var search by remember { mutableStateOf("") }
     var createName by remember { mutableStateOf<String?>(null) }
     val rootFocus = remember { FocusRequester() }
@@ -158,7 +160,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                                     else TrackList(state.library.filter { if (selected.page == Page.ALBUMS) it.albumKey == selected.detail else it.artist == selected.detail }.sortedWith(compareBy<StoredTrack> { it.discNumber }.thenBy { it.trackNumber }.thenBy { it.title }).map { it.song() }, model, state, Modifier.padding(horizontal = 28.dp))
                                 Page.HISTORY -> TrackList(state.history.mapNotNull { id -> state.library.find { it.id == id }?.song() }, model, state, Modifier.padding(horizontal = 28.dp), emptyText = "Your recently played tracks will appear here.")
                                 Page.REPLAY -> ReplayView(model, state)
-                                Page.PLAYER -> NowPlaying(model, state)
+                                Page.PLAYER -> NowPlaying(model, state, playerPane) { playerPane = it }
                                 Page.QUEUE -> QueueView(model)
                                 Page.LYRICS -> LyricsView(model, Modifier.padding(horizontal = 28.dp))
                                 Page.SETTINGS -> Settings(model, state)
@@ -169,8 +171,10 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                         }
                     }
                 }
-                HorizontalDivider(color = colors.outline)
-                MiniPlayer(model, state) { route = Route(Page.PLAYER) }
+                if (route.page != Page.PLAYER) {
+                    HorizontalDivider(color = colors.outline)
+                    MiniPlayer(model, state) { route = Route(Page.PLAYER) }
+                }
             }
         }
         if (createName != null) AlertDialog(onDismissRequest = { createName = null }, title = { Text("New playlist") },
@@ -185,6 +189,18 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 val playlist = state.playlists.firstOrNull()
                 if (playlist != null) { route = Route(Page.PLAYLISTS, playlist.id, playlist.name); delay(450); onSmokePage("playlist-detail") }
                 state.library.firstOrNull()?.let { route = Route(Page.ALBUMS, it.albumKey, it.album); delay(450); onSmokePage("album-detail") }
+                route = Route(Page.PLAYER)
+                val fixtureArt = model.state.value.library.first().song().thumbnailUrl
+                check(withContext(Dispatchers.IO) { ArtworkBackdropCache.shared.load(fixtureArt) } != null) { "Generated cover could not be prepared" }
+                for (dark in listOf(true, false)) {
+                    model.preferences(model.state.value.preferences.copy(dark = dark, reducedMotion = true))
+                    for (selectedPane in PlayerPane.entries) {
+                        playerPane = selectedPane; delay(500)
+                        onSmokePage("player-${selectedPane.name.lowercase()}-${if (dark) "dark" else "light"}")
+                    }
+                }
+                playerPane = PlayerPane.CONTROLS
+                model.preferences(model.state.value.preferences.copy(dark = true, reducedMotion = false))
                 route = Route(Page.HOME); delay(300); rootFocus.requestFocus()
                 val robot = java.awt.Robot()
                 fun shortcut(key: Int) {
@@ -195,8 +211,10 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 check(route.page == Page.SEARCH) { "Ctrl+F did not open search" }
                 shortcut(java.awt.event.KeyEvent.VK_SPACE)
                 withTimeout(5000) { model.engine.state.first { it.playing || it.error != null } }.let { check(it.error == null) { it.error.orEmpty() } }
+                route = Route(Page.PLAYER); delay(650); rootFocus.requestFocus(); onSmokePage("player-playing")
                 shortcut(java.awt.event.KeyEvent.VK_SPACE)
                 withTimeout(3000) { model.engine.state.first { !it.playing } }
+                delay(650); onSmokePage("player-paused")
                 route = Route(Page.HOME); delay(300)
             }
             onReady()
@@ -384,27 +402,97 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
     }
     }
 }
-@Composable private fun NowPlaying(model: DesktopModel, state: SavedState) {
+// Layout/size/pane timings adapted from Android LandscapePlayer.kt and NowPlayingScreen.kt.
+private enum class PlayerPane(val title: String, val icon: ImageVector) {
+    CONTROLS("Controls", Icons.Rounded.PlayArrow), LYRICS("Lyrics", Icons.Rounded.Lyrics), QUEUE("Queue", Icons.Rounded.PlaylistPlay)
+}
+
+@Composable private fun PlayerPaneButtons(pane: PlayerPane, select: (PlayerPane) -> Unit) {
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.Center) {
+        PlayerPane.entries.forEach { choice ->
+            FilterChip(selected = pane == choice, onClick = { select(choice) }, label = { Text(choice.title) },
+                leadingIcon = { Icon(choice.icon, null, Modifier.size(18.dp)) }, modifier = Modifier.padding(horizontal = 3.dp))
+        }
+    }
+}
+
+@Composable private fun PlayerArtwork(song: Song, playing: Boolean, reducedMotion: Boolean, size: Int) {
+    val scale by animateFloatAsState(if (playing) 1f else 0.88f,
+        tween(if (reducedMotion) 0 else 500, easing = androidx.compose.animation.core.CubicBezierEasing(0.215f, 0.61f, 0.355f, 1f)),
+        label = "playerArtworkScale")
+    Art(song, size, Modifier.graphicsLayer { scaleX = scale; scaleY = scale })
+}
+
+@Composable private fun PlayerDetails(model: DesktopModel, state: SavedState, song: Song, scrollable: Boolean = true) {
+    val audio by model.engine.state.collectAsState()
+    Column(Modifier.fillMaxWidth().then(if (scrollable) Modifier.verticalScroll(rememberScrollState()) else Modifier).padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(song.title, style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(8.dp))
+        Text(song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(song.albumName.orEmpty(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(18.dp)); SeekBar(model)
+        PlayerControls(model)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+            Icon(Icons.Rounded.VolumeDown, "Volume", Modifier.size(20.dp))
+            Slider(state.preferences.volume, { model.preferences(state.preferences.copy(volume = it)) }, Modifier.weight(1f), valueRange = 0f..1f)
+            Icon(Icons.Rounded.VolumeUp, null, Modifier.size(20.dp))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Control(if (song.videoId in state.favorites) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, "Toggle favorite", selected = song.videoId in state.favorites) { model.favorite(song.videoId) }
+            Text(if (audio.fading) "Crossfading" else "Local music • ${File(song.localPath.orEmpty()).extension.uppercase()}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable private fun NowPlaying(model: DesktopModel, state: SavedState, pane: PlayerPane, selectPane: (PlayerPane) -> Unit) {
     val audio by model.engine.state.collectAsState()
     val song = audio.entry?.song
     if (song == null) { Empty("Choose a track from your library to start listening."); return }
-    BoxWithConstraints(Modifier.fillMaxSize().padding(28.dp, 0.dp, 28.dp, 24.dp)) {
-        val wide = maxWidth > 720.dp
-        if (state.preferences.dynamicBackground) ArtworkBackground(song.thumbnailUrl, state.preferences.copy(reducedMotion = state.preferences.reducedMotion || !audio.playing))
-        Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-                Art(song, if (wide) 300 else 230)
-                Spacer(Modifier.height(22.dp)); Text(song.title, style = MaterialTheme.typography.headlineMedium)
-                Text(song.artist, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(song.albumName.orEmpty(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(Modifier.height(12.dp)); SeekBar(model)
-                PlayerControls(model)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Control(if (song.videoId in state.favorites) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, "Toggle favorite", selected = song.videoId in state.favorites) { model.favorite(song.videoId) }
-                    Text(if (audio.fading) "Crossfading" else "Local music • ${File(song.localPath.orEmpty()).extension.uppercase()}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val dark = state.preferences.dark
+    val colors = MaterialTheme.colorScheme.copy(onSurface = if (dark) Color.White else Color.Black,
+        onSurfaceVariant = if (dark) Color.White.copy(alpha = 0.80f) else Color.Black.copy(alpha = 0.70f))
+    MaterialTheme(colorScheme = colors) {
+        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (state.preferences.dynamicBackground) ArtworkBackground(song.thumbnailUrl, state.preferences)
+            val wide = maxWidth > 720.dp
+            val content = Modifier.widthIn(max = 1100.dp).fillMaxSize().padding(horizontal = 24.dp, vertical = 16.dp)
+            if (wide) {
+                Row(content, horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            PlayerArtwork(song, audio.playing, state.preferences.reducedMotion, minOf(maxWidth, maxHeight, 460.dp).value.toInt().coerceAtLeast(1))
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        PlayerPaneButtons(pane, selectPane)
+                    }
+                    AnimatedContent(pane, transitionSpec = {
+                        fadeIn(tween(if (state.preferences.reducedMotion) 0 else 220, delayMillis = if (state.preferences.reducedMotion) 0 else 90)) togetherWith
+                            fadeOut(tween(if (state.preferences.reducedMotion) 0 else 140))
+                    }, modifier = Modifier.weight(1f).fillMaxHeight(), label = "playerPane") { selected ->
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            when (selected) {
+                                PlayerPane.CONTROLS -> PlayerDetails(model, state, song)
+                                PlayerPane.LYRICS -> LyricsView(model)
+                                PlayerPane.QUEUE -> QueueView(model, embedded = true)
+                            }
+                        }
+                    }
+                }
+            } else {
+                Column(content) {
+                    PlayerPaneButtons(pane, selectPane)
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        when (pane) {
+                            PlayerPane.CONTROLS -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
+                                PlayerArtwork(song, audio.playing, state.preferences.reducedMotion, 230)
+                                PlayerDetails(model, state, song, scrollable = false)
+                            }
+                            PlayerPane.LYRICS -> LyricsView(model)
+                            PlayerPane.QUEUE -> QueueView(model, embedded = true)
+                        }
+                    }
                 }
             }
-            if (wide) LyricsView(model, Modifier.weight(1f))
         }
     }
 }
@@ -429,11 +517,11 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         Control(if (queue.repeat == RepeatMode.ONE) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat, "Repeat: ${queue.repeat.name}", selected = queue.repeat != RepeatMode.OFF) { model.repeat() }
     }
 }
-@Composable private fun QueueView(model: DesktopModel) {
+@Composable private fun QueueView(model: DesktopModel, embedded: Boolean = false) {
     val queue by model.queue.collectAsState()
     if (queue.entries.isEmpty()) { Empty("Your queue is empty. Play a collection or add a song to queue."); return }
-    LazyColumn(Modifier.padding(horizontal = 28.dp)) {
-        item { PlayerControls(model); Spacer(Modifier.height(16.dp)) }
+    LazyColumn(Modifier.padding(horizontal = if (embedded) 0.dp else 28.dp)) {
+        if (!embedded) item { PlayerControls(model); Spacer(Modifier.height(16.dp)) }
         itemsIndexed(queue.entries, key = { _, it -> it.key }) { index, entry ->
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(if (index == queue.cursor) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent).clickable { model.selectQueue(index) }.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Art(entry.song, 42); Spacer(Modifier.width(12.dp))

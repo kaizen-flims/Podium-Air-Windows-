@@ -1,49 +1,74 @@
 // SPDX-License-Identifier: GPL-3.0-only
+// Desktop adapter of Podium Air's full-artwork blur and pair-of-textures fade.
+// Source: ArtworkMeshBackdrop.kt, Android commit 48902e6b20fdcfeb1723e02d4744849e82d5067a.
 package com.podium.air.desktop
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.net.URI
-import javax.imageio.ImageIO
-import kotlin.math.cos
-import kotlin.math.sin
+import kotlin.math.roundToInt
 
-/** Slow artwork-derived color motion; disabled while paused or when reduced motion is requested. */
+/** One prepared 128px blur: no full-screen blur or perpetual drift/render loop. */
 @Composable
 internal fun ArtworkBackground(uri: String?, preferences: Preferences) {
-    var palette by remember(uri) { mutableStateOf(listOf(AccentRed)) }
+    var prepared by remember { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(uri) {
-        palette = withContext(Dispatchers.IO) {
-            runCatching {
-                val image = uri?.let { ImageIO.read(File(URI(it))) } ?: return@runCatching listOf(AccentRed)
-                val buckets = mutableMapOf<Int, Int>()
-                for (x in 0 until 24) for (y in 0 until 24) {
-                    val rgb = image.getRGB(x * image.width / 24, y * image.height / 24)
-                    val key = ((rgb shr 16 and 255) / 32 shl 6) or ((rgb shr 8 and 255) / 32 shl 3) or ((rgb and 255) / 32)
-                    buckets[key] = (buckets[key] ?: 0) + 1
-                }
-                buckets.entries.sortedByDescending { it.value }.take(3).map { (key, _) ->
-                    Color(((key shr 6 and 7) * 32 + 16) / 255f, ((key shr 3 and 7) * 32 + 16) / 255f, ((key and 7) * 32 + 16) / 255f)
-                }.ifEmpty { listOf(AccentRed) }
-            }.getOrDefault(listOf(AccentRed))
+        prepared = withContext(Dispatchers.IO) {
+            ArtworkBackdropCache.shared.load(uri)?.toComposeImageBitmap()
         }
     }
-    val transition = rememberInfiniteTransition(label = "artwork")
-    val phase = if (!preferences.reducedMotion) transition.animateFloat(0f, (2 * Math.PI).toFloat(), infiniteRepeatable(tween(32000, easing = LinearEasing)), label = "artwork drift").value else 0f
+    var shown by remember { mutableStateOf<ImageBitmap?>(null) }
+    var incoming by remember { mutableStateOf<ImageBitmap?>(null) }
+    val fade = remember { Animatable(0f) }
+    LaunchedEffect(prepared, preferences.reducedMotion) {
+        val next = prepared
+        incoming?.let { shown = it }
+        incoming = null
+        if (next == null || shown == null || preferences.reducedMotion) {
+            shown = next
+        } else if (next !== shown) {
+            incoming = next
+            fade.snapTo(0f)
+            fade.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
+            shown = next
+            incoming = null
+        }
+    }
     Canvas(Modifier.fillMaxSize()) {
-        palette.forEachIndexed { index, color ->
-            val angle = phase + index * 2.1f
-            val center = Offset(size.width * (0.5f + 0.32f * cos(angle)), size.height * (0.5f + 0.32f * sin(angle)))
-            drawRect(Brush.radialGradient(listOf(color.copy(alpha = if (preferences.dark) 0.26f else 0.15f), Color.Transparent), center, size.maxDimension * 0.75f))
-        }
+        shown?.let { drawArtworkCrop(it, 1f) }
+        incoming?.let { drawArtworkCrop(it, fade.value) }
+        // Desktop respects the selected light/dark theme and keeps dense lyrics legible.
+        val scrim = if (preferences.dark) Color.Black else Color.White
+        drawRect(Brush.verticalGradient(
+            0f to scrim.copy(alpha = if (preferences.dark) 0.62f else 0.84f),
+            0.55f to scrim.copy(alpha = if (preferences.dark) 0.70f else 0.90f),
+            1f to scrim.copy(alpha = if (preferences.dark) 0.78f else 0.94f),
+        ))
     }
+}
+
+private fun DrawScope.drawArtworkCrop(image: ImageBitmap, alpha: Float) {
+    if (alpha <= 0.001f || size.width < 1f || size.height < 1f) return
+    val ratio = size.width / size.height
+    val sourceWidth = minOf(image.width, (image.height * ratio).roundToInt()).coerceAtLeast(1)
+    val sourceHeight = minOf(image.height, (image.width / ratio).roundToInt()).coerceAtLeast(1)
+    drawImage(image,
+        srcOffset = IntOffset((image.width - sourceWidth) / 2, (image.height - sourceHeight) / 2),
+        srcSize = IntSize(sourceWidth, sourceHeight), dstOffset = IntOffset.Zero,
+        dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+        alpha = alpha, filterQuality = FilterQuality.Low)
 }
