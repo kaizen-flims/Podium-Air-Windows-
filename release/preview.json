@@ -1,7 +1,7 @@
 {
-  "tag": "v0.3.0-preview.1",
-  "title": "Podium Air Windows 0.3.0 \u2014 Glass and embedded lyrics preview",
-  "package_version": "0.3.0",
+  "tag": "v0.4.0-preview.1",
+  "title": "Podium Air Windows 0.4.0 — Google account setup preview",
+  "package_version": "0.4.0",
   "source_branch": "feat/complete-native-parity",
-  "approval": "Prem explicitly requested a new verified native Windows prerelease and website download update in the completion master prompt on 11 October 2026."
+  "approval": "Prem authorized verified native Windows prereleases and website download updates on 11 October, and requested continuation on 12 October 2026."
 }

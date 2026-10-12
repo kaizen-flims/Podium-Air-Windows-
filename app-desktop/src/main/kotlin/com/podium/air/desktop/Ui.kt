@@ -88,7 +88,7 @@ private enum class Page(val title: String, val icon: ImageVector) {
 private data class Route(val page: Page = Page.HOME, val detail: String? = null, val title: String = page.title)
 
 @Composable
-fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}, onSmokeFailure: (Throwable) -> Unit = { throw it }, startOnPlayer: Boolean = false, embeddedLyricsCheck: String? = null) {
+fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker: (Playlist?) -> Unit, smoke: Boolean = false, onSmokePage: (String) -> Unit = {}, onReady: () -> Unit = {}, onSmokeFailure: (Throwable) -> Unit = { throw it }, startOnPlayer: Boolean = false, embeddedLyricsCheck: String? = null, googleClientPicker: () -> Unit = {}, googleFixtureFile: File? = null) {
     val state by model.state.collectAsState()
     val audio by model.engine.state.collectAsState()
     val message by model.message.collectAsState()
@@ -166,7 +166,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                                 Page.QUEUE -> QueueView(model)
                                 Page.LYRICS -> LyricsView(model, Modifier.padding(horizontal = 28.dp))
                                 Page.SETTINGS -> Settings(model, state)
-                                Page.ACCOUNT -> Account(model)
+                                Page.ACCOUNT -> Account(model, googleClientPicker)
                                 Page.SOURCES -> Sources(model, state)
                                 Page.ABOUT -> About()
                             }
@@ -206,6 +206,31 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
         LaunchedEffect(Unit) {
             rootFocus.requestFocus()
             try {
+            if (smoke && googleFixtureFile != null) {
+                route = Route(Page.ACCOUNT)
+                withTimeout(5000) { model.googleAccount.first { !it.busy } }
+                val picked = WindowsFilePicker.chooseForSmoke("--pick-oauth", googleFixtureFile.name, googleFixtureFile.parentFile, 1).single()
+                check(java.nio.file.Files.isSameFile(picked.toPath(), googleFixtureFile.toPath()))
+                model.configureGoogle(picked)
+                withTimeout(5000) { model.googleAccount.first { it.configured && !it.busy } }
+                model.signInGoogle()
+                val account = withTimeout(15000) { model.googleAccount.first { !it.busy } }
+                check(account.identity?.name == "CI fixture account" && account.playlists.size == 2 && account.saved) { "Packaged Google contract failed: ${account.status}" }
+                delay(500); onSmokePage("google-playlists-dark")
+                model.selectGooglePlaylist(account.playlists.first())
+                val selected = withTimeout(10000) { model.googleAccount.first { !it.busy } }
+                check(selected.items.size == 3 && selected.items.map { it.position } == listOf(0, 1, 2))
+                delay(500); onSmokePage("google-items-dark")
+                model.preferences(model.state.value.preferences.copy(dark = false, reducedMotion = true))
+                delay(500); onSmokePage("google-items-light")
+                model.disconnectGoogle()
+                val disconnected = withTimeout(10000) { model.googleAccount.first { !it.busy } }
+                check(!disconnected.saved && disconnected.identity == null && disconnected.playlists.isEmpty())
+                model.forgetGoogleClient()
+                withTimeout(5000) { model.googleAccount.first { !it.busy && !it.configured } }
+                delay(400); onSmokePage("google-disconnected-light")
+                onReady(); return@LaunchedEffect
+            }
             if (smoke && embeddedLyricsCheck != null) {
                 route = Route(Page.LYRICS)
                 withTimeout(10000) { model.lyrics.first { lines -> lines.any { embeddedLyricsCheck in it.text } } }
@@ -801,17 +826,14 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
         item { Text("Mapped Windows/SMB folders can also be imported using Import folder. Direct SMB accounts, WebDAV uploads and addon sources remain unfinished.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
-@Composable private fun Account(model: DesktopModel) {
+@Composable private fun Account(model: DesktopModel, chooseGoogleClient: () -> Unit) {
     val state by model.state.collectAsState()
     val status by model.scrobblingStatus.collectAsState()
     val busy by model.scrobblingBusy.collectAsState()
     var token by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Text("Local music", style = MaterialTheme.typography.headlineMedium); Text("No account is needed to use your local collection.")
-        Text("YouTube Music • Unavailable", fontWeight = FontWeight.Bold)
-        Text("Google login, personalized streaming, remote playlists and bidirectional account sync need a supported provider integration. Google passwords and session cookies are not collected.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button({ Desktop.getDesktop().browse(URI("https://music.youtube.com")) }) { Text("Open YouTube Music") }
-        Text("The service opens in your default browser, with its own sign-in and playback rules. It does not connect or synchronize this app.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        GoogleAccountPanel(model, chooseGoogleClient)
         HorizontalDivider()
         Text("ListenBrainz", style = MaterialTheme.typography.headlineMedium)
         Text("Share track, artist and album names and listening timestamps with your ListenBrainz account. Listens count after half a track or four minutes of actual playback, whichever comes first; tracks of 30 seconds or less are excluded. Your token is saved in Windows Credential Manager.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -839,7 +861,7 @@ private enum class PlayerPane(val title: String, val icon: ImageVector) {
     val licensePaths = remember { readResource("/licenses/INDEX.txt").lineSequence().filter { it.startsWith("licenses/") }.toList() }
     Column(Modifier.fillMaxSize().padding(28.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Podium Air — Windows Edition", style = MaterialTheme.typography.headlineMedium)
-        Text("0.3.0 • Native Windows preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
+        Text("0.4.0 • Native Windows preview"); Text("Adapted from the Android application Podium Air."); Text("Made with ❤️ by Prem", color = AccentRed)
         Text("Native Windows playback, measured Automix, optional LRCLIB lyrics, ListenBrainz and Windows media controls are included. Google streaming and full Android feature parity remain unfinished.", color = MaterialTheme.colorScheme.onSurfaceVariant)
         TextButton({ Desktop.getDesktop().browse(URI("https://github.com/kaizen-flims/Podium-Air-Windows-")) }) { Text("Corresponding source & build instructions") }
         TextButton({ licenses = readResource("/licenses/THIRD_PARTY_NOTICES.md") + "\n\n" + readResource("/licenses/LICENSE") }) { Text("Third-party licenses & legal notices") }

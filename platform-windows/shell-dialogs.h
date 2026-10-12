@@ -35,14 +35,16 @@ std::vector<std::wstring> choose(std::string const& mode, HWND owner, std::wstri
     if (mode == "--save-image") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_OVERWRITEPROMPT | FOS_STRICTFILETYPES);
     if (mode == "--pick-folder") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_PICKFOLDERS);
     if (mode == "--pick-files") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST);
+    if (mode == "--pick-oauth") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_FILEMUSTEXIST | FOS_STRICTFILETYPES);
     check_hresult(dialog->SetOptions(options));
     if (mode != "--pick-folder") {
         COMDLG_FILTERSPEC images[] = {{L"PNG image", L"*.png"}};
+        COMDLG_FILTERSPEC oauth[] = {{L"Google Desktop OAuth client JSON", L"*.json"}};
         COMDLG_FILTERSPEC music[] = {{L"Supported music", L"*.mp3;*.wav;*.aif;*.aiff;*.m4a;*.flac;*.opus;*.ogg"}, {L"All files", L"*.*"}};
         COMDLG_FILTERSPEC playlists[] = {{L"Local playlists", L"*.m3u8;*.m3u"}, {L"All files", L"*.*"}};
-        check_hresult(dialog->SetFileTypes(mode == "--save-image" ? 1 : 2, mode == "--save-image" ? images : mode == "--pick-files" ? music : playlists));
+        check_hresult(dialog->SetFileTypes(mode == "--save-image" || mode == "--pick-oauth" ? 1 : 2, mode == "--save-image" ? images : mode == "--pick-oauth" ? oauth : mode == "--pick-files" ? music : playlists));
     }
-    check_hresult(dialog->SetTitle(mode == "--pick-folder" ? L"Import music folder" : mode == "--pick-files" ? L"Import music" : mode == "--save-image" ? L"Save your Replay" : mode == "--save-playlist" ? L"Export local playlist" : L"Import local playlist"));
+    check_hresult(dialog->SetTitle(mode == "--pick-folder" ? L"Import music folder" : mode == "--pick-files" ? L"Import music" : mode == "--pick-oauth" ? L"Import Google Desktop OAuth client" : mode == "--save-image" ? L"Save your Replay" : mode == "--save-playlist" ? L"Export local playlist" : L"Import local playlist"));
     if (!name.empty()) check_hresult(dialog->SetFileName(name.c_str()));
     if (!folder.empty()) {
         com_ptr<IShellItem> location;

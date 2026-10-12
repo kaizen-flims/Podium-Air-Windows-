@@ -26,6 +26,7 @@ for report in reports:
     skipped += int(suite.get('skipped', 0))
 assert reports and failures == 0 and skipped == 0, (tests, failures, skipped)
 assert any(p.name == 'TEST-com.podium.air.desktop.EmbeddedLyricsTest.xml' for p in reports), 'Embedded reader regressions were not run'
+assert any(p.name == 'TEST-com.podium.air.desktop.GoogleAccountTest.xml' for p in reports), 'OAuth/account lifecycle regressions were not run'
 for name in ('ui-smoke.txt', 'platform-smoke.txt', 'audio-smoke.txt', 'installer-smoke.txt',
              'dpi-1.5-smoke.txt', 'dpi-2.0-smoke.txt', 'performance-smoke.txt',
              'codec-flac-smoke.txt', 'codec-opus-smoke.txt', 'codec-mp3-smoke.txt',
@@ -33,7 +34,7 @@ for name in ('ui-smoke.txt', 'platform-smoke.txt', 'audio-smoke.txt', 'installer
              'credentials-smoke.txt', 'webdav-smoke.txt', 'replay-smoke.txt',
              'embedded-lyrics-id3-uslt-smoke.txt', 'embedded-lyrics-id3-sylt-smoke.txt',
              'embedded-lyrics-android-enhanced-smoke.txt', 'embedded-lyrics-vorbis-comments-smoke.txt',
-             'embedded-lyrics-mp4-lyrics-smoke.txt'):
+             'embedded-lyrics-mp4-lyrics-smoke.txt', 'google-ui-smoke.txt'):
     assert 'PASS:' in (args.verification / name).read_text(encoding='utf-8-sig'), name
 source = args.packages / 'podium-air-windows-source.zip'
 with zipfile.ZipFile(source) as archive:

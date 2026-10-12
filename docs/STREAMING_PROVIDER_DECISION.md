@@ -20,7 +20,7 @@ A normal YouTube Data API key or desktop Google OAuth registration can support
 permitted account/metadata operations; neither grants permission to provide
 native audio-only background streams or downloads. No OAuth client project or
 provider authorization for the required audio capability has been supplied.
-The Windows app therefore does not collect Google passwords or session cookies.
+The Windows app therefore does not collect Google passwords or session cookies. The 0.4.0 continuation implements the permitted official desktop OAuth/userinfo and read-only YouTube playlist metadata flow. It requires a registered Desktop client JSON and owner's OAuth project/consent/API setup, and remains unverified against a live account. [Account setup and limits](GOOGLE_DESKTOP_SETUP.md). This progresses account functionality independently of the unsupported native-audio capability; it does not establish full YouTube Music sync.
 
 To implement the remaining core, the owner must choose a supported native-audio
 provider and supply its documented API/SDK and authorized application setup, or

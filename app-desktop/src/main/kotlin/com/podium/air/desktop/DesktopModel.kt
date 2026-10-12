@@ -19,6 +19,7 @@ class DesktopModel(
     val localLibrary: LocalLibrary = LocalLibrary(),
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
     private val onlineLyrics: LyricsProvider = LrcLibLyrics(),
+    googleFixture: java.net.URI? = null,
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val saveMutex = Mutex()
@@ -42,6 +43,31 @@ class DesktopModel(
     private var saveJob: Job? = null
     private var lyricsJob: Job? = null
     private var sleepJob: Job? = null
+    private val google = if (googleFixture == null) GoogleConnection(scope) else {
+        val api = GoogleHttp(GoogleEndpoints.fixture(googleFixture))
+        val prefix = "google-fixture-${java.util.UUID.randomUUID()}"
+        GoogleConnection(scope, api, WindowsSecretStore("$prefix-client"), WindowsSecretStore("$prefix-refresh"), WindowsSecretStore("$prefix-permissions")) { uri ->
+            // Explicit packaged contract fixture only; a normal sign-in always opens the system browser.
+            Thread({
+                runCatching {
+                    java.net.http.HttpClient.newBuilder().followRedirects(java.net.http.HttpClient.Redirect.NORMAL).build().use { http ->
+                        val response = http.send(java.net.http.HttpRequest.newBuilder(uri).timeout(java.time.Duration.ofSeconds(10)).GET().build(), java.net.http.HttpResponse.BodyHandlers.discarding())
+                        check(response.statusCode() == 200)
+                    }
+                }.onFailure { googleAccountFailure(it) }
+            }, "podium-google-fixture").apply { isDaemon = true; start() }
+        }
+    }
+    val googleAccount = google.state
+    fun configureGoogle(file: File) = google.configure(file)
+    fun signInGoogle() = google.signIn()
+    fun refreshGooglePlaylists() = google.refresh()
+    fun selectGooglePlaylist(playlist: GooglePlaylist) = google.select(playlist)
+    fun googlePlaylistBack() = google.back()
+    fun cancelGoogle() = google.cancel()
+    fun disconnectGoogle() = google.disconnect()
+    fun forgetGoogleClient() = google.forgetClient()
+    private fun googleAccountFailure(error: Throwable) { scope.launch { google.cancel(); message.value = "Google fixture callback failed: ${error.javaClass.simpleName}" } }
     private val scrobbling = ScrobblingIntegration(scope, ListenBrainzHttp(), WindowsSecretStore(), mutable.value.preferences) { enabled, username ->
         change { copy(preferences = preferences.copy(listenBrainzEnabled = enabled, listenBrainzUser = username)) }
     }
@@ -268,7 +294,7 @@ class DesktopModel(
         val localTime = java.time.LocalDateTime.now()
         recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, localTime.toLocalDate().toString(), localTime.hour)
         flushListening()
-        scope.cancel(); onlineLyrics.close(); scrobbling.close(); dav.close(); engine.close()
+        scope.cancel(); onlineLyrics.close(); scrobbling.close(); dav.close(); google.close(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.
         runCatching { synchronized(saveLock) { persistence.save(mutable.value) } }.onFailure { System.err.println("Library save failed: ${it.message}") }
     }

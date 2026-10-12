@@ -113,6 +113,24 @@ jobs:
             if ($p.ExitCode -ne 0 -or !(Test-Path $result)) { throw "$name packaged lyrics failed" }
             Get-Content $result
           }
+      - name: Verify packaged Google account contract and visible UI
+        shell: pwsh
+        run: |
+          $portFile = Join-Path $PWD 'google-fixture-port.txt'
+          $clientFile = Join-Path $PWD 'google-fixture/音-client.json'
+          $server = Start-Process python -ArgumentList @('scripts/google_fixture_server.py', '--port-file', "`"$portFile`"", '--client-file', "`"$clientFile`"") -PassThru
+          try {
+            for ($i = 0; $i -lt 60 -and !(Test-Path $portFile); $i++) { Start-Sleep -Milliseconds 100 }
+            if (!(Test-Path $portFile)) { throw 'Local Google protocol fixture did not start' }
+            $portNumber = (Get-Content $portFile -Raw).Trim()
+            $exe = Resolve-Path 'app-desktop/build/compose/binaries/main/app/Podium Air/Podium Air.exe'
+            $result = Join-Path $PWD 'google-ui-smoke.txt'
+            $shots = Join-Path $PWD 'google-screenshots'
+            $p = Start-Process $exe -ArgumentList @('--ui-smoke', "--google-ui=http://127.0.0.1:$portNumber/", "--google-client=`"$clientFile`"", "--result=`"$result`"", "--screenshots=`"$shots`"") -PassThru
+            if (-not $p.WaitForExit(35000)) { $p.Kill(); throw 'Google packaged contract timed out' }
+            if ($p.ExitCode -ne 0 -or !(Test-Path $result)) { throw 'Google packaged contract failed' }
+            Get-Content $result
+          } finally { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
       - name: Verify packaged Windows helper
         if: env.PODIUM_BUILD_PHASE == 'release'
         shell: pwsh
@@ -387,6 +405,8 @@ jobs:
             ui-smoke.txt
             embedded-lyrics-*-smoke.txt
             embedded-lyrics-screenshots/
+            google-ui-smoke.txt
+            google-screenshots/
             ui-smoke.png
             audio-smoke.txt
             automix-smoke.txt
@@ -418,7 +438,7 @@ jobs:
       contents: write
       actions: read
     concurrency:
-      group: podium-air-windows-0-3-preview
+      group: podium-air-windows-0-4-preview
       cancel-in-progress: false
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

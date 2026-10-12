@@ -4,6 +4,8 @@ Native Kotlin/Compose Windows adaptation of [Podium Air Android](https://github.
 
 ## In this preview
 
+The next **0.4.0 account preview** adds an official desktop Google OAuth flow and read-only YouTube playlist browsing. It requires a registered Desktop client JSON and real-account acceptance; no live Google account has been tested. The current public 0.3.0 build does not include this new flow. See [setup and exact limits](docs/GOOGLE_DESKTOP_SETUP.md). Native YouTube audio/downloads and bidirectional/full Music synchronization remain unavailable.
+
 - Android Liquid Glass parameters, original licensed chromatic lens shader, native Skia backdrop blur, floating navigation/top controls/mini player, red accents, artwork background and source landscape controls/lyrics/queue panes. Windows layout is adapted; exact Android motion/pixel parity is not claimed.
 - Embedded ID3 USLT/SYLT milliseconds, FLAC/Vorbis/Opus comments, M4A ©lyr/freeform and Android `BITCHORD_LYRICS`. Word-timed custom tags, TTML/LRC/UTF-16 sidecars, backing/duet timing, offsets, seeking and scrolling; untimed text is never given invented timing. Invalid/empty sidecars fall back to embedded tags.
 - Native local MP3/WAV/AIFF/M4A/FLAC/Opus playback, playlists/library/albums/artists/history/favorites, duplicate-safe queue, shuffle/repeat, equalizer/rate/sleep and 0–12-second crossfade. Tagged MP3 is decoded by replaceable LGPL JLayer into a cancellable disk PCM cache after an observed JavaFX failure.

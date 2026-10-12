@@ -29,6 +29,8 @@ fun main(args: Array<String>) {
     val performance = args.contains("--performance-smoke")
     val embeddedFixture = args.firstOrNull { it.startsWith("--embedded-ui=") }?.substringAfter("=")?.let(::File)
     val embeddedCheck = args.firstOrNull { it.startsWith("--expect-lyrics=") }?.substringAfter("=")
+    val googleFixture = args.firstOrNull { it.startsWith("--google-ui=") }?.substringAfter("=")?.let { java.net.URI(it) }
+    val googleFixtureFile = if (googleFixture != null) File(args.first { it.startsWith("--google-client=") }.substringAfter("=")) else null
     val smoke = args.contains("--ui-smoke") || performance
     val store = if (smoke) StateStore(File(System.getProperty("java.io.tmpdir"), "podium-ui-smoke-${System.currentTimeMillis()}")) else StateStore()
     if (smoke) {
@@ -52,7 +54,8 @@ fun main(args: Array<String>) {
         if (embeddedFixture == null) File(store.directory, "test-tone.ttml").writeText("<tt><body><p begin='0' end='2'><span begin='0' end='1.2'>Podium </span><span begin='1.2' end='2'>Air</span></p></body></tt>")
         store.save(SavedState(queue = listOf(SavedQueueEntry("ui-current", a.id), SavedQueueEntry("ui-next", b.id)), cursor = 0, library = listOf(a, b), playlists = listOf(Playlist(name = "Smoke playlist", tracks = listOf(a.id, b.id))), favorites = setOf(a.id), history = listOf(b.id, a.id)))
     }
-    val model = DesktopModel(JavaFxAudioEngine(), store)
+    require(googleFixture == null || smoke) { "Google contract fixtures require isolated --ui-smoke mode." }
+    val model = DesktopModel(JavaFxAudioEngine(), store, googleFixture = googleFixture)
     var tray: TrayIcon? = null
     var mediaControls: WindowsMediaControls? = null
     application {
@@ -60,6 +63,21 @@ fun main(args: Array<String>) {
         val pickerScope = rememberCoroutineScope()
         var pickerActive by remember { mutableStateOf(false) }
         val windows = System.getProperty("os.name").startsWith("Windows")
+        fun pickGoogleClient() {
+            if (pickerActive) return
+            if (windows) {
+                pickerActive = true
+                pickerScope.launch {
+                    try { WindowsFilePicker.choose("--pick-oauth").firstOrNull()?.let(model::configureGoogle) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { model.message.value = "Could not select the Google Desktop client JSON." }
+                    finally { pickerActive = false }
+                }
+            } else {
+                val chooser = JFileChooser().apply { dialogTitle = "Google Desktop OAuth client"; fileFilter = FileNameExtensionFilter("Desktop OAuth JSON", "json") }
+                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) model.configureGoogle(chooser.selectedFile)
+            }
+        }
         val bounds = GraphicsEnvironment.getLocalGraphicsEnvironment().maximumWindowBounds
         val windowState = rememberWindowState(placement = if (args.contains("--small")) WindowPlacement.Floating else WindowPlacement.Maximized,
             position = WindowPosition(Alignment.Center), width = minOf(760, bounds.width - 24).coerceAtLeast(360).dp, height = minOf(560, bounds.height - 24).coerceAtLeast(280).dp)
@@ -147,7 +165,7 @@ fun main(args: Array<String>) {
                     }.onFailure { model.message.value = "System tray is unavailable: ${it.message}" }
                 }
             }
-            PodiumApp(model, ::pick, ::pickPlaylist, startOnPlayer = performance, smoke = smoke && !performance, embeddedLyricsCheck = embeddedCheck, onSmokePage = { page ->
+            PodiumApp(model, ::pick, ::pickPlaylist, startOnPlayer = performance, smoke = smoke && !performance, embeddedLyricsCheck = embeddedCheck, googleClientPicker = ::pickGoogleClient, googleFixtureFile = googleFixtureFile, onSmokePage = { page ->
                 val screenshots = args.firstOrNull { it.startsWith("--screenshots=") }?.substringAfter("=")
                 if (screenshots != null) {
                     val output = File(screenshots).apply { mkdirs() }
@@ -163,7 +181,7 @@ fun main(args: Array<String>) {
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(if (performance) 20000 else 2500)
                         val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                        File(result).writeText(if (performance) "PASS: Paused expanded player window and Windows media helper stayed responsive during the performance observation.\n" else if (embeddedFixture != null) "PASS: ${embeddedFixture.name} imported, persisted, restored, played/paused and rendered in the packaged lyrics UI in both themes: ${model.lyricsStatus.value}.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, artwork-backed controls/lyrics/queue in both themes, reduced-motion panes, playing/paused sleeve scale, Ctrl+F and Ctrl+Space playback/pause verified.\n")
+                        File(result).writeText(if (googleFixture != null) "PASS: Packaged Google contract used real PKCE/loopback callbacks, Windows credential writes/deletes, paginated read-only playlist/item requests and visible Account UI in both themes. Loopback fixture account only; real Google sign-in is unverified.\n" else if (performance) "PASS: Paused expanded player window and Windows media helper stayed responsive during the performance observation.\n" else if (embeddedFixture != null) "PASS: ${embeddedFixture.name} imported, persisted, restored, played/paused and rendered in the packaged lyrics UI in both themes: ${model.lyricsStatus.value}.\n" else "PASS: Compose desktop window, all 16 navigation routes, populated playlist/album detail, artwork-backed controls/lyrics/queue in both themes, reduced-motion panes, playing/paused sleeve scale, Ctrl+F and Ctrl+Space playback/pause verified.\n")
                         val png = args.firstOrNull { it.startsWith("--screenshot=") }?.substringAfter("=")
                         if (png != null) runCatching {
                             ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(png))
