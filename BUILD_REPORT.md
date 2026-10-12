@@ -1,4 +1,14 @@
-# Published Windows 0.3.0 preview — 11 October 2026
+# Published Windows 0.4.0 account preview — 12 October 2026
+
+[0.4.0-preview.1](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.4.0-preview.1) contains executable source `2258dc63986876955efec6b447667b264388fb8c`. The Google desktop OAuth/refresh/revocation and read-only YouTube playlist metadata flow is implemented, requires the owner's registered Desktop client configuration, and **has not been validated against a real Google account**. No native YouTube audio/downloads, playlist writes or full Music sync is claimed. [Setup guide](docs/GOOGLE_DESKTOP_SETUP.md).
+
+[Windows build 38245481117](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38245481117) passed. Independent XML inspection recorded 95 tests with zero failures/errors/skips, including all six named OAuth/account regression methods. Packaged checks selected a Unicode JSON through the actual native picker, ran the same PKCE/callback/token/metadata implementation against an isolated loopback provider, stored/deleted Windows credentials and rendered Account in both themes. Account screenshots were reviewed. An initial packaged picker failure was corrected before this build. The user still needs to configure and test a real account.
+
+All existing native/UI/codec/lyrics/Automix/WebDAV/Replay/credential and MSI install/launch/uninstall gates passed. The [verification artifact](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38245481117/artifacts/11746536815) matched SHA-256 `cf2b34542ce796a4b4d7fb1c06d31ba8a7b8068cba59a549e7eb9da6a9a7dbc5`. Inspection checked 147 tracked source files, actual app/model/native payloads and 51 notices. Observed paused player/helper use was 1.21% of one logical core and 295.87 MB peak sampled working set; this short cloud sample is not physical-device or long-session acceptance.
+
+[Publication run 38247120269](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38247120269) reuses the exact successful artifacts without rebuilding. MSI: 158237911 bytes, SHA-256 `36dede3ea441948ec0a63a18f1c8ca16959c60dc9455a5281d78a6018cdad764`. EXE, portable, corresponding app/dependency sources, notices, build evidence and hashes accompany the release. Website/deployment verification is recorded in the progress log. The older previews and Android channels remain preserved. Remaining provider/service/UI and consumer Windows acceptance gaps below still apply.
+
+## Archived Windows 0.3.0 release — 11 October 2026
 
 [0.3.0-preview.1 is published](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.3.0-preview.1). Executable source and Git tag target `584160d88cb0be0a6f3409bd8feb5e09c3126a6d`. [Windows build 38148562182](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38148562182) passed after feature integration. Independent XML inspection found 89 tests across 18 suites, zero failures/errors/skips. These are recorded results, not a completeness target.
 

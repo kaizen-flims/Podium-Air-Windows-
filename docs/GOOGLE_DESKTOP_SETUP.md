@@ -1,6 +1,6 @@
 # Google desktop account setup
 
-The 0.4.0 preview adds an official system-browser OAuth flow and read-only YouTube Data API playlist browsing. **No registered project/client has been supplied, and no live Google account has been tested.** Packaged tests use an explicitly isolated loopback fixture and dummy account.
+The published 0.4.0 preview adds an official system-browser OAuth flow and read-only YouTube Data API playlist browsing. **No registered project/client has been supplied, and no live Google account has been tested.** Packaged tests use an explicitly isolated loopback fixture and dummy account.
 
 ## Configure your own desktop client
 
@@ -27,3 +27,5 @@ YouTube Data API metadata is distinct from YouTube Music's private account/libra
 Protocol tests cover bad/duplicate state, declined authorization, PKCE/token fields, permission denial, header-only tokens, paginated/ordered metadata, refresh/disconnect races, redirects and response bounds. Packaged UI checks exercise the native Unicode JSON picker, the same OAuth/token/API implementation, Windows credential writes/deletes and both themes using the dummy loopback provider. **These checks do not establish successful live Google sign-in.** Project/client setup and authorized account acceptance remain the owner's next step.
 
 Primary API documentation: [installed-app OAuth](https://developers.google.com/identity/protocols/oauth2/native-app), [OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect), [owned playlists](https://developers.google.com/youtube/v3/docs/playlists/list), [playlist items](https://developers.google.com/youtube/v3/docs/playlistItems/list).
+
+Verified executable source: `2258dc63986876955efec6b447667b264388fb8c`; [Windows build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38245481117) and [release](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.4.0-preview.1). All six named account regression methods and the packaged/native fixture flow passed. A real-account test still needs your registered Desktop client. One Google connection is saved per Windows user; changing the imported client clears its previous saved authorization.

@@ -1,5 +1,7 @@
 # Feature parity
 
+Latest 0.4.0 executable source is `2258dc63986876955efec6b447667b264388fb8c`, verified by [Windows run 38245481117](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38245481117). Google desktop authorization/read-only playlist browsing requires the owner's registered client and real-account acceptance. All OAuth/native-account tests use a loopback fixture, and no live Google sign-in is claimed. Existing native player/lyrics/codec/installer gates passed again in this integrated build. [Setup](docs/GOOGLE_DESKTOP_SETUP.md) and [latest release](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.4.0-preview.1). Earlier scope-specific evidence below is retained as history.
+
 **Verified** means recorded passing automated evidence for the stated scope.
 **Partial** means implemented but missing source behavior or broader device
 acceptance. **Blocked** identifies a supported integration or missing pipeline.
