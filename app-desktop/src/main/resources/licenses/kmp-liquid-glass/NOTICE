@@ -1,0 +1,8 @@
+KMP Liquid Glass / backdrop 0.0.1-alpha02
+Copyright 2026 Kyant (Original), Kashif Mehmood (KMP Port)
+https://github.com/Kashif-E/KMPLiquidGlass
+Based on AndroidLiquidGlass / Kyant0/backdrop. Apache License 2.0.
+Podium Air uses the published desktop renderer and adapts its Android integration parameters.
+The integration ports Kyant's original Android dispersion shader into Skia. Copyright 2025 Kyant.
+Windows uses full-resolution backdrop processing instead of Android's 0.33 resolution optimization.
+Noctis and Tunetastic were evaluated; their Avalonia/WinUI application code was not copied.

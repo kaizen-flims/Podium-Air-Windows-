@@ -51,3 +51,142 @@
 
 - Prem explicitly authorized publishing Windows release assets and website download buttons. Added exact Skiko 0.9.22.2 LICENSE/NOTICE and Skia copyright/license before public preview packaging; source/API release preparation and website updates are in progress.
 - Main commit 4948feb passed all 40 tests and Windows packaging/integration checks in run 37980037577. Release preparation validated exact-source provenance and all package hashes. Fixed draft publishing: upload through the release ID after validating its target; a draft Git tag exists only after publication. No partial release was published.
+
+- 2026-10-10: Resumed the complete native-port scope after the public local preview. Added the original AGPL Automix analysis/policy/planner and native DSP/JNI, bounded PCM preparation including MP3/AIFF, pitch-preserving overlap preparation, original-track clock mapping, confidence-based fallback and adaptive EQ handoffs. The Linux native analyzer test measured 120.005 BPM from generated PCM, measured content boundaries and rejected silence for beat matching. Kotlin tests and packaged Windows Automix control/seek/cleanup checks are pending CI. This development branch is not a complete release; online account/streaming/provider and neural-model parity remain unresolved.
+
+### Automix Windows validation and remaining app work — 10 October 2026
+
+Feature commit c2e63ec passed Windows run 38018280923: 48 tests, zero failures;
+actual packaged Automix PCM preparation and overlap; original-track seek while
+paused; all six codecs; 15 UI routes and keyboard shortcuts; native media
+controls/dialogs; installer lifecycle. Paused observation: 1.73% of one logical
+core and 254.07 MB sampled working set. This verifies the DSP/WSOLA change,
+not full Android parity.
+
+Opt-in LRCLIB networking, strict recording/duration matching, body limits,
+cancellation, provider status and bounded offline cache are now implemented.
+Neural Automix adapters, original mel/STFT front ends, the two exact pinned
+Android model assets and CPU ONNX Runtime are being verified on Windows.
+No public full release has been declared. Streaming/login/sync and remaining
+network/social features are still unresolved. The website still points to the
+previous explicitly labeled local preview.
+
+Replay summary PNG export now includes a frozen preview, selected-period
+filtering (excluding future records), original poster dimensions/margins,
+local artwork, Unicode native PNG save dialog and atomic output. Unit and
+packaged export checks are included. Native model front ends also passed the
+standalone C++ self-test locally. A Gradle Java-extension name collision found
+by Windows CI was fixed; full neural/lyrics/Replay verification is pending.
+
+
+### Verified neural Automix / LRCLIB / Replay checkpoint
+
+- `1b12da5` fixed the Replay coroutine/image-converter compile errors and passed
+  complete Windows run 38064057032: 58 tests, zero failures/errors/skips; bundled
+  neural graphs, actual Automix/seek, six codec PCM/control/end checks, Replay
+  PNG, native media/dialogs, 15 UI routes/keyboard/DPI and MSI lifecycle.
+- Independently verified the report ZIP digest, counted XML results and viewed
+  actual Settings/Replay screenshots. Logical-font fallback and singular labels
+  were corrected after visual inspection of Replay.
+- `dba37cb` adds opt-in ListenBrainz scrobbling, measured audible-time eligibility,
+  documented/rate-limited API calls, masked token input, Windows Credential
+  Manager JNI and eight new tests plus packaged credential smoke. CI pending.
+- This branch remains an unfinished native streaming port. No new full release
+  or website-link replacement has been made. Supported provider/account setup,
+  remaining integrations/source UI and consumer-device acceptance remain open.
+
+- `db8ab51` corrects the scrobbling test's required thumbnail constructor
+  argument and cancels any pending connection before disconnecting. CI rerun
+  pending; no tests or acceptance gates were disabled.
+
+- Implemented source calendar Replay periods and all eight individual story
+  PNG cards, plus measured local listening-hour profiles with backward-
+  compatible older records. Added three calendar/rendering/statistics tests and
+  expanded packaged Replay evidence to all cards. New checks pending.
+
+
+### WebDAV and packaged-payload verification — 11 October 2026
+
+- `016c63c` exposes separate installer/portable/source/dependency downloads while
+  retaining the combined release-validator bundle. All Windows gates passed.
+  Downloaded corresponding source matched all 127 tracked Git blobs.
+- `65ef6f9` adds Sources/WebDAV browsing, Windows Credential Manager, selected
+  offline import and nine actual HTTP/XML/path/state/cancellation tests. Run
+  38124280801 passed 79 tests with zero failures/errors/skips and all existing
+  native/UI/installer gates. Source screenshots and the XML ZIP were inspected.
+- Checkpoint `0573e24` includes the packaged loopback WebDAV download/native playback gate,
+  enforces actual per-import byte limits, requires 79 tests/no skips, and inspects
+  actual packages/source/model/native/license payloads. Run 38126328359 passed
+  all gates. Its verification digest is e6ba7ffba4648bfa56703cbd09a7d0e693e1516befbb7e0ab0ccb2a4f5f8e0e2.
+  The independently downloaded source matches all 132 remote Git blobs; the
+  exact packaged JAR/model/x64-native/license evidence also matched. The PR
+  run 38126332001 passed as well. Paused sample: 1.38% of one logical core,
+  236.69 MB peak app/direct-helper working set. MSI install/launch/uninstall passed.
+- The full streaming release remains unfinished. Five product work blocks remain,
+  starting with the supported provider/OAuth application dependency. No new full
+  release, main merge, website link replacement or Android update was made.
+
+
+### Desktop player parity — 11 October 2026
+
+- Replaced the three-color drifting backdrop with the original source's
+  three-pass, 128px full-artwork blur. Decode/blur runs on IO workers; an
+  eight-cover cache bounds memory and the draw path has no perpetual animation.
+  Covers keep their spatial color balance; reduced motion cuts transitions.
+- Adapted source landscape arrangement: anchored artwork left, selectable
+  Controls/Lyrics/Queue right, 1100dp maximum width and source pane fades.
+  Compact windows expose the same panes with scrolling. Source 0.88 paused
+  sleeve scale / 500ms easing and a dedicated player volume row are implemented.
+- Added five image/cache/input regression tests and generated artwork in the
+  packaged UI fixture. UI smoke now exercises every player pane in light/dark
+  reduced-motion modes plus actual playing/paused covers, including scaled
+  windows. Package inspection also requires the new backdrop class.
+- Windows validation is pending for this change; the prior 79-test checkpoint
+  remains the latest verified build. No full release or website change was made.
+
+- Initial player build `f33d598` passed all 84 tests and every Windows gate in
+  run 38142815467. Its downloaded verification/source matched their artifact
+  hashes; all 134 source blobs and actual JAR/model/native/license evidence matched.
+  Screenshot review prompted a small embedded-queue full-height correction.
+  The follow-up also observes the paused expanded player instead of Home;
+  verification of this follow-up is pending.
+
+### Expanded player verification — 11 October 2026
+
+- Code `9415dc7ac454f3b0b861a4a0b3b24525f7c1dc6f` passed Windows run
+  38143937527 with 84 tests, zero failures/errors/skips and all native,
+  six-codec, neural Automix, WebDAV, Replay, credential and MSI gates.
+- Controls/Lyrics/Queue were exercised in both themes with reduced motion,
+  actual playing/paused artwork and 150/200% compact windows. Final screenshots
+  were inspected, including the queue's full-height/top-aligned viewport.
+- Verification artifact 11703669092 has SHA-256
+  955d479f41fe468d77d566df2584b7f12757f0d4f63d2c9df5f2c48e471aff70. Downloaded XML/package/JAR evidence matched;
+  corresponding source matched all 134 remote Git blobs.
+- The paused expanded player/native helper sample measured 0.69% of one
+  logical core and 266.14 MB peak working set. Multi-hour/physical
+  Windows 10/11 acceptance remains open. The acceptance guide now covers the
+  new player, WebDAV, ListenBrainz and Replay checks.
+- Full streaming/sign-in still depends on the documented provider/app setup.
+  No full release, main merge, website replacement or Android update was made.
+
+## 11 October — completion prompt implementation
+
+- c42c0af integrated native Liquid Glass and Android/custom/common container lyric readers. Only compile/UI checks ran during development.
+- 4285397 fixed a visually observed tagged-MP3 JavaFX failure via JLayer PCM decoding; real tagged files then imported/restored/played/paused and rendered lyrics in both themes (run 38147720644).
+- Final integration extends artwork behind the floating chrome and recreates cached glass layers on theme/blur switches. Full regression and installer packaging run after this integrated app, then screenshot review and exact-artifact prerelease promotion. The old preview and Android update channels are preserved.
+- Online/account and service-dependent gaps remain explicit; no full-parity claim or mock functionality.
+
+### Published integrated preview — 11 October 2026
+
+- Released executable source/tag: `584160d88cb0be0a6f3409bd8feb5e09c3126a6d`. Windows run 38148562182 passed the integrated native/installer regression and real tagged-file playback/lyrics. Final artwork-glass and both-theme screenshots were reviewed. Verification archive SHA-256: `6b6693a9105725433aed78b53c323f468f84d9bba0a32e51a88ad1cc9b3b6bd3`.
+- Run 38149562724 promoted the exact artifacts without rebuilding or rerunning Windows tests. Public `v0.3.0-preview.1` has eight verified permanent assets: MSI, EXE, portable, matching source, dependency sources, notices, evidence and checksums. The previous preview remains preserved.
+- Website commit `c2a71983c0dc80768e887505cac516f63a2b37cd` updates only the Windows release link and relevant download checks. Run 38149660302 passed responsive platform labels/logos/layout, anonymous MSI HEAD/binary signature and live Cloudflare HTTP 200 with the new link. All three Android download button lines remain byte-identical; Android source main is still `48902e6b20fdcfeb1723e02d4744849e82d5067a`.
+- Full Android parity remains unfinished: supported streaming provider/desktop OAuth setup, remaining translation/canvas/presence/shared-listening/network integrations, exact UI/motion gaps and physical Windows acceptance. No account or consumer-hardware success is claimed.
+
+### Google desktop account continuation — 12 October 2026
+
+- Added official external-browser desktop OAuth with S256 PKCE, one-time state/random loopback callback, native client-JSON picker, separate Windows credential storage, refresh/cancel/disconnect/revocation and read-only YouTube playlist/item pagination. Real Google project/client/account acceptance remains unverified; no native YouTube audio or full Music synchronization is claimed.
+- Released executable source `2258dc63986876955efec6b447667b264388fb8c` passed Windows run 38245481117 after correcting a packaged picker failure. All six named OAuth/account regression methods and packaged native-credential/UI fixture flow ran successfully; existing audio/lyrics/glass/Automix/WebDAV/Replay/native/installer gates passed. Verification digest: `cf2b34542ce796a4b4d7fb1c06d31ba8a7b8068cba59a549e7eb9da6a9a7dbc5`. Account screenshots were reviewed in both themes. No live Google account was used.
+- Publication run 38247120269 promoted the exact reviewed artifacts without a Windows rebuild. Public tag `v0.4.0-preview.1` points to the tested source and has eight verified permanent assets. MSI digest: `36dede3ea441948ec0a63a18f1c8ca16959c60dc9455a5281d78a6018cdad764`.
+- Website commit `c8001ee4186eeeaf65018138a02dd1b2a769e60a` updates Windows links and accurately states the OAuth setup requirement. Run 38247569114 passed anonymous MSI HEAD/binary signature, four responsive platform/button checks and live Cloudflare HTTP 200 with the 0.4.0 link. Android button lines and update behavior remain unchanged; Android main remains `48902e6b20fdcfeb1723e02d4744849e82d5067a`. Earlier Windows previews remain preserved.
+- Next account acceptance step: owner registers/enables the Desktop OAuth project/client, imports its JSON locally and completes authorized sign-in. Native streaming/provider permissions, remaining source features and physical Windows acceptance are still distinct gaps. See `docs/GOOGLE_DESKTOP_SETUP.md`.

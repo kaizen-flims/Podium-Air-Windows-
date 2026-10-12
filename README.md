@@ -1,129 +1,31 @@
 # Podium Air — Windows Edition
 
-A native Kotlin + Compose Desktop adaptation of the Android Podium Air app,
-built by Prem Das aka Kaizen. This preview plays your **local music** on Windows
-through JavaFX native audio. It bundles its runtime and uses a native Windows
-installer. Full Android feature parity is tracked in [FEATURE_PARITY.md](FEATURE_PARITY.md).
+Native Kotlin/Compose Windows adaptation of [Podium Air Android](https://github.com/kaizen-flims/Podium-Air), made with ❤️ by Prem. **0.4.0-preview.1 is published**, preserving the older Windows previews and Android channels. The official Google desktop connection flow requires your registered Desktop OAuth client; live account acceptance is unverified. **Native YouTube audio/downloads, playlist writes and full/bidirectional YouTube Music synchronization remain unavailable.**
 
-Local file/folder imports, metadata/artwork, albums/artists, search, favorites,
-history, editable playlists, M3U8 interchange, duplicate-safe queues, repeat/
-shuffle, play/pause/seek/volume, 0–12 second equal-power crossfade, speed,
-ten-band equalizer, sleep timer, TTML/LRC lyrics, lyric timing/word motion,
-artwork color motion and Replay listening statistics are implemented. Windows shell file/folder dialogs,
-system media controls, tray, optional notifications and optional startup are included.
+## In this preview
 
-The verified Windows build passed 40 tests, all 15 navigation routes, real
-playback/crossfade in WAV, FLAC, Opus, MP3, AAC/M4A and AIFF, native media-session
-checks and MSI install/run/uninstall. See [BUILD_REPORT.md](BUILD_REPORT.md) for
-exact build evidence and the current interaction/performance verification.
+- Official system-browser Google desktop OAuth using S256 PKCE, a random loopback callback and Windows Credential Manager; refresh, partial permission, cancellation and disconnect/revocation. Read-only owned YouTube playlists/items, ordered pagination and explicit 500-entry limits. [Configure your Desktop OAuth client](docs/GOOGLE_DESKTOP_SETUP.md). Native/paged/credential/UI checks use an isolated dummy provider; successful live Google sign-in is not claimed.
 
-Google login, YouTube streaming/downloads and remote account sync require a
-supported provider integration. Automix needs a beat-analysis/time-stretch
-pipeline. Online canvas video, lyrics translation, scrobbling, Discord RPC and
-Listen Together remain incomplete. The app discloses unavailable capabilities.
+- Android Liquid Glass parameters, original licensed chromatic lens shader, native Skia backdrop blur, floating navigation/top controls/mini player, red accents, artwork background and source landscape controls/lyrics/queue panes. Windows layout is adapted; exact Android motion/pixel parity is not claimed.
+- Embedded ID3 USLT/SYLT milliseconds, FLAC/Vorbis/Opus comments, M4A ©lyr/freeform and Android `BITCHORD_LYRICS`. Word-timed custom tags, TTML/LRC/UTF-16 sidecars, backing/duet timing, offsets, seeking and scrolling; untimed text is never given invented timing. Invalid/empty sidecars fall back to embedded tags.
+- Native local MP3/WAV/AIFF/M4A/FLAC/Opus playback, playlists/library/albums/artists/history/favorites, duplicate-safe queue, shuffle/repeat, equalizer/rate/sleep and 0–12-second crossfade. Tagged MP3 is decoded by replaceable LGPL JLayer into a cancellable disk PCM cache after an observed JavaFX failure.
+- Original neural Automix/DSP/planner, Beat This!/Open-unmix models and WSOLA; optional LRCLIB lyrics, ListenBrainz with Windows Credential Manager, Replay calendar filters/eight PNG story exports, and personal HTTPS WebDAV browsing/offline imports.
+- Native Windows media session/keys, file/folder/save dialogs, Unicode paths and opt-in tray/startup/notifications.
 
-## Build on Windows 10/11 x64
+## Download and acceptance
 
-Install Temurin JDK 21.0.12.1+1, WiX Toolset 3.14.1 and Visual Studio Build Tools with Desktop
-development with C++ and a Windows SDK. In a Visual Studio x64 developer shell:
+[Download the Windows x64 MSI](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/download/v0.4.0-preview.1/Podium-Air-Windows-0.4.0-x64.msi). The [0.4.0 release](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.4.0-preview.1) also contains an EXE installer, portable ZIP, matching app/dependency sources, notices, build evidence and SHA-256 checksums. The Java runtime is bundled; installers are unsigned. The [website](https://podium-air-website.pages.dev/) Windows buttons have been updated to this MSI; Android downloads are unchanged.
 
-```powershell
-.\platform-windows\build.ps1
-.\gradlew.bat :shared-domain:check :app-desktop:check
-.\gradlew.bat :app-desktop:run
-.\gradlew.bat :app-desktop:createDistributable :app-desktop:packageMsi :app-desktop:packageExe
-```
+Released executable source `2258dc63986876955efec6b447667b264388fb8c` passed the [integrated Windows build](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38245481117), including the native Unicode OAuth JSON picker and account protocol/UI checks, actual tagged-file playback/visible lyrics, existing native integrations, six codecs and MSI install/launch/uninstall. The [publication run](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38247120269) promoted these exact files without rebuilding. Windows cloud CI and dummy-provider checks do not replace real-account or consumer-device acceptance. See the [build report](BUILD_REPORT.md).
 
-Pinned dependencies: Kotlin 2.2.21, Compose 1.9.3, Gradle 8.14.3, OpenJFX
-21.0.9, jFLAC 1.5.2, Concentus 1.0.2 and JAAD 0.8.7. CI records the exact
-Temurin JDK build and hashes all runtime JARs. End users do not install Java,
-VLC, FFmpeg or .NET. FFmpeg is used only in CI to generate test fixtures.
+## Remaining integration dependencies
 
-Installers are **unsigned test builds** and may show SmartScreen warnings.
-Prem has authorized a public Windows preview. The release workflow publishes
-only after the main-branch Windows build and package verification succeed.
-Android releases and automatic updates remain unchanged.
+A provider-approved native-audio/download API and registered desktop OAuth setup are required for the streaming/account core. Android uses private Innertube/extraction and WebView session cookies; these are not silently transplanted. See [provider decision](docs/STREAMING_PROVIDER_DECISION.md). Translation/canvas service integration, Last.fm configuration, official native Discord presence, shared listening and additional network-source protocols remain unfinished. No mock buttons substitute for them.
 
-## Download the Windows preview
+WebM/Matroska and MPEG-frame timestamp SYLT are unsupported. Some codecs use bounded 16-bit PCM; lossless device output and sample-accurate gaplessness are not claimed. Physical Windows 10/11, mixed DPI, sleep/resume, output hotplug and long-session acceptance remain distinct from Windows cloud CI.
 
-[Download Podium Air for Windows — MSI](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/download/v0.2.0-preview.1/Podium-Air-Windows-0.2.0-x64.msi) ·
-[All release assets and notes](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1) ·
-[Podium Air website](https://podium-air-website.pages.dev/)
+## Build and license
 
-The public **v0.2.0-preview.1** release includes the MSI, EXE installer, portable
-ZIP, exact application source, dependency sources, third-party notices, build
-evidence and SHA256SUMS. It is an unsigned local-music preview for Windows
-10/11 x64. No separate Java installation is needed.
+Windows x64, JDK 21, CMake/MSVC/C++/WinRT and WiX 3 are required. Run `platform-windows/build.ps1`, then `gradlew.bat :app-desktop:run` or `:app-desktop:packageMsi :app-desktop:packageExe`. The GitHub workflow includes the pinned runtime, native build, renderer notices and corresponding dependency sources.
 
-[Successful Windows checks](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583) ·
-[Verification reports and screenshots](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583/artifacts/11640779965) ·
-[Merged PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
-
-The [Windows workflow](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/workflows/windows.yml)
-also stores temporary CI packages for 30 days. `Windows-verification` holds
-reports, screenshots, codec/native integration results, installer logs and
-performance samples. Public release assets can be downloaded without signing in.
-
-The local audio checks can also be run against the portable executable:
-
-```powershell
-& '.\Podium Air\Podium Air.exe' --audio-smoke --result=audio-smoke.txt
-& '.\Podium Air\Podium Air.exe' --platform-smoke --result=platform-smoke.txt
-& '.\Podium Air\Podium Air.exe' --audio-smoke --media='C:\Music\song.flac' --result=flac-smoke.txt
-```
-
-The audio fixture check expects a track of at least six seconds. CI reports a
-recognized missing-output error as Blocked only for its baseline WAV check;
-unexpected errors and the explicit codec checks fail the build. The
-`audio_smoke` workflow input also makes a missing output fail the baseline check.
-
-## Use
-
-Ctrl+O imports files; Ctrl+Shift+O imports a folder. Music stays in its original
-location, including accessible mapped/UNC folders. Moving files requires
-reimporting. Menus provide Play Next, Add to Queue, playlist actions and
-favorites. Playlists support duplicates, reordering and local M3U8 import/export;
-remote URLs inside imported playlists are skipped with a report.
-
-WAV, MP3 and AIFF use JavaFX directly. FLAC, Ogg Opus and AAC/M4A prepare a
-disk-backed 16-bit WAV on background workers. This makes first play of long
-tracks slower and converts high-bit-depth FLAC to 16 bits. Mono/stereo FLAC
-8–24 bit up to 192 kHz and Opus mapping family 0 are supported. Protected,
-fragmented/non-AAC M4A, Ogg Vorbis, multichannel/chained Opus and decoded tracks
-over 750 MB are explicitly rejected. No sample-accurate gapless claim is made.
-
-Place a `.ttml` or `.lrc` with the same basename beside the audio file. TTML
-supports timed words, overlapping/duet vocals and backing lines. Embedded lyrics
-are a fallback. Lyrics allow click-to-seek, per-track timing offsets, reload and
-auto-scroll. Reduced motion disables word/background motion.
-
-Library state is in `%LOCALAPPDATA%\PodiumAirWindows\library.json`. Corrupt
-state is copied for recovery before replacing it. Decoder/artwork/helper caches
-live beside it. Playback restores paused. Closing quits by default; Settings
-can opt into closing to tray, launching at sign-in and track notifications.
-The tray offers Show, Play/Pause, Previous, Next and Quit. Windows system media
-controls publish current metadata/timeline and accept transport commands.
-
-Ctrl+F searches, Ctrl+Space plays/pauses, Ctrl+Left/Right changes tracks,
-Alt+Left/Right seeks ten seconds and Esc leaves a collection. The navigation
-collapses to icons at narrower widths and scrolls at small heights. Settings
-controls dark/light theme, volume, rate, equalizer, crossfade, sleep and Windows options.
-Crossfade works at 1× and is cancelled by seeking. Replay counts real elapsed
-playing time; paused time and seek distance do not inflate listening minutes.
-
-## Credits and license
-
-Adapted from the Android application [Podium Air](https://github.com/kaizen-flims/Podium-Air),
-based on [BitChord](https://github.com/kushagrasinghx/BitChord) by Kushagra Singh
-and contributors. Original source and notices remain credited under [GPLv3](LICENSE).
-The Windows adaptation was created on 9 October 2026. See
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and About → Third-party licenses.
-Matching application source and exact decoder/library sources accompany each
-CI package. SF Pro fonts and the separately licensed AGPL Automix code/model
-are not included. No Android releases, updates or files are modified.
-
-Made with ❤️ by Prem.
-
-## Preview release publishing
-
-`release/preview.json` records the explicitly approved Windows preview. After a successful main-branch Windows build, the release workflow validates all test results, integration reports, exact-source provenance and five package checksums; it uploads installers, portable app, corresponding sources, notices and checksums to a draft and then publishes it as a prerelease. An already published preview is never overwritten. Stable releases still require consumer-device acceptance.
+GPLv3 app combined with separately headed AGPLv3-or-later Automix components under section 13. Original contributors/model/runtime/library notices and full licenses ship in About and all source distributions. [Third-party notices](THIRD_PARTY_NOTICES.md), [feature matrix](FEATURE_PARITY.md), [build report](BUILD_REPORT.md), [acceptance guide](docs/WINDOWS_ACCEPTANCE.md).

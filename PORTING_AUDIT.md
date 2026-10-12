@@ -1,4 +1,4 @@
-# Porting audit — 9 October 2026
+# Porting audit — updated 11 October 2026
 
 Source: `kaizen-flims/Podium-Air`, default branch `main`, commit
 `48902e6b20fdcfeb1723e02d4744849e82d5067a` (Podium Air v1.0.1 revision 1).
@@ -33,19 +33,21 @@ simply changing the Gradle target would not produce a desktop app.
 | Brand images | Reusable | Original mono mark and Glow Flow app icon retained; Windows icon derived |
 | SF Pro Display OTF files | Blocked pending redistribution rights | Not bundled; desktop default system font used |
 | `LocalMediaRepository` | Android-only / reimplement | MediaStore, URI permissions and MediaMetadataRetriever replaced with Windows Common Item Dialogs, cancellable filesystem scanning and jaudiotagger |
-| `AppSettings`, SearchHistory, LastPlayed, ListeningStats | Android-only persistence bindings | Atomic JSON store, preferences, favorites and recent history implemented. Elapsed-time recorder and 7/30/365-day Replay implemented; source annual share-card presentation is not ported |
+| `AppSettings`, SearchHistory, LastPlayed, ListeningStats | Android-only persistence bindings | Atomic JSON store, preferences, favorites and recent history implemented. Elapsed-time recorder and 7/30/365-day Replay implemented; summary PNG preview/export is now ported; all eight individual story card PNG types and calendar month/year/all-time filters now have desktop adapters, with all eight export/calendar/statistics checks passed |
 | PlaybackService / PlayerConnection / audio sink / output routing | Android-only / reimplement | JavaFX native audio backend on JVM, single-thread lifecycle, reactive StateFlow; Windows JavaFX native libraries packaged |
 | `CrossfadeController` | Android-only orchestration | Two-player equal-power overlap implemented for local tracks at 1×; not claiming sample-accurate gaplessness |
-| `smart/TransitionPlanner.kt` | Reusable after abstraction + separate license | Orchard AGPLv3-or-later header within GPL source. Not copied into this port |
-| Automix analyzer / WSOLA / on-device model | Reimplement / pending | Android decoding, JNI/model distribution and performance need separate audit. Automix not simulated |
+| `smart/TransitionPlanner.kt` | Reusable after abstraction + separate license | Original policy/planner/analysis reused with AGPLv3-or-later headers and bundled license; source obligations retained under section 13 |
+| Automix analyzer / WSOLA / on-device model | Reused/adapted and tested | Original native DSP, mel/STFT front ends, Beat This!/Open-unmix adapters and exact model bytes; custom bounded pitch-preserving desktop WSOLA; actual model/PCM and packaged transition checks passed 84-test run 38143937527 |
 | YtMusicRepository / Innertube / StreamResolver / PO tokens | Blocked pending compatible supported provider integration | Private API/extraction pipeline and Android WebView path not ported under the prompt's provider-policy constraint |
 | Google / Discord auth, EncryptedPrefs | Android-only / pending supported API | No cookies or credentials collected. No desktop auth/session sync claim |
-| Sources, addon modules, JioSaavn, WebDAV, SMB | Pending provider/dependency audit and implementation | Not connected or advertised as functional |
-| Canvas Apple/Spotify/Tidal/community | Pending asset/API rights and player integration | Embedded artwork, extracted dominant-color animated background and reduced-motion setting implemented; online canvas video is not connected |
+| Sources / WebDAV | Desktop adapter tested | Read-only HTTPS Basic-auth browse/selected offline import; original folder semantics, native credential storage, bounded/cancellable requests and nine HTTP/state tests; packaged Unicode download/playback passed. Uploads, direct streaming and sidecar cover scans remain |
+| Addons / JioSaavn / direct SMB accounts | Pending provider/dependency audit and implementation | Mapped/UNC folder import is functional; other adapters are not connected or advertised as complete |
+| Canvas Apple/Spotify/Tidal/community | Pending asset/API rights and player integration | Embedded artwork and original full-artwork blur/landscape player adapter implemented and checked; portrait mesh and online canvas video are not connected |
 | TTML / lyric clock / lyric focus | Reusable after minimal abstraction | Original parser, alignments and clock reused; clock/focus visibility made public across modules. Word growth, lift, bloom, overlaps, backing vocals, local offsets and click-to-seek implemented |
-| Online lyrics providers / translation | Pending supported provider integration | No remote retrieval or translation claim; local TTML/LRC/embedded lyrics work offline |
+| Online lyrics providers / translation | Partial | Optional documented LRCLIB API with strict metadata/duration matching, bounded bodies, cancellation and offline cache; five local HTTP contract tests passed. Other providers/translation remain missing |
 | DownloadService / Downloader / offline DASH/HLS | Android-only + provider policy | No streaming download feature in Windows preview |
-| Last.fm / ListenBrainz / Discord RPC / Listen Together | Pending desktop integration | Explicit gaps recorded in parity checklist |
+| ListenBrainz | Adapted and contract/native tested | Documented API with actual audible-time thresholds, one-request-per-second pacing and rate headers; Windows Credential Manager stores user tokens. No real-account submission has been tested |
+| Last.fm / Discord RPC / Listen Together | Pending supported desktop integration | Last.fm application setup, official native Discord RPC/application ID and a supported shared-listening service contract remain missing; Android Discord account-token gateway impersonation is not copied |
 | Widgets / Android Auto / foreground notifications / haptics | Android-only | Desktop file chooser, standard window controls, AWT tray, optional notifications/startup and native Windows SMTC provided; physical media-key/device checks remain |
 
 ## Provider boundary
@@ -77,8 +79,9 @@ for the current local preview; empty modules for unimplemented services would
 not add functionality. StatePersistence and AudioEngine are injectable in tests.
 
 Filesystem and library writes run on IO coroutines; mutable UI/queue commands
-run on Swing EDT; MediaPlayer operations are confined to JavaFX thread. Tokens
-and credential storage are deferred because no authenticated provider exists.
+run on Swing EDT; MediaPlayer operations are confined to JavaFX thread. Google tokens and account sync remain deferred. ListenBrainz tokens use the
+current Windows user's Credential Manager through a narrowly scoped JNI API;
+no token is placed in the library state, logs, URLs or process arguments.
 No automatic updates or Android release actions are present.
 
 ## Decoder and Windows integration assessment
@@ -103,10 +106,12 @@ coordinator tests cover the bridge's commands; physical keyboard behavior
 still requires client-device acceptance. No global keyboard hook is installed.
 
 All newly included decoder and C++/WinRT notices are bundled in the app; exact
-decoder source JARs accompany the package. The AGPL Automix planner/analyzer and
-beat model were inspected but not copied. AGPL is not treated as a blanket ban: a
-port requires retaining its license obligations and adapting the Android/JNI/
-model/time-stretch pipeline. JavaFX's overlap alone cannot deliver beat matching.
+decoder source JARs accompany the package. The original AGPL Automix planner,
+DSP and model adapters are now included with notices and matching source. The
+exact pinned Android Beat This! and Open-unmix weights and CPU ONNX Runtime
+have their own MIT/third-party notices. JavaFX overlap supplies the two-player
+handoff; measured DSP/neural analysis and WSOLA supply the transition evidence
+and pitch-preserving preparation.
 
 The Windows file/folder/import/export picker now uses COM `IFileOpenDialog` and
 `IFileSaveDialog` in a separate STA helper mode. The dialog is owned by the
@@ -116,3 +121,47 @@ paths as bounded hex lines. Cancellation/parent shutdown kills the helper and
 removes the temporary response. Swing choosers remain only for non-Windows
 development. Native Unicode file/folder/save selection, cancellation, packaged JVM protocol
 and cancelling an open picker without leaving a helper passed run 37957264531.
+
+## Supported scrobbling reference
+
+ListenBrainz integration follows https://listenbrainz.readthedocs.io/en/latest/users/api/core.html
+and https://listenbrainz.readthedocs.io/en/latest/users/api/index.html. It validates
+a user token through an Authorization header, serializes requests at no more
+than one per second, handles rate-limit reset headers, and sends only actual
+qualifying listens. The UI reports failed submissions; offline retries are not
+implemented. Windows native storage uses CredWriteW/CredReadW/CredDeleteW for
+`PodiumAirWindows/` generic credentials in the current user's credential set:
+https://learn.microsoft.com/en-us/windows/win32/api/wincred/nf-wincred-credwritew.
+
+## WebDAV adapter references and evidence
+
+Pinned source `data/webdav/WebDavClient.kt`, `WebDavConfig.kt`,
+`WebDavRepository.kt` and `ui/screens/SourcesScreen.kt` were reviewed before
+porting. Android OkHttp/shared interceptors/settings/media binding were replaced
+with JDK HTTP/atomic disk import and current-user Windows Credential Manager.
+Source behavior is adapted; direct Android streaming/upload/cover traversal is
+not claimed. Exact origin/port/folder checks, DAV success propstat handling,
+case-sensitive paths, disabled XML entities, redirect refusal and bounded transfers
+improve the desktop boundary. No remote account or private server was contacted.
+
+Primary protocol references:
+https://www.rfc-editor.org/rfc/rfc4918.html (PROPFIND/Depth/multistatus) and
+https://www.rfc-editor.org/rfc/rfc7617.html (Basic authentication/TLS/UTF-8).
+Nine actual HTTP/XML/path/state checks and packaged download/native playback
+passed Windows run 38143937527. Real-server and physical-device acceptance remain.
+
+## Desktop player source functions
+
+The full-artwork box-blur functions and relevant landscape layout/pane and
+paused-sleeve constants were reviewed from pinned Android
+`ui/player/ArtworkMeshBackdrop.kt`, `LandscapePlayer.kt` and
+`NowPlayingScreen.kt`. This does not claim that the entire large Android
+player orchestration was ported. Blur algorithm/comments are retained; bounded
+AWT/ImageIO worker decode and cache replace Bitmap/Coil. Source pane timings,
+1100dp cap, paused scale and easing are adapted to mouse/keyboard/desktop resizing.
+The original source license/notices remain bundled.
+
+Five artwork/input/cache tests and packaged light/dark/pane/play-state/scaled-
+window checks passed Windows run 38143937527. The compact desktop view uses the
+full-artwork blur, not the source phone mesh/shader path; canvas video and
+remaining source differences are tracked separately.

@@ -18,6 +18,8 @@ class DesktopModel(
     private val persistence: StatePersistence = StateStore(),
     val localLibrary: LocalLibrary = LocalLibrary(),
     dispatcher: CoroutineDispatcher = Dispatchers.Main,
+    private val onlineLyrics: LyricsProvider = LrcLibLyrics(),
+    googleFixture: java.net.URI? = null,
 ) : AutoCloseable {
     private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val saveMutex = Mutex()
@@ -35,11 +37,87 @@ class DesktopModel(
     private var lastStatsFlush = 0L
     private var historyKey: String? = null
     val lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
+    val lyricsStatus = MutableStateFlow("Select a track to view lyrics.")
     val sleepRemaining = MutableStateFlow<Long?>(null)
     val platformStatus = MutableStateFlow("Windows media controls initialize when the window opens.")
     private var saveJob: Job? = null
     private var lyricsJob: Job? = null
     private var sleepJob: Job? = null
+    private val google = if (googleFixture == null) GoogleConnection(scope) else {
+        val api = GoogleHttp(GoogleEndpoints.fixture(googleFixture))
+        val prefix = "google-fixture-${java.util.UUID.randomUUID()}"
+        GoogleConnection(scope, api, WindowsSecretStore("$prefix-client"), WindowsSecretStore("$prefix-refresh"), WindowsSecretStore("$prefix-permissions")) { uri ->
+            // Explicit packaged contract fixture only; a normal sign-in always opens the system browser.
+            Thread({
+                runCatching {
+                    java.net.http.HttpClient.newBuilder().followRedirects(java.net.http.HttpClient.Redirect.NORMAL).build().use { http ->
+                        val response = http.send(java.net.http.HttpRequest.newBuilder(uri).timeout(java.time.Duration.ofSeconds(10)).GET().build(), java.net.http.HttpResponse.BodyHandlers.discarding())
+                        check(response.statusCode() == 200)
+                    }
+                }.onFailure { googleAccountFailure(it) }
+            }, "podium-google-fixture").apply { isDaemon = true; start() }
+        }
+    }
+    val googleAccount = google.state
+    fun configureGoogle(file: File) = google.configure(file)
+    fun signInGoogle() = google.signIn()
+    fun refreshGooglePlaylists() = google.refresh()
+    fun selectGooglePlaylist(playlist: GooglePlaylist) = google.select(playlist)
+    fun googlePlaylistBack() = google.back()
+    fun cancelGoogle() = google.cancel()
+    fun disconnectGoogle() = google.disconnect()
+    fun forgetGoogleClient() = google.forgetClient()
+    private fun googleAccountFailure(error: Throwable) { scope.launch { google.cancel(); message.value = "Google fixture callback failed: ${error.javaClass.simpleName}" } }
+    private val scrobbling = ScrobblingIntegration(scope, ListenBrainzHttp(), WindowsSecretStore(), mutable.value.preferences) { enabled, username ->
+        change { copy(preferences = preferences.copy(listenBrainzEnabled = enabled, listenBrainzUser = username)) }
+    }
+    val scrobblingStatus = scrobbling.status
+    val scrobblingBusy = scrobbling.busy
+    fun connectListenBrainz(token: String) = scrobbling.connect(token)
+    fun disconnectListenBrainz() = scrobbling.disconnect()
+    private val dav = DavSession(scope, savedRoot = { state.value.preferences.webDavUrl }) { url, user ->
+        change { copy(preferences = preferences.copy(webDavUrl = url, webDavUser = user)) }
+    }
+    val davEntries = dav.entries
+    val davLocation = dav.location
+    val davStatus = dav.status
+    val davBusy = dav.busy
+    fun connectDav(url: String, user: String, password: String) = dav.connect(url, user, password)
+    fun browseDav(uri: java.net.URI? = null) = dav.browse(uri)
+    fun cancelDav() = dav.cancel()
+    fun disconnectDav() { importJob?.cancel(); dav.disconnect() }
+    fun importDav(entries: List<DavEntry>) {
+        if (importing.value || dav.busy.value || entries.isEmpty()) return
+        val selected = entries.filter { it.audio }.distinctBy { it.uri }.take(100)
+        importJob = scope.launch {
+            importing.value = true
+            var imported = 0; var downloadedBytes = 0L
+            try {
+                for ((index, entry) in selected.withIndex()) {
+                    ensureActive(); importProgress.value = (index + 1) to selected.size
+                    if (downloadedBytes + (entry.bytes ?: 750_000_000) > 5_000_000_000) {
+                        message.value = "Imported $imported tracks. The 5 GB per-import limit was reached."; break
+                    }
+                    val file = dav.download(entry, File(defaultDataDirectory(), "webdav/music"), 5_000_000_000 - downloadedBytes)
+                    downloadedBytes += file.length()
+                    val result = withContext(Dispatchers.IO) { localLibrary.import(listOf(file), { ensureActive() }) }
+                    ensureActive()
+                    val track = result.first.singleOrNull() ?: error("Downloaded track could not be imported.")
+                    val filename = entry.name.substringBeforeLast('.')
+                    val named = track.copy(
+                        title = if (track.title == file.nameWithoutExtension) filename.substringAfter(" - ") else track.title,
+                        artist = if (track.artist == "Unknown artist" && " - " in filename) filename.substringBefore(" - ") else track.artist,
+                        album = if (track.album == "Local music") entry.uri.path.substringBeforeLast('/').substringAfterLast('/').ifBlank { "WebDAV music" } else track.album,
+                    )
+                    change { copy(library = (library + named).associateBy { it.id }.values.toList()) }
+                    imported++
+                    message.value = "Imported $imported WebDAV tracks for offline playback."
+                }
+            } catch (e: CancellationException) { message.value = "WebDAV import cancelled. $imported completed tracks remain available."; throw e }
+            catch (e: Exception) { message.value = "WebDAV import stopped after $imported tracks: ${e.message}" }
+            finally { importing.value = false; importProgress.value = null }
+        }
+    }
     init {
         engine.configure(mutable.value.preferences)
         scope.launch {
@@ -47,7 +125,9 @@ class DesktopModel(
                 val now = System.nanoTime() / 1_000_000
                 val playbackKey = audio.entry?.let { "${it.key}:${audio.session}" }
                 if (audio.playing && audio.entry != null && historyKey != playbackKey) { historyKey = playbackKey; record(audio.entry.song) }
-                recorder.sample(audio.entry?.song?.videoId, playbackKey, audio.playing, now, java.time.LocalDate.now().toString())
+                val localTime = java.time.LocalDateTime.now()
+                recorder.sample(audio.entry?.song?.videoId, playbackKey, audio.playing, now, localTime.toLocalDate().toString(), localTime.hour)
+                scrobbling.sample(audio, now, System.currentTimeMillis() / 1000)
                 if (!audio.playing || now - lastStatsFlush >= 5000) { flushListening(); lastStatsFlush = now }
             }
         }
@@ -150,8 +230,21 @@ class DesktopModel(
     }
     private fun record(song: Song) { change { copy(history = (listOf(song.videoId) + history.filterNot { it == song.videoId }).take(200)) } }
     private fun loadLyrics(song: Song) {
-        lyricsJob?.cancel(); lyrics.value = emptyList()
-        lyricsJob = scope.launch { lyrics.value = withContext(Dispatchers.IO) { runCatching { localLibrary.lyrics(song) }.getOrElse { emptyList() } } }
+        lyricsJob?.cancel(); lyrics.value = emptyList(); lyricsStatus.value = "Loading lyrics…"
+        val online = state.value.preferences.onlineLyrics
+        val duration = state.value.library.find { it.id == song.videoId }?.duration ?: engine.state.value.durationMs
+        lyricsJob = scope.launch {
+            try {
+                val local = withContext(Dispatchers.IO) { localLibrary.loadLyrics(song) }
+                ensureActive()
+                if (local != null) { lyrics.value = local.lines; lyricsStatus.value = local.source + if (local.lines.any { it.timeMs > 0 || it.isWordSynced }) " • synchronized" else " • untimed text" }
+                else {
+                    val result = onlineLyrics.lookup(LyricsQuery(song.title, song.artist, song.albumName.orEmpty(), duration), online)
+                    ensureActive(); lyrics.value = result.lines; lyricsStatus.value = result.status
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { ensureActive(); lyricsStatus.value = "Could not load lyrics: ${error.message}" }
+        }
     }
     fun favorite(id: String) { change { copy(favorites = if (id in favorites) favorites - id else favorites + id) } }
     fun createPlaylist(name: String) { val trimmed = name.trim(); if (trimmed.isNotEmpty()) change { copy(playlists = playlists + Playlist(name = trimmed)) } }
@@ -168,11 +261,14 @@ class DesktopModel(
             playlists = playlists.map { it.copy(tracks = it.tracks.filterNot { track -> track == id }) }) }
     }
     fun preferences(value: Preferences) {
+        val reload = value.onlineLyrics != state.value.preferences.onlineLyrics
         if (value.launchAtStartup != state.value.preferences.launchAtStartup) {
             try { WindowsStartup.set(value.launchAtStartup) }
             catch (error: Exception) { message.value = error.message; return }
         }
         change { copy(preferences = value) }; engine.configure(value)
+        scrobbling.configure(value.listenBrainzEnabled)
+        if (reload) reloadLyrics()
     }
     fun sleepTimer(minutes: Int?) {
         sleepJob?.cancel(); sleepRemaining.value = minutes?.times(60L)
@@ -195,9 +291,10 @@ class DesktopModel(
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         val audio = engine.state.value
-        recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, java.time.LocalDate.now().toString())
+        val localTime = java.time.LocalDateTime.now()
+        recorder.sample(audio.entry?.song?.videoId, audio.entry?.let { "${it.key}:${audio.session}" }, false, System.nanoTime() / 1_000_000, localTime.toLocalDate().toString(), localTime.hour)
         flushListening()
-        scope.cancel(); engine.close()
+        scope.cancel(); onlineLyrics.close(); scrobbling.close(); dav.close(); google.close(); engine.close()
         // Flush the final snapshot before process shutdown; StateStore serializes with an in-flight save.
         runCatching { synchronized(saveLock) { persistence.save(mutable.value) } }.onFailure { System.err.println("Library save failed: ${it.message}") }
     }

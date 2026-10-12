@@ -1,156 +1,167 @@
-# Build report — 10 October 2026
+# Published Windows 0.4.0 account preview — 12 October 2026
 
-**Podium Air Windows 0.2.0 is a working native local-music preview.** It compiled,
-passed the Windows checks below, and produced MSI, EXE and portable packages.
-Full Android, provider and Automix parity remains incomplete.
+[0.4.0-preview.1](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.4.0-preview.1) contains executable source `2258dc63986876955efec6b447667b264388fb8c`. The Google desktop OAuth/refresh/revocation and read-only YouTube playlist metadata flow is implemented, requires the owner's registered Desktop client configuration, and **has not been validated against a real Google account**. No native YouTube audio/downloads, playlist writes or full Music sync is claimed. [Setup guide](docs/GOOGLE_DESKTOP_SETUP.md).
 
-## Verified build
+[Windows build 38245481117](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38245481117) passed. Independent XML inspection recorded 95 tests with zero failures/errors/skips, including all six named OAuth/account regression methods. Packaged checks selected a Unicode JSON through the actual native picker, ran the same PKCE/callback/token/metadata implementation against an isolated loopback provider, stored/deleted Windows credentials and rendered Account in both themes. Account screenshots were reviewed. An initial packaged picker failure was corrected before this build. The user still needs to configure and test a real account.
 
-Released source commit `ad91ba8ac4f960330c5986698072f34441be7c48` passed
-[Windows run 37981495583](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583).
-**40 tests ran with zero failures/errors.**
+All existing native/UI/codec/lyrics/Automix/WebDAV/Replay/credential and MSI install/launch/uninstall gates passed. The [verification artifact](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38245481117/artifacts/11746536815) matched SHA-256 `cf2b34542ce796a4b4d7fb1c06d31ba8a7b8068cba59a549e7eb9da6a9a7dbc5`. Inspection checked 147 tracked source files, actual app/model/native payloads and 51 notices. Observed paused player/helper use was 1.21% of one logical core and 295.87 MB peak sampled working set; this short cloud sample is not physical-device or long-session acceptance.
 
-[Preview v0.2.0-preview.1](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1)
-is public. [Publisher run 37982272174](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37982272174)
-validated this exact source and uploaded eight permanent assets before publishing:
-MSI, EXE, portable ZIP, application source, dependency sources, third-party notices,
-build evidence and SHA256SUMS. The release tag points to the commit above.
+[Publication run 38247120269](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38247120269) reuses the exact successful artifacts without rebuilding. MSI: 158237911 bytes, SHA-256 `36dede3ea441948ec0a63a18f1c8ca16959c60dc9455a5281d78a6018cdad764`. EXE, portable, corresponding app/dependency sources, notices, build evidence and hashes accompany the release. Website/deployment verification is recorded in the progress log. The older previews and Android channels remain preserved. Remaining provider/service/UI and consumer Windows acceptance gaps below still apply.
 
-[Download installers, portable app and matching sources](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1) ·
-[Verification reports and screenshots](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583/artifacts/11640779965) ·
-[Merged PR #1](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/1)
+## Archived Windows 0.3.0 release — 11 October 2026
 
-| Check | Recorded result |
+[0.3.0-preview.1 is published](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.3.0-preview.1). Executable source and Git tag target `584160d88cb0be0a6f3409bd8feb5e09c3126a6d`. [Windows build 38148562182](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38148562182) passed after feature integration. Independent XML inspection found 89 tests across 18 suites, zero failures/errors/skips. These are recorded results, not a completeness target.
+
+Final packaged reports passed real tagged-file import/persistence/restore/playback and visible lyrics for USLT, millisecond SYLT, Android FLAC enhanced fields, Opus comments and M4A ©lyr in both themes. Screenshot review confirmed Bengali UTF-16 text, word highlighting, artwork-backed glass and corrected theme capture. The observed tagged-MP3 playback error was fixed with replaceable LGPL JLayer PCM preparation. Existing neural Automix, six codecs, native media/dialogs/credentials, loopback WebDAV import/playback, Replay export, scaled UI and MSI install/launch/uninstall also passed.
+
+[Verification artifact](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38148562182/artifacts/11706026863) matched SHA-256 `6b6693a9105725433aed78b53c323f468f84d9bba0a32e51a88ad1cc9b3b6bd3`. Package inspection checked 141 tracked source files, app JAR, pinned models, native binaries, 51 notices and 50 runtime legal files. Observed paused player/native-helper use was 0.35% of one logical core and 271.05 MB peak sampled working set; this is a short cloud observation.
+
+[Publication run 38149562724](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38149562724) promoted these exact artifacts without rebuilding or rerunning Windows tests. All eight public assets, their sizes/digests and the Git tag were independently verified. [Windows MSI](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/download/v0.3.0-preview.1/Podium-Air-Windows-0.3.0-x64.msi): 158061783 bytes, SHA-256 `b71e1ad578d9b1540ee5ae9e0f7b0ad5143816225fd2e618f1fe6ceed65f1fd6`. EXE, portable ZIP, both source archives, notices, evidence and checksums are in the release.
+
+Website commit `c2a71983c0dc80768e887505cac516f63a2b37cd` updates the two Windows buttons to this MSI; all three Android button lines are unchanged. Its workflow verifies the anonymous MSI binary, responsive buttons and live Cloudflare HTML. Final deployment evidence is recorded in the progress log. The old Windows preview and Android channels remain preserved.
+
+Google/YouTube native streaming/downloads/sign-in/sync still need supported provider and desktop application setup. Translation/canvas/native video, Last.fm/official Discord/shared listening, additional network protocols and remaining exact Android UI/motion remain unfinished. Cloud Windows checks do not establish physical Windows 10/11 hotplug, mixed-monitor DPI, sleep/resume, multi-hour stability, real external account/NAS behavior or listening quality. [Acceptance guide](docs/WINDOWS_ACCEPTANCE.md) and [provider decision](docs/STREAMING_PROVIDER_DECISION.md) describe the remaining scope. Full Android parity is not claimed.
+
+## Archived 0.2 development checkpoint — superseded by the release above
+
+# Build report — 11 October 2026
+
+**The native development build works; the complete streaming-focused Windows
+edition is unfinished.** The public website still downloads the older local
+preview. No new full release or Android update has been published.
+
+## Latest verified development build
+
+[Draft PR #2](https://github.com/kaizen-flims/Podium-Air-Windows-/pull/2) contains
+the implementation on `feat/complete-native-parity`. Tested executable code:
+`9415dc7ac454f3b0b861a4a0b3b24525f7c1dc6f`. [Windows run 38143937527](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38143937527)
+completed successfully with **84 tests, zero failures/errors and zero skips**.
+A later Markdown-only checkpoint records these results without changing executable
+code; it is not represented as a newly tested binary.
+
+[Verification reports, screenshots, exact app JAR and package manifest](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/38143937527/artifacts/11703669092)
+have archive SHA-256 `955d479f41fe468d77d566df2584b7f12757f0d4f63d2c9df5f2c48e471aff70`. Their XML results were independently
+counted. Actual Replay, Sources and the new player screenshots in both themes/panes and play states were reviewed.
+
+| Check | Verified scope |
 |---|---|
-| Domain and desktop tests | 40 passed: queue identity/mutation/repeat/shuffle; state recovery/normalization/final-save ordering; callback/restart regressions; lyrics/security/clock; actual Opus decoding/cache and bounded MP4 parsing; statistics and M3U interchange |
-| Packaged UI | All 15 routes plus populated playlist/album details rendered; Robot Ctrl+F and Ctrl+Space exercised actual search/play/pause |
-| Windows media session | Native and packaged SMTC metadata/state/timeline exposed; actual Windows pause/seek requests reached callbacks |
-| Windows shell dialogs | Actual Unicode music-file/folder/save selection and cancellation passed; packaged JVM/native protocol passed; cancelling an open dialog left no helper process |
-| Real playback | WAV, FLAC, Opus, MP3, AAC/M4A and AIFF fixtures played, paused, sought, resumed, crossfaded and reached natural end; missing-file error and recovery passed |
-| Resizing/DPI | Startup and route checks at simulated 150/200%; compact navigation and bounded/scrollable layouts; screenshots reviewed |
-| CPU/memory/shutdown | Paused sample: 1.04% of one logical core, 237.75 MB peak sampled working set, including direct helper processes; helper exited with app |
-| MSI lifecycle | Silent install to selected directory, installed route/keyboard smoke and silent uninstall passed |
-| Source and packages | Exact runtime check, vendor-source checksum, dependency/native sources, application source, package SHA256 inventory and artifact uploads passed |
+| Native analysis and models | Original DSP, resampling, mel/stereo STFT, pinned Beat This!/Open-unmix inference and cancellation; measured PCM WSOLA preserves pitch |
+| Automix | Original policy/planner, actual PCM/model preparation and two-player overlap; paused original-clock seek, cancellation/replanning, manual crossfade zero, volume change and natural end |
+| Lyrics | Local TTML/LRC/embedded priority; opt-in documented LRCLIB, strict title/artist/duration matching, bounded body/cache, offline use and cancellation through five actual HTTP tests |
+| Replay | Month/year/all-time and legacy rolling periods; eight distinct 1080×1920 story cards, native Unicode save and reopen; real elapsed-time/hour recording and legacy state compatibility |
+| ListenBrainz | Eight elapsed-time/HTTP/state/native tests; opt-in thresholds, metadata-only sharing, rate pacing/reset headers, secure token round-trip and disconnect cancellation |
+| WebDAV | Nine path/XML/actual HTTP/state tests; folder/Unicode handling, Basic auth, origin/folder confinement, redirect refusal, bounded bodies, interrupted atomic transfer and disconnect races |
+| Packaged WebDAV | Packaged JVM/native credentials, authenticated PROPFIND and Unicode conditional GET from a loopback server; actual downloaded WAV metadata, play/pause/seek/natural end and credential deletion |
+| Playback formats | WAV, FLAC, Opus, MP3, AAC/M4A and AIFF: real play/pause/seek/resume/crossfade/end; actual PCM format/duration/non-silence; missing-file recovery |
+| Native/UI | All 16 routes and populated album/playlist detail; artwork-backed Controls/Lyrics/Queue in both themes, reduced-motion panes and playing/paused sleeve scale; Robot Ctrl+F/Ctrl+Space; actual SMTC callbacks, native Unicode file/folder/save/cancel and helper disposal |
+| Artwork pipeline | Source three-pass blur, 128px worker decode, eight-cover cache and bounded local inputs; five neutral/color-balance/transparency/cache/invalid-image regression tests |
+| DPI/performance | Simulated 150/200% startup and scrolling; paused expanded player 0.69% of one logical core, 266.14 MB peak sampled app/direct-helper working set; shutdown passed |
+| Installer | MSI install at a selected directory, installed UI/keyboard smoke and uninstall passed |
+| Actual package payload | Five file hashes; all tracked source bytes match Git; portable JAR matches tested app; both model SHA-256s, native PE resources, required licenses, replaceable JARs and runtime legal files checked |
 
 Runner: Windows Server 2025 x64, Temurin 21.0.12.1+1, Kotlin 2.2.21, Compose
-1.9.3, Gradle 8.14.3 and OpenJFX 21.0.9. CI builds the C++20 helper with the
-Visual Studio x64 compiler and Windows SDK. End users need no separate Java,
-VLC, FFmpeg or .NET installation. All installers are unsigned.
+1.9.3, Gradle 8.14.3, OpenJFX 21.0.9 and ONNX Runtime 1.28.0. MSVC builds the
+native Windows bridge/analysis/credentials DLL. End users need no separate Java,
+VLC, FFmpeg or .NET. The test fixture server and FFmpeg are CI tools. Installers
+remain unsigned. Cloud tests do not establish physical Windows 10/11 hotplug,
+mixed-monitor DPI, long-run resource use, listening quality or exact source motion.
 
-The short paused observation is not proof of long-session resource behavior.
-DPI is simulated, not a physical mixed-monitor check. Generated codec fixtures
-exercise the packaged playback pipeline; listening quality and audio-device
-routing still require a consumer PC.
+## Downloadable development packages
 
-## Implemented scope
+The run exposes separate **Windows-installers**, **Windows-portable**,
+**Windows-corresponding-source** and **Windows-dependency-sources** artifacts,
+alongside the original combined bundle and Windows-verification. Packages expire
+after 30 days; verification expires after 90 days. They are test builds, not a
+full public streaming release. Use the run's Artifacts section for the actual files.
 
-- Native Compose/AWT window with original branding, palette and icon; dark/light
-  themes, compact navigation, keyboard controls, responsive scrolling, mini
-  player and volume available in Settings at narrow widths.
-- Owned Windows Common Item Dialogs for file/folder and M3U import/export,
-  with cancellable STA helper lifecycle and Unicode protocol handling.
-- Real filesystem import with tags/artwork, progress/cancellation, accessible
-  mapped/UNC folders, album-artist identity and disc/track ordering.
-- Persisted local playlists, favorites, actual-start history, duplicate-safe
-  queue, repeat, reversible upcoming shuffle and M3U8/M3U interchange.
-- JavaFX transport/rate/ten-band EQ, monotonic sleep timer and equal-power
-  two-player crossfade at 1×. Seeking cancels overlap; other speeds disable it.
-- Cancellable background FLAC/Opus/AAC preparation to disk-backed 16-bit PCM,
-  Opus pre-skip/gain/end trimming, supported AAC edit trimming, bounded container
-  parsing and explicit damaged/protected/unsupported errors.
-- Original TTML/LRC/alignment/focus/clock reuse: timed word growth/lift/bloom,
-  overlapping/duet/backing vocals, offsets, reload and autoscroll.
-- Embedded-art dominant-color motion and reduced-motion/paused behavior;
-  elapsed-time Replay for 7/30/365 days with tracks/artists/minutes/starts.
-  Pauses/seek distances do not inflate time; repeats/completed restarts count
-  fresh playback sessions.
-- Native SMTC metadata/timeline/transport, tray controls and opt-in notifications,
-  close-to-tray and launch-at-sign-in.
-- Atomic JSON recovery/normalization, ordered final shutdown save, idempotent
-  close, cancelled workers and player/helper disposal.
+The connector's large installer-archive transfer was incomplete, so an independent
+local inspection of the entire installers is not claimed. The corresponding-source archive was independently downloaded, its SHA-256
+verified, and all **134 tracked source blobs** matched the remote Git tree at
+`9415dc7`. The final Windows package inspection checks the actual shipped JAR,
+model/native/license payload and portable distribution. The exact app JAR was
+also independently inspected: both pinned model hashes, x64 PE resources and
+all 49 bundled notices match the manifest; the portable runtime contains 50 legal
+files, and JLayer remains a separate, replaceable JAR.
 
-## Provenance and distribution
+## Desktop player behavior and limits
 
-Audited Android commit `48902e6b20fdcfeb1723e02d4744849e82d5067a` was read only.
-The Windows branch preserves source attribution and GPL headers. About displays
-“Made with ❤️ by Prem” and “Adapted from the Android application Podium Air,”
-and exposes bundled third-party notices.
+The source landscape layout is adapted with anchored artwork, a 1100dp cap,
+switchable Controls/Lyrics/Queue, the original pane fade timings and a 0.88
+paused sleeve scale with 500ms easing. Compact windows use the same panes with
+scrolling. The player has its own volume row; the mini player is hidden while
+Now Playing is open. All variants were exercised in the packaged UI, including
+both themes, reduced motion and 150/200% small-window scaling.
 
-Each successful package contains matching application source, separately
-licensed codec/tag/OpenJFX source JARs, complete OpenJFX native source, exact
-Temurin source/build scripts, runtime metadata, dependency hashes and package
-checksums. LGPL codec/tag libraries remain replaceable JARs. Original runtime
-legal files and C++/WinRT MIT text are retained. Restricted SF Pro fonts,
-Android binaries, secrets and separately licensed Automix code/models are not
-redistributed. The published preview also includes the pinned Skiko 0.9.22.2
-LICENSE/NOTICE, Skia BSD license and native renderer third-party legal files.
-Application JAR and installer metadata both identify version 0.2.0.
+The original full-artwork three-pass box blur is prepared from a bounded 128px
+local decode on an IO worker and cached for eight covers. Cover changes fade
+between bitmaps; no perpetual artwork animation or screen-sized blur runs.
+The source's original comments and reuse notices are retained. Desktop
+light/dark scrims and mouse/keyboard pane choices replace phone gestures.
+The portrait mesh/shaders, video canvas and remaining exact UI/motion parity
+are still incomplete. The resource sample above observes the paused expanded player and its native
+helper after startup; it does not establish multi-hour leak or physical-device
+acceptance.
 
-The downloaded release package was independently inspected: its GitHub artifact
-digest matched, and all five package hashes and sizes matched both the CI
-inventory and the public GitHub release asset metadata. The source ZIP records
-the released commit; all 83 tracked files match the tested source snapshot after
-Windows line-ending normalization. The portable application includes the native
-helper, versioned application JAR, 42 notice files (including 10 renderer legal
-files) and 50 runtime legal entries. Codec/tag dependencies remain separate JARs.
+## WebDAV behavior and limits
 
-The source archive describes the released commit above. Follow-up documentation
-records the release and website results without changing packaged application
-code. CI artifacts are temporary; the public prerelease supplies permanent
-installer/source/checksum download URLs.
+Sources connects a personal HTTPS music-folder URL, browses one folder at a time,
+and imports up to 100 selected tracks / 5 GB of actual bytes, capped at 750 MB per
+file. Completed files atomically replace their own URL-hash cache entry; interrupted
+partials are removed and completed earlier tracks remain in Library. Tagged
+metadata/artwork is read locally, with filename/parent-folder fallback. No server
+write operations or unsolicited startup scans occur. Credentials live in Windows
+Credential Manager; URL/username are ordinary preferences. Disconnect removes the
+saved credentials and retains downloaded music.
 
-## Acceptance gates
+Depth 1 DAV multistatus properties with success status are used; directories stay
+inside the configured origin/folder. HTTPS must have a certificate trusted by the
+bundled runtime. Redirects, credential-bearing/query URLs, traversal, external XML
+entities and excessive listing/file bodies are rejected. Read-only Basic-auth
+servers are supported. Direct remote streaming, uploads, cover-sidecar traversal,
+browser SSO, direct SMB accounts and addon sources remain incomplete. Actual NAS
+acceptance has not been performed; only generated loopback fixtures were used.
 
-| Gate | Result |
-|---|---|
-| A — audit/reuse | Exact source inventory, architecture/provider/license assessment and notices recorded |
-| B — native startup | Packaged and MSI-installed routes/details/keyboard passed; consumer-device acceptance pending |
-| C — real audio | Six codec controls/crossfade/natural-end and missing-file recovery passed; physical listening/hotplug pending |
-| D — honest parity | FEATURE_PARITY.md identifies tested local scope and missing source capabilities |
-| E — installable artifact | MSI/EXE/portable/source produced; MSI install/run/uninstall passed; unsigned |
-| F — handoff | Main source and merged PR #1, public preview assets, permanent website downloads, notices/evidence and client acceptance guide provided |
+## Source, notices and published preview
 
-## Remaining capabilities and limits
+Android source `48902e6b20fdcfeb1723e02d4744849e82d5067a` remains unchanged.
+About retains “Made with ❤️ by Prem” and “Adapted from the Android application
+Podium Air,” with bundled third-party licenses. GPLv3 plus original AGPLv3-or-later
+Automix headers/section-13 obligations, exact corresponding source, Beat This!/
+Open-unmix MIT model licenses and ONNX/runtime/dependency/native notices remain.
+Restricted SF Pro fonts are absent; logical platform fallback renders Unicode.
 
-Google/YouTube streaming, authentication, downloads and account synchronization
-need a supported provider interface consistent with the locked product policy.
-The Android private API/extraction pipeline was not transplanted. Account
-visibly explains this and opens the official browser service without collecting
-credentials or claiming application sync.
+The public [v0.2.0-preview.1](https://github.com/kaizen-flims/Podium-Air-Windows-/releases/tag/v0.2.0-preview.1)
+still targets `ad91ba8ac4f960330c5986698072f34441be7c48`, verified by
+[run 37981495583](https://github.com/kaizen-flims/Podium-Air-Windows-/actions/runs/37981495583)
+with 40 tests. Its eight permanent assets include installers, portable app, both
+source archives, notices, build evidence and checksums. It does not contain the
+new development features.
 
-Automix's beat-analysis/time-stretch/model pipeline is not ported. Its separate
-AGPL headers must be retained if adapted; applicable model rights and a working
-desktop audio pipeline must be established. Online canvas video, network lyrics/
-translation, scrobbling, Discord RPC, Listen Together, WebDAV/SMB account clients
-and addons remain missing. Replay lacks the source annual sharing presentation.
-Exact Android pixel/animation parity is not claimed.
+Website source checked on 11 October at `582476fa64ca8ff3ac74d611d54e04d76cbaec78`
+still has separate “Download Podium Air for Android” and “Download Podium Air for
+Windows” anchors with their platform logos. Windows points to the older preview
+MSI and is labeled a local preview. Android links remain scoped independently.
+The earlier [website QA run 38016631060](https://github.com/kaizen-flims/Podium-Air-Website/actions/runs/38016631060)
+verified its labels/URLs/platform isolation, four responsive widths and live HTTP
+200 at its tested revision. This report does not claim a new live deployment.
 
-FLAC above 16 bits converts to 16-bit PCM. Opus accepts mono/stereo mapping
-family 0, not Vorbis, chained or multichannel streams. M4A accepts unencrypted,
-nonfragmented AAC with supported sample/edit tables, not ALAC/DRM/external media
-references. Decoded tracks are capped at 750 MB. Existing-cache pruning starts
-at 1.5 GB before decode; this is not a strict total-cache cap. Long tracks take
-time to prepare. No high-resolution-lossless or sample-accurate-gapless claim
-is made. Audio originals remain unchanged.
+## Remaining product work
 
-[Windows client acceptance](docs/WINDOWS_ACCEPTANCE.md) covers consumer Windows
-10/11 installation/upgrade, physical media keys, picker/tray/startup/notifications,
-mixed-monitor DPI, output changes/hotplug, long-session resources and listening
-quality. Signing credentials were not supplied; SmartScreen warnings may appear.
+1. Supported streaming/catalog/search/download integration.
+2. Google sign-in and playlist/account sync, with authorized application setup.
+3. Remaining source integrations, network sources and faithful UI/motion behavior:
+   canvas/translation, Last.fm, official Discord presence, shared listening, direct
+   SMB/addons and remaining source differences.
+4. Whole-product integration and physical Windows 10/11 acceptance.
+5. Full installer publication, followed by the website link replacement.
 
-Prem explicitly requested publishing the Windows code and release assets. PR #1
-is merged into main and the approved Windows preview is public. The website at
-[https://podium-air-website.pages.dev/](https://podium-air-website.pages.dev/)
-has separate “Download Podium Air for Android” and “Download Podium Air for
-Windows” links with their platform logos. The Windows link targets the permanent
-preview MSI; the existing Android release updater affects only Android links.
+The original master prompt requires supported, authorized provider access.
+[The exact provider dependency](docs/STREAMING_PROVIDER_DECISION.md) remains
+unresolved; ordinary Google OAuth/Data API access does not grant native audio-only
+background/download capability. No cookie login or private extraction path is
+claimed. This is a genuine core input dependency, while the other listed source
+differences are still incomplete work.
 
-[Website verification run 38016631060](https://github.com/kaizen-flims/Podium-Air-Website/actions/runs/38016631060)
-passed Chromium checks at 1440/768/390/320px, platform labels/logos/URLs,
-Android-update isolation and a live production HTTP 200 check. Desktop and mobile
-screenshots were inspected. Cloudflare reported successful deployment of website
-commit `f3e79165643812ee56da96b08417396d6e19d9c6`.
-
-Android source/releases and automatic updates remain unchanged. Target-platform
-compilation and checks ran in Windows Actions; the Linux workspace could not
-fetch required build dependencies. Consumer-device acceptance remains pending.
+[FEATURE_PARITY.md](FEATURE_PARITY.md) records scope-specific statuses and
+[Windows acceptance](docs/WINDOWS_ACCEPTANCE.md) records physical-device checks.
+No source/feature scaffolding is presented as a complete Windows Podium Air release.
