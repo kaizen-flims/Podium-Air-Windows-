@@ -142,7 +142,7 @@ class GoogleAccountTest {
             assertNull(connection.state.value.identity); assertTrue(connection.state.value.playlists.isEmpty())
         } finally { release.countDown(); connection.close(); scope.cancel(); server.stop(0) }
     }
-    @Test fun redirectsMalformedTokenAndOversizedResponsesAreNotAccepted() = runBlocking {
+    @Test fun redirectsMalformedTokenAndOversizedResponsesAreNotAccepted(): Unit = runBlocking {
         var mode = 0
         val server = server { e -> when (mode) {
             0 -> { e.responseHeaders.add("Location", "https://attacker.invalid/"); reply(e, "{}", 302) }

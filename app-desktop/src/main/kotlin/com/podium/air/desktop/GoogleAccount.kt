@@ -94,11 +94,14 @@ internal class GoogleCallback(private val timeoutMs: Long = 180000) : AutoClosea
             if (Thread.currentThread().isInterrupted) throw InterruptedException()
             val connection = try { socket.accept() } catch (_: SocketTimeoutException) { continue }
             connection.use { peer ->
-                peer.soTimeout = 2500
+                val peerDeadline = minOf(deadline, System.nanoTime() + 2500000000)
                 var status = 400; var accepted: String? = null; var denied = false
                 try {
                     val bytes = ArrayList<Byte>(); val input = peer.getInputStream()
                     while (bytes.size < 16384) {
+                        val remaining = peerDeadline - System.nanoTime()
+                        require(remaining > 0)
+                        peer.soTimeout = ((remaining / 1000000) + 1).coerceIn(1, 2500).toInt()
                         val next = input.read(); if (next < 0) break; bytes.add(next.toByte())
                         if (bytes.size >= 4 && bytes.takeLast(4) == listOf(13.toByte(), 10.toByte(), 13.toByte(), 10.toByte())) break
                     }

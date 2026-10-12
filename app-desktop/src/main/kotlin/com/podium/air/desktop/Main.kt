@@ -173,7 +173,11 @@ fun main(args: Array<String>) {
                 }
             }, onSmokeFailure = { error ->
                 val result = args.firstOrNull { it.startsWith("--result=") }?.substringAfter("=") ?: "ui-smoke.txt"
-                File(result).writeText("FAIL: ${error.javaClass.simpleName}: ${error.message}\n")
+                File(result).writeText("FAIL: ${error.javaClass.simpleName}: ${error.message}\n${error.stackTraceToString()}\n")
+                args.firstOrNull { it.startsWith("--screenshots=") }?.substringAfter("=")?.let { path -> runCatching {
+                    val directory = File(path).apply { mkdirs() }
+                    ImageIO.write(Robot().createScreenCapture(Rectangle(window.locationOnScreen, window.size)), "png", File(directory, "failure.png"))
+                } }
                 error.printStackTrace(); mediaControls?.close(); model.close(); FxRuntime.exit(); exitProcess(1)
             }, onReady = {
                 if (smoke) {

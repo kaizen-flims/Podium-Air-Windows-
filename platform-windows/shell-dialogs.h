@@ -35,7 +35,7 @@ std::vector<std::wstring> choose(std::string const& mode, HWND owner, std::wstri
     if (mode == "--save-image") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_OVERWRITEPROMPT | FOS_STRICTFILETYPES);
     if (mode == "--pick-folder") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_PICKFOLDERS);
     if (mode == "--pick-files") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST);
-    if (mode == "--pick-oauth") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_FILEMUSTEXIST | FOS_STRICTFILETYPES);
+    if (mode == "--pick-oauth") options = static_cast<FILEOPENDIALOGOPTIONS>(options | FOS_FILEMUSTEXIST);
     check_hresult(dialog->SetOptions(options));
     if (mode != "--pick-folder") {
         COMDLG_FILTERSPEC images[] = {{L"PNG image", L"*.png"}};

@@ -209,8 +209,14 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
             if (smoke && googleFixtureFile != null) {
                 route = Route(Page.ACCOUNT)
                 withTimeout(5000) { model.googleAccount.first { !it.busy } }
-                val picked = WindowsFilePicker.chooseForSmoke("--pick-oauth", googleFixtureFile.name, googleFixtureFile.parentFile, 1).single()
-                check(java.nio.file.Files.isSameFile(picked.toPath(), googleFixtureFile.toPath()))
+                val pickerFixture = withContext(Dispatchers.IO) {
+                    require(googleFixtureFile.isFile) { "Google fixture configuration file was not found." }
+                    val directory = java.nio.file.Files.createTempDirectory("podium-google-picker-").toFile()
+                    googleFixtureFile.copyTo(File(directory, "Google 音.json"))
+                }
+                val picked = WindowsFilePicker.chooseForSmoke("--pick-oauth", pickerFixture.name, pickerFixture.parentFile, 1).singleOrNull()
+                    ?: error("Google OAuth picker was cancelled before choosing the fixture JSON.")
+                check(java.nio.file.Files.isSameFile(picked.toPath(), pickerFixture.toPath()))
                 model.configureGoogle(picked)
                 withTimeout(5000) { model.googleAccount.first { it.configured && !it.busy } }
                 model.signInGoogle()
@@ -228,6 +234,7 @@ fun PodiumApp(model: DesktopModel, filePicker: (Boolean) -> Unit, playlistPicker
                 check(!disconnected.saved && disconnected.identity == null && disconnected.playlists.isEmpty())
                 model.forgetGoogleClient()
                 withTimeout(5000) { model.googleAccount.first { !it.busy && !it.configured } }
+                withContext(Dispatchers.IO) { pickerFixture.parentFile.deleteRecursively() }
                 delay(400); onSmokePage("google-disconnected-light")
                 onReady(); return@LaunchedEffect
             }
